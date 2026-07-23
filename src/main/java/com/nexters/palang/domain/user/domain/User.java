@@ -12,8 +12,9 @@ import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.UuidGenerator;
 
 @Getter
 @Entity
@@ -28,9 +29,9 @@ import org.hibernate.annotations.UuidGenerator;
 public class User extends BaseEntity {
 
     @Id
-    @UuidGenerator
-    @Column(name = "id", columnDefinition = "CHAR(36)", nullable = false, updatable = false)
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", updatable = false)
+    private Long id;
 
     @Column(name = "nickname", length = 15, nullable = false)
     private String nickname;

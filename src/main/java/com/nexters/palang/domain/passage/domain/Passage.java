@@ -15,8 +15,9 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import org.hibernate.annotations.Check;
-import org.hibernate.annotations.UuidGenerator;
 
 @Getter
 @Entity
@@ -29,9 +30,9 @@ import org.hibernate.annotations.UuidGenerator;
 public class Passage extends BaseEntity {
 
     @Id
-    @UuidGenerator
-    @Column(name = "id", columnDefinition = "CHAR(36)", nullable = false, updatable = false)
-    private String id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", updatable = false)
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "book_id", nullable = false)
