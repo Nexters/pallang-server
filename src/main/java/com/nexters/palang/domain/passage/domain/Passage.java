@@ -1,7 +1,7 @@
 package com.nexters.palang.domain.passage.domain;
 
 import com.nexters.palang.domain.book.domain.Book;
-import com.nexters.palang.domain.common.BaseEntity;
+import com.nexters.palang.global.common.entity.BaseEntity;
 import com.nexters.palang.domain.user.domain.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

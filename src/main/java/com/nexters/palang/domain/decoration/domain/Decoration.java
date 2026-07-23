@@ -1,6 +1,6 @@
 package com.nexters.palang.domain.decoration.domain;
 
-import com.nexters.palang.domain.common.BaseEntity;
+import com.nexters.palang.global.common.entity.BaseEntity;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
