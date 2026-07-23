@@ -24,3 +24,15 @@ spring:
         jdbc:
           time_zone: Asia/Seoul
     open-in-view: false
+
+  # 3. 파일 업로드 설정 (OCR용 이미지 업로드)
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+# 4. 네이버 클로바 OCR 연동 설정
+clova:
+  ocr:
+    invoke-url: ${CLOVA_OCR_INVOKE_URL:}
+    secret-key: ${CLOVA_OCR_SECRET_KEY:}
