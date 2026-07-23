@@ -35,13 +35,7 @@ public class PassageController implements PassageControllerDocs {
 
     @PostMapping
     public DataResponse<PassageResponse.Detail> createPassage(@Valid @RequestBody PassageRequest.Create request) {
-        Passage passage = passageService.addPassage(
-                request.bookId(),
-                request.creatorId(),
-                request.pageNumber(),
-                request.quotedText(),
-                request.isSpoiler()
-        );
+        Passage passage = passageService.addPassage(request);
         return DataResponse.from(PassageResponse.Detail.from(passage));
     }
 }
