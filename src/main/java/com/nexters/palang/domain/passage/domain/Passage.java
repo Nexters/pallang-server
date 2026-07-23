@@ -1,8 +1,8 @@
-package com.nexters.palang.passage.domain;
+package com.nexters.palang.domain.passage.domain;
 
-import com.nexters.palang.book.domain.Book;
-import com.nexters.palang.common.BaseEntity;
-import com.nexters.palang.user.domain.User;
+import com.nexters.palang.domain.book.domain.Book;
+import com.nexters.palang.domain.common.BaseEntity;
+import com.nexters.palang.domain.user.domain.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

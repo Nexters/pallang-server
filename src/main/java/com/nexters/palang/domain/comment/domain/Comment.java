@@ -1,8 +1,8 @@
-package com.nexters.palang.comment.domain;
+package com.nexters.palang.domain.comment.domain;
 
-import com.nexters.palang.common.BaseEntity;
-import com.nexters.palang.opinion.domain.Opinion;
-import com.nexters.palang.user.domain.User;
+import com.nexters.palang.domain.common.BaseEntity;
+import com.nexters.palang.domain.opinion.domain.Opinion;
+import com.nexters.palang.domain.user.domain.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;

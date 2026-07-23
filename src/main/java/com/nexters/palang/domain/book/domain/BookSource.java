@@ -1,4 +1,4 @@
-package com.nexters.palang.book.domain;
+package com.nexters.palang.domain.book.domain;
 
 public enum BookSource {
     API,

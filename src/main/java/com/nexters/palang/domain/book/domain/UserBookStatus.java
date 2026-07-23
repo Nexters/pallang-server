@@ -1,7 +1,7 @@
-package com.nexters.palang.book.domain;
+package com.nexters.palang.domain.book.domain;
 
-import com.nexters.palang.common.BaseEntity;
-import com.nexters.palang.user.domain.User;
+import com.nexters.palang.domain.common.BaseEntity;
+import com.nexters.palang.domain.user.domain.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

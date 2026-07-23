@@ -1,4 +1,4 @@
-package com.nexters.palang.common;
+package com.nexters.palang.domain.common;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
