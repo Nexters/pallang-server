@@ -9,7 +9,6 @@ import com.nexters.palang.domain.passage.common.error.PassageException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
@@ -18,12 +17,15 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 @Component
-@RequiredArgsConstructor
 public class ClovaOcrClient implements OcrClient {
 
-    private final ClovaOcrProperties properties;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private final RestClient restClient = RestClient.create();
+    private final ObjectMapper objectMapper;
+    private final RestClient restClient;
+
+    public ClovaOcrClient(ObjectMapper clovaObjectMapper, RestClient clovaOcrRestClient) {
+        this.objectMapper = clovaObjectMapper;
+        this.restClient = clovaOcrRestClient;
+    }
 
     // 이미지 바이트 배열을 네이버 클로바 OCR API로 전송하여 텍스트 인식
     @Override
@@ -60,8 +62,6 @@ public class ClovaOcrClient implements OcrClient {
     private ClovaOcrResponse requestOcr(MultipartBodyBuilder bodyBuilder) {
         try {
             ClovaOcrResponse response = restClient.post()
-                    .uri(properties.invokeUrl())
-                    .header("X-OCR-SECRET", properties.secretKey())
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(bodyBuilder.build())
                     .retrieve()
@@ -99,7 +99,7 @@ public class ClovaOcrClient implements OcrClient {
         }
     }
 
-    // Content-Type에 따라 이미지 포맷 문자열 추출
+    // Content-Type에 따라 이미지 포맷 문자열 추출.
     private String resolveFormat(String contentType) {
         if (MediaType.IMAGE_PNG_VALUE.equals(contentType)) {
             return "png";
@@ -107,6 +107,7 @@ public class ClovaOcrClient implements OcrClient {
         if (MediaType.IMAGE_JPEG_VALUE.equals(contentType)) {
             return "jpg";
         }
-        throw new PassageException(PassageErrorCode.INVALID_IMAGE_FILE);
+        // 지원 포맷(JPEG/PNG) 여부는 PassageOcrService에서 미리 검증
+        throw new IllegalStateException("지원하지 않는 이미지 포맷입니다: " + contentType);
     }
 }
