@@ -4,6 +4,7 @@ import com.nexters.palang.domain.passage.application.PassageOcrService;
 import com.nexters.palang.domain.passage.application.PassageService;
 import com.nexters.palang.domain.passage.application.dto.OcrResultDto;
 import com.nexters.palang.domain.passage.domain.Passage;
+import com.nexters.palang.domain.passage.presentation.docs.PassageControllerDocs;
 import com.nexters.palang.domain.passage.presentation.request.PassageRequest;
 import com.nexters.palang.domain.passage.presentation.response.PassageResponse;
 import com.nexters.palang.global.common.response.DataResponse;
@@ -21,7 +22,7 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/passages")
 @RequiredArgsConstructor
-public class PassageController {
+public class PassageController implements PassageControllerDocs {
 
     private final PassageOcrService passageOcrService;
     private final PassageService passageService;
