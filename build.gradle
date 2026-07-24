@@ -21,6 +21,8 @@ dependencies {
 	// Web & Validation
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	// 알라딘 외부 API 호출용 WebClient (WebMVC와 병행 사용, reactive 서버로 전환 아님)
+	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 
 	// Database & Cache
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
@@ -29,8 +31,14 @@ dependencies {
 	runtimeOnly 'com.h2database:h2'
 	runtimeOnly 'com.mysql:mysql-connector-j'
 
+	// QueryDSL
+	implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
+	annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
+	annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+	annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+
 	// Swagger
-	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.0'
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
 
 	// Lombok
 	compileOnly 'org.projectlombok:lombok'
@@ -47,4 +55,23 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+// QueryDSL Q-class generated source directory
+def querydslDir = 'src/main/generated'
+
+sourceSets {
+	main {
+		java {
+			srcDirs += [querydslDir]
+		}
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.generatedSourceOutputDirectory = file(querydslDir)
+}
+
+clean {
+	delete file(querydslDir)
 }

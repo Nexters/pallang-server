@@ -66,3 +66,6 @@ desktop.ini
 ### Logs ###
 *.log
 logs/
+
+### QueryDSL ###
+src/main/generated/
