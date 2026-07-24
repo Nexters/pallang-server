@@ -4,6 +4,8 @@ import com.nexters.palang.global.common.entity.BaseEntity;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
@@ -43,18 +45,23 @@ public class Decoration extends BaseEntity {
     @Column(name = "end_offset", nullable = false)
     private int endOffset;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "effect_type", length = 30, nullable = false)
-    private String effectType;
+    private EffectType effectType;
 
     @Column(name = "color", length = 20, nullable = false)
     private String color;
 
     @Builder
-    private Decoration(Opinion opinion, int startOffset, int endOffset, String effectType, String color) {
+    private Decoration(Opinion opinion, int startOffset, int endOffset, EffectType effectType, String color) {
         this.opinion = opinion;
         this.startOffset = startOffset;
         this.endOffset = endOffset;
         this.effectType = effectType;
         this.color = color != null ? color : "#PRIMARY";
+    }
+
+    public void assignOpinion(Opinion opinion) {
+        this.opinion = opinion;
     }
 }
