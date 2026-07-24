@@ -1,3 +1,5 @@
 spring:
   application:
     name: palang
+  profiles:
+    active: local
