@@ -31,6 +31,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Comment extends BaseEntity {
 
+    public static final int CONTENT_MAX_LENGTH = 500;
+    public static final int CONTENT_COLUMN_LENGTH = 1000;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false)
@@ -49,7 +52,7 @@ public class Comment extends BaseEntity {
     @JoinColumn(name = "parent_comment_id")
     private Comment parentComment;
 
-    @Column(name = "content", length = CommentPolicy.CONTENT_COLUMN_LENGTH, nullable = false)
+    @Column(name = "content", length = CONTENT_COLUMN_LENGTH, nullable = false)
     private String content;
 
     @Column(name = "deleted_at")

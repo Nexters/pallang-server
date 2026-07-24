@@ -28,12 +28,14 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseEntity {
 
+    public static final int NICKNAME_MAX_LENGTH = 15;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false)
     private Long id;
 
-    @Column(name = "nickname", length = UserPolicy.NICKNAME_MAX_LENGTH, nullable = false)
+    @Column(name = "nickname", length = NICKNAME_MAX_LENGTH, nullable = false)
     private String nickname;
 
     @Column(name = "nickname_updated_at")

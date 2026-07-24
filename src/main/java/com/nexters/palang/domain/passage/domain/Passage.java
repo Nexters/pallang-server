@@ -32,6 +32,8 @@ import org.hibernate.annotations.Check;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Passage extends BaseEntity {
 
+    public static final int QUOTED_TEXT_MAX_LENGTH = 150;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false)
@@ -48,7 +50,7 @@ public class Passage extends BaseEntity {
     @Column(name = "page_number", nullable = false)
     private int pageNumber;
 
-    @Column(name = "quoted_text", length = PassagePolicy.QUOTED_TEXT_MAX_LENGTH, nullable = false)
+    @Column(name = "quoted_text", length = QUOTED_TEXT_MAX_LENGTH, nullable = false)
     private String quotedText;
 
     @Column(name = "is_spoiler", nullable = false)

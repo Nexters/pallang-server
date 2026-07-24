@@ -39,6 +39,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Opinion extends BaseEntity {
 
+    public static final int CONTENT_MAX_LENGTH = 500;
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false)
@@ -52,7 +54,7 @@ public class Opinion extends BaseEntity {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(name = "content", length = OpinionPolicy.CONTENT_MAX_LENGTH, nullable = false)
+    @Column(name = "content", length = CONTENT_MAX_LENGTH, nullable = false)
     private String content;
 
     // opinion_likes 테이블에 대한 INSERT/DELETE 트리거로 DB에서 직접 동기화되는 캐시 값
