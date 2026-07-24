@@ -23,7 +23,10 @@ import org.hibernate.annotations.Check;
 @Entity
 @Table(
         name = "passages",
-        indexes = @Index(name = "idx_passages_book_page", columnList = "book_id, page_number")
+        indexes = {
+                @Index(name = "idx_passages_book_page", columnList = "book_id, page_number"),
+                @Index(name = "idx_passages_book_hash", columnList = "book_id, normalized_hash")
+        }
 )
 @Check(constraints = "page_number > 0")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -45,18 +48,23 @@ public class Passage extends BaseEntity {
     @Column(name = "page_number", nullable = false)
     private int pageNumber;
 
-    @Column(name = "quoted_text", length = 150, nullable = false)
+    @Column(name = "quoted_text", length = PassagePolicy.QUOTED_TEXT_MAX_LENGTH, nullable = false)
     private String quotedText;
 
     @Column(name = "is_spoiler", nullable = false)
     private boolean isSpoiler;
 
+    // 유사 문장 판정(FR-WRITE-07)용: quotedText에서 공백·구두점 제거 후 정규화한 SHA-256 해시
+    @Column(name = "normalized_hash", length = 64, nullable = false)
+    private String normalizedHash;
+
     @Builder
-    private Passage(Book book, User creator, int pageNumber, String quotedText, boolean isSpoiler) {
+    private Passage(Book book, User creator, int pageNumber, String quotedText, boolean isSpoiler, String normalizedHash) {
         this.book = book;
         this.creator = creator;
         this.pageNumber = pageNumber;
         this.quotedText = quotedText;
         this.isSpoiler = isSpoiler;
+        this.normalizedHash = normalizedHash;
     }
 }
