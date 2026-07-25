@@ -51,6 +51,10 @@ dependencies {
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+	// Dotenv
+	implementation platform('me.paulschwarz:spring-dotenv-bom:5.1.0')
+	developmentOnly 'me.paulschwarz:springboot4-dotenv'
 }
 
 tasks.named('test') {

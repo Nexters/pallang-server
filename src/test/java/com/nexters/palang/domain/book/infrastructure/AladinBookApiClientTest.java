@@ -6,7 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 
 import com.nexters.palang.domain.book.application.ExternalBookResult;
-import com.nexters.palang.domain.book.common.ExternalBookSearchException;
+import com.nexters.palang.domain.book.common.error.BookException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -121,13 +121,13 @@ class AladinBookApiClientTest {
     }
 
     @Test
-    @DisplayName("알라딘 검색 요청이 실패하면 ExternalBookSearchException을 던진다")
-    void searchThrowsExternalBookSearchExceptionWhenAladinFails() {
+    @DisplayName("알라딘 검색 요청이 실패하면 BookException을 던진다")
+    void searchThrowsBookExceptionWhenAladinFails() {
         given(exchangeFunction.exchange(any())).willReturn(
                 Mono.just(ClientResponse.create(HttpStatus.INTERNAL_SERVER_ERROR).body("error").build()));
 
         assertThatThrownBy(() -> aladinBookApiClient().search("프랑켄슈타인", PageRequest.of(0, 20)))
-                .isInstanceOf(ExternalBookSearchException.class);
+                .isInstanceOf(BookException.class);
     }
 
     @Test

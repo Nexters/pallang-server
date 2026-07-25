@@ -1,4 +1,4 @@
-package com.nexters.palang.domain.book.common;
+package com.nexters.palang.domain.book.common.error;
 
 import com.nexters.palang.global.common.error.BaseErrorCode;
 import lombok.AllArgsConstructor;
@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 @AllArgsConstructor
 public enum BookErrorCode implements BaseErrorCode {
 
+    BOOK_NOT_FOUND(HttpStatus.NOT_FOUND, "BOOK_404_1", "해당 도서를 찾을 수 없습니다."),
     EXTERNAL_SEARCH_FAILED(HttpStatus.BAD_REQUEST, "BOOK_400_1", "외부 도서 검색에 실패했습니다. 잠시 후 다시 시도해주세요."),
     ;
 

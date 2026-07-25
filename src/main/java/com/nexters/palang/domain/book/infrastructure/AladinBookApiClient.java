@@ -1,7 +1,8 @@
 package com.nexters.palang.domain.book.infrastructure;
 
 import com.nexters.palang.domain.book.application.ExternalBookResult;
-import com.nexters.palang.domain.book.common.ExternalBookSearchException;
+import com.nexters.palang.domain.book.common.error.BookErrorCode;
+import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.infrastructure.dto.AladinItem;
 import com.nexters.palang.domain.book.infrastructure.dto.AladinItemSearchResponse;
 import java.util.List;
@@ -63,7 +64,7 @@ public class AladinBookApiClient {
                     .collectList()
                     .block();
         } catch (RuntimeException e) {
-            throw new ExternalBookSearchException(e);
+            throw new BookException(BookErrorCode.EXTERNAL_SEARCH_FAILED, e);
         }
 
         long totalResults = response.totalResults() != null ? response.totalResults() : content.size();
