@@ -12,6 +12,7 @@ import com.nexters.palang.global.config.JpaAuditingConfig;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -109,25 +110,53 @@ class CommentQueryRepositoryTest {
     }
 
     @Test
-    @DisplayName("여러 원댓글의 답글을 부모 ID 목록으로 한 번에 조회한다")
-    void findRepliesByParentIdsGroupsRepliesUnderRequestedParents() {
+    @DisplayName("여러 원댓글의 답글 개수를 부모 ID별로 집계한다")
+    void countRepliesByParentIdsCountsPerParent() {
+        Comment root1 = root("첫 댓글");
+        Comment root2 = root("둘째 댓글");
+        reply(root1, "첫 댓글의 답글1");
+        reply(root1, "첫 댓글의 답글2");
+        reply(root2, "둘째 댓글의 답글");
+
+        Map<Long, Long> counts = commentQueryRepository.countRepliesByParentIds(List.of(root1.getId(), root2.getId()));
+
+        assertThat(counts).containsEntry(root1.getId(), 2L).containsEntry(root2.getId(), 1L);
+    }
+
+    @Test
+    @DisplayName("부모 ID 목록이 비어 있으면 빈 개수 맵을 반환한다")
+    void countRepliesByParentIdsReturnsEmptyForEmptyInput() {
+        Map<Long, Long> counts = commentQueryRepository.countRepliesByParentIds(List.of());
+
+        assertThat(counts).isEmpty();
+    }
+
+    @Test
+    @DisplayName("답글 미리보기는 부모마다 지정한 개수만큼만 오래된 순으로 조회한다")
+    void findReplyPreviewsByParentIdsLimitsToPreviewSizePerParent() {
         Comment root1 = root("첫 댓글");
         Comment root2 = root("둘째 댓글");
         Comment root1Reply1 = reply(root1, "첫 댓글의 답글1");
         Comment root1Reply2 = reply(root1, "첫 댓글의 답글2");
-        reply(root2, "둘째 댓글의 답글");
+        for (int i = 3; i <= 6; i++) {
+            reply(root1, "첫 댓글의 답글" + i);
+        }
+        Comment root2Reply = reply(root2, "둘째 댓글의 답글");
 
-        List<Comment> results = commentQueryRepository.findRepliesByParentIds(List.of(root1.getId()));
+        Map<Long, List<Comment>> previews = commentQueryRepository.findReplyPreviewsByParentIds(
+                List.of(root1.getId(), root2.getId()), 2);
 
-        assertThat(results).extracting(Comment::getId).containsExactly(root1Reply1.getId(), root1Reply2.getId());
+        assertThat(previews.get(root1.getId())).extracting(Comment::getId)
+                .containsExactly(root1Reply1.getId(), root1Reply2.getId());
+        assertThat(previews.get(root2.getId())).extracting(Comment::getId).containsExactly(root2Reply.getId());
     }
 
     @Test
-    @DisplayName("부모 ID 목록이 비어 있으면 빈 목록을 반환한다")
-    void findRepliesByParentIdsReturnsEmptyForEmptyInput() {
-        List<Comment> results = commentQueryRepository.findRepliesByParentIds(List.of());
+    @DisplayName("부모 ID 목록이 비어 있으면 빈 미리보기 맵을 반환한다")
+    void findReplyPreviewsByParentIdsReturnsEmptyForEmptyInput() {
+        Map<Long, List<Comment>> previews = commentQueryRepository.findReplyPreviewsByParentIds(List.of(), 5);
 
-        assertThat(results).isEmpty();
+        assertThat(previews).isEmpty();
     }
 
     @Test
