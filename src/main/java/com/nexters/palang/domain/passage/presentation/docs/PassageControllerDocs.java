@@ -44,16 +44,27 @@ public interface PassageControllerDocs {
             @RequestPart("image") MultipartFile image
     );
 
-    @Operation(summary = "대목 생성", description = "도서에 새로운 대목을 등록합니다.")
+    @Operation(summary = "유사 문장 후보 조회", description = "저장 전 같은 도서의 인접 페이지(±1)에서 정규화 해시가 같은 대목 후보를 조회합니다. "
+            + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인). (FR-WRITE-07)")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "대목 등록 성공"),
+            @ApiResponse(responseCode = "200", description = "조회 성공 (후보가 없으면 빈 배열)"),
             @ApiResponse(
-                    responseCode = "404", 
-                    description = "BOOK_404_1: 해당 도서를 찾을 수 없습니다.<br>USER_404_1: 해당 사용자를 찾을 수 없습니다.", 
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(value = "{\"type\":\"/api/v1/passages\",\"title\":\"BOOK_404_1\",\"status\":404,\"detail\":\"해당 도서를 찾을 수 없습니다.\"}"))
+                    responseCode = "400",
+                    description = "필수값 누락 또는 인용 문구 150자 초과 (COMMON_400_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "AUTH_401_1: 로그인이 필요합니다.",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "BOOK_404_1: 해당 도서를 찾을 수 없습니다.",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(value = "{\"type\":\"/api/v1/passages/similar-check\",\"title\":\"BOOK_404_1\",\"status\":404,\"detail\":\"해당 도서를 찾을 수 없습니다.\"}"))
             )
     })
-    DataResponse<PassageResponse.Detail> createPassage(
-            @Valid @RequestBody PassageRequest.Create request
+    DataResponse<PassageResponse.SimilarCandidates> checkSimilarPassages(
+            @Valid @RequestBody PassageRequest.SimilarCheck request
     );
 }

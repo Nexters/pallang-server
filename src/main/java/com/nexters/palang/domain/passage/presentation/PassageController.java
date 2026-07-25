@@ -1,13 +1,14 @@
 package com.nexters.palang.domain.passage.presentation;
 
 import com.nexters.palang.domain.passage.application.PassageOcrService;
-import com.nexters.palang.domain.passage.application.PassageService;
+import com.nexters.palang.domain.passage.application.SimilarPassageFinder;
+import com.nexters.palang.domain.passage.application.SimilarPassageProjection;
 import com.nexters.palang.domain.passage.application.dto.OcrResultDto;
-import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.presentation.docs.PassageControllerDocs;
 import com.nexters.palang.domain.passage.presentation.request.PassageRequest;
 import com.nexters.palang.domain.passage.presentation.response.PassageResponse;
 import com.nexters.palang.global.common.response.DataResponse;
+import com.nexters.palang.global.security.CurrentUserProvider;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +26,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class PassageController implements PassageControllerDocs {
 
     private final PassageOcrService passageOcrService;
-    private final PassageService passageService;
+    private final SimilarPassageFinder similarPassageFinder;
+    private final CurrentUserProvider currentUserProvider;
 
     @PostMapping(path = "/ocr", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public DataResponse<PassageResponse.OcrRecognize> createOcrResult(@RequestPart("image") MultipartFile image) {
@@ -33,9 +35,13 @@ public class PassageController implements PassageControllerDocs {
         return DataResponse.from(PassageResponse.OcrRecognize.from(blocks));
     }
 
-    @PostMapping
-    public DataResponse<PassageResponse.Detail> createPassage(@Valid @RequestBody PassageRequest.Create request) {
-        Passage passage = passageService.addPassage(request);
-        return DataResponse.from(PassageResponse.Detail.from(passage));
+    @PostMapping("/similar-check")
+    public DataResponse<PassageResponse.SimilarCandidates> checkSimilarPassages(
+            @Valid @RequestBody PassageRequest.SimilarCheck request) {
+        // 조회 결과는 유저 무관하게 동일하지만, 인증 필요 엔드포인트이므로 로그인 여부만 확인한다.
+        currentUserProvider.getCurrentUserId();
+        List<SimilarPassageProjection> candidates = similarPassageFinder.find(
+                request.bookId(), request.pageNumber(), request.quotedText());
+        return DataResponse.from(PassageResponse.SimilarCandidates.from(candidates));
     }
 }
