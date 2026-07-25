@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.opinion.domain;
 
 import com.nexters.palang.domain.decoration.domain.Decoration;
+import com.nexters.palang.domain.decoration.domain.DecorationRangeValidator;
 import com.nexters.palang.global.common.entity.BaseEntity;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.user.domain.User;
@@ -73,6 +74,20 @@ public class Opinion extends BaseEntity {
         this.user = user;
         this.content = content;
         this.likeCount = 0;
+    }
+
+    // 흔적 작성(직접 입력, FR-WRITE-10): 겹치지 않는 Decoration들과 함께 Opinion을 생성한다.
+    // Decoration 겹침(Q-09/FR-WRITE-09)은 같은 Opinion 안의 형제 엔티티끼리만 비교하면 판단 가능한
+    // 생성 시점 불변식이라 Comment.root()/reply()와 같은 방식으로 정적 팩토리에서 차단한다.
+    public static Opinion createWithDecorations(Passage passage, User user, String content, List<Decoration> decorations) {
+        DecorationRangeValidator.validate(decorations);
+        Opinion opinion = Opinion.builder()
+                .passage(passage)
+                .user(user)
+                .content(content)
+                .build();
+        decorations.forEach(opinion::addDecoration);
+        return opinion;
     }
 
     public void addDecoration(Decoration decoration) {
