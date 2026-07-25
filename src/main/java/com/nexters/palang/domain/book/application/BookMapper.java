@@ -7,7 +7,8 @@ import com.nexters.palang.domain.book.presentation.dto.BookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookResponse;
 import com.nexters.palang.domain.book.presentation.dto.ExternalBookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.ExternalBookResponse;
-import java.util.List;
+import com.nexters.palang.global.common.response.PageInfo;
+import org.springframework.data.domain.Page;
 
 public final class BookMapper {
 
@@ -20,8 +21,8 @@ public final class BookMapper {
                 book.getPageCount(), book.getIsbn(), book.getCoverImageUrl(), book.getSource());
     }
 
-    public static BookListResponse toListResponse(List<Book> books) {
-        return new BookListResponse(books.stream().map(BookMapper::toResponse).toList());
+    public static BookListResponse toListResponse(Page<Book> books) {
+        return new BookListResponse(books.map(BookMapper::toResponse).getContent(), PageInfo.from(books));
     }
 
     public static ExternalBookResponse toExternalResponse(ExternalBookResult result) {
@@ -30,8 +31,9 @@ public final class BookMapper {
                 result.isbn(), result.coverImageUrl());
     }
 
-    public static ExternalBookListResponse toExternalListResponse(List<ExternalBookResult> results) {
-        return new ExternalBookListResponse(results.stream().map(BookMapper::toExternalResponse).toList());
+    public static ExternalBookListResponse toExternalListResponse(Page<ExternalBookResult> results) {
+        return new ExternalBookListResponse(
+                results.map(BookMapper::toExternalResponse).getContent(), PageInfo.from(results));
     }
 
     public static BookActivityResponse toActivityResponse(BookActivityProjection projection) {
@@ -40,7 +42,8 @@ public final class BookMapper {
                 projection.coverImageUrl(), projection.passageCount(), projection.opinionCount());
     }
 
-    public static BookActivityListResponse toActivityListResponse(List<BookActivityProjection> projections) {
-        return new BookActivityListResponse(projections.stream().map(BookMapper::toActivityResponse).toList());
+    public static BookActivityListResponse toActivityListResponse(Page<BookActivityProjection> projections) {
+        return new BookActivityListResponse(
+                projections.map(BookMapper::toActivityResponse).getContent(), PageInfo.from(projections));
     }
 }

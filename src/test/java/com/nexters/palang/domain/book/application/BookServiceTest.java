@@ -2,8 +2,6 @@ package com.nexters.palang.domain.book.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -21,6 +19,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,11 +58,12 @@ class BookServiceTest {
     @Test
     @DisplayName("키워드로 외부 검색을 하면 알라딘 API 클라이언트의 결과를 그대로 반환한다")
     void searchExternalBooks() {
-        List<ExternalBookResult> expected = List.of(
-                new ExternalBookResult("제목", "작가", "출판사", "isbn", "cover"));
-        given(aladinBookApiClient.search("제목")).willReturn(expected);
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<ExternalBookResult> expected = new PageImpl<>(
+                List.of(new ExternalBookResult("제목", "작가", "출판사", "isbn", "cover")), pageable, 1);
+        given(aladinBookApiClient.search("제목", pageable)).willReturn(expected);
 
-        List<ExternalBookResult> results = bookService.searchExternalBooks("제목");
+        Page<ExternalBookResult> results = bookService.searchExternalBooks("제목", pageable);
 
         assertThat(results).isEqualTo(expected);
     }
@@ -68,12 +71,14 @@ class BookServiceTest {
     @Test
     @DisplayName("키워드로 내부 도서를 검색하면 제목에 포함된 도서 목록을 반환한다")
     void searchInternalBooks() {
+        Pageable pageable = PageRequest.of(0, 20);
         Book book = book(1L, "프랑켄슈타인");
-        given(bookRepository.findByTitleContainingIgnoreCase("프랑")).willReturn(List.of(book));
+        given(bookRepository.findByTitleContainingIgnoreCase("프랑", pageable))
+                .willReturn(new PageImpl<>(List.of(book), pageable, 1));
 
-        List<Book> results = bookService.searchInternalBooks("프랑");
+        Page<Book> results = bookService.searchInternalBooks("프랑", pageable);
 
-        assertThat(results).containsExactly(book);
+        assertThat(results.getContent()).containsExactly(book);
     }
 
     @Test
@@ -93,27 +98,30 @@ class BookServiceTest {
     @Test
     @DisplayName("내가 최근에 남긴 도서 목록은 최근 활동 순서를 그대로 유지한다")
     void getRecentBooksKeepsActivityOrder() {
+        Pageable pageable = PageRequest.of(0, 20);
         Book book1 = book(1L, "책1");
         Book book2 = book(2L, "책2");
         Book book3 = book(3L, "책3");
-        given(bookQueryRepository.findRecentlyActiveBookIds(anyLong(), anyInt()))
-                .willReturn(List.of(3L, 1L, 2L));
+        given(bookQueryRepository.findRecentlyActiveBookIds(10L, pageable))
+                .willReturn(new PageImpl<>(List.of(3L, 1L, 2L), pageable, 3));
         given(bookRepository.findAllById(List.of(3L, 1L, 2L)))
                 .willReturn(List.of(book1, book2, book3));
 
-        List<Book> results = bookService.getRecentBooks(10L);
+        Page<Book> results = bookService.getRecentBooks(10L, pageable);
 
-        assertThat(results).containsExactly(book3, book1, book2);
+        assertThat(results.getContent()).containsExactly(book3, book1, book2);
+        assertThat(results.getTotalElements()).isEqualTo(3);
     }
 
     @Test
     @DisplayName("인기 도서 목록을 조회하면 QueryRepository 결과를 그대로 반환한다")
     void getPopularBooks() {
-        List<BookActivityProjection> expected = List.of(
-                new BookActivityProjection(1L, "책1", "작가", "cover", 5, 10));
-        given(bookQueryRepository.findPopularBooks(anyInt())).willReturn(expected);
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<BookActivityProjection> expected = new PageImpl<>(
+                List.of(new BookActivityProjection(1L, "책1", "작가", "cover", 5, 10)), pageable, 1);
+        given(bookQueryRepository.findPopularBooks(pageable)).willReturn(expected);
 
-        List<BookActivityProjection> results = bookService.getPopularBooks();
+        Page<BookActivityProjection> results = bookService.getPopularBooks(pageable);
 
         assertThat(results).isEqualTo(expected);
     }

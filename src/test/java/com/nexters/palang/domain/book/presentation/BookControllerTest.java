@@ -1,7 +1,10 @@
 package com.nexters.palang.domain.book.presentation;
 
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -18,8 +21,12 @@ import com.nexters.palang.global.security.CurrentUserProvider;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -39,6 +46,8 @@ class BookControllerTest {
     @MockitoBean
     private CurrentUserProvider currentUserProvider;
 
+    private static final Pageable DEFAULT_PAGEABLE = PageRequest.of(0, 20);
+
     private Book book(Long id, String title) {
         Book book = Book.builder()
                 .title(title)
@@ -54,18 +63,21 @@ class BookControllerTest {
     @Test
     @DisplayName("키워드로 도서 외부 검색을 요청하면 결과 목록을 반환한다")
     void searchExternalBooks() throws Exception {
-        given(bookService.searchExternalBooks(anyString())).willReturn(
-                List.of(new ExternalBookResult("제목", "작가", "출판사", "isbn", "cover")));
+        given(bookService.searchExternalBooks(eq("제목"), any(Pageable.class))).willReturn(
+                new PageImpl<>(List.of(new ExternalBookResult("제목", "작가", "출판사", "isbn", "cover")),
+                        DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/search").param("keyword", "제목"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.books[0].title").value("제목"));
+                .andExpect(jsonPath("$.data.books[0].title").value("제목"))
+                .andExpect(jsonPath("$.data.pageInfo.totalElements").value(1));
     }
 
     @Test
     @DisplayName("키워드로 도서 내부 검색을 요청하면 등록된 도서 목록을 반환한다")
     void searchInternalBooks() throws Exception {
-        given(bookService.searchInternalBooks(anyString())).willReturn(List.of(book(1L, "제목")));
+        given(bookService.searchInternalBooks(eq("제목"), any(Pageable.class))).willReturn(
+                new PageImpl<>(List.of(book(1L, "제목")), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/internal-search").param("keyword", "제목"))
                 .andExpect(status().isOk())
@@ -77,7 +89,7 @@ class BookControllerTest {
     @DisplayName("필수 항목을 채워 도서를 직접 등록하면 등록된 도서를 반환한다")
     void createBook() throws Exception {
         CreateBookRequest request = new CreateBookRequest("제목", "작가", "출판사", 300, "isbn", "cover");
-        given(bookService.createBook(org.mockito.ArgumentMatchers.any())).willReturn(book(1L, "제목"));
+        given(bookService.createBook(any())).willReturn(book(1L, "제목"));
 
         mockMvc.perform(post("/api/books")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -101,8 +113,9 @@ class BookControllerTest {
     @Test
     @DisplayName("홈 캐러셀 도서 목록을 요청하면 대목/흔적 수와 함께 반환한다")
     void getHomeCarouselBooks() throws Exception {
-        given(bookService.getHomeCarouselBooks()).willReturn(
-                List.of(new BookActivityProjection(1L, "제목", "작가", "cover", 3, 7)));
+        given(bookService.getHomeCarouselBooks(any(Pageable.class))).willReturn(
+                new PageImpl<>(List.of(new BookActivityProjection(1L, "제목", "작가", "cover", 3, 7)),
+                        DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/home/books"))
                 .andExpect(status().isOk())
@@ -114,7 +127,8 @@ class BookControllerTest {
     @DisplayName("내가 최근에 남긴 도서 목록을 요청하면 현재 사용자 기준으로 조회한다")
     void getRecentBooks() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(bookService.getRecentBooks(1L)).willReturn(List.of(book(1L, "최근 책")));
+        given(bookService.getRecentBooks(eq(1L), any(Pageable.class))).willReturn(
+                new PageImpl<>(List.of(book(1L, "최근 책")), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/recent"))
                 .andExpect(status().isOk())
@@ -124,11 +138,27 @@ class BookControllerTest {
     @Test
     @DisplayName("인기 도서 목록을 요청하면 흔적 많은 순 목록을 반환한다")
     void getPopularBooks() throws Exception {
-        given(bookService.getPopularBooks()).willReturn(
-                List.of(new BookActivityProjection(1L, "인기 도서", "작가", "cover", 3, 10)));
+        given(bookService.getPopularBooks(any(Pageable.class))).willReturn(
+                new PageImpl<>(List.of(new BookActivityProjection(1L, "인기 도서", "작가", "cover", 3, 10)),
+                        DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/popular"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.books[0].opinionCount").value(10));
+    }
+
+    @Test
+    @DisplayName("page/size 파라미터를 주면 그 값으로 Pageable을 구성해서 서비스에 전달한다")
+    void getPopularBooksUsesGivenPageAndSize() throws Exception {
+        given(bookService.getPopularBooks(any(Pageable.class))).willReturn(
+                new PageImpl<>(List.of(), PageRequest.of(2, 5), 0));
+
+        mockMvc.perform(get("/api/books/popular").param("page", "2").param("size", "5"))
+                .andExpect(status().isOk());
+
+        ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
+        verify(bookService).getPopularBooks(captor.capture());
+        assertThat(captor.getValue().getPageNumber()).isEqualTo(2);
+        assertThat(captor.getValue().getPageSize()).isEqualTo(5);
     }
 }

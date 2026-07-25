@@ -11,6 +11,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,19 +22,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class BookService {
 
-    private static final int RECENT_BOOKS_LIMIT = 10;
-    private static final int POPULAR_BOOKS_LIMIT = 20;
-
     private final BookRepository bookRepository;
     private final BookQueryRepository bookQueryRepository;
     private final AladinBookApiClient aladinBookApiClient;
 
-    public List<ExternalBookResult> searchExternalBooks(String keyword) {
-        return aladinBookApiClient.search(keyword);
+    public Page<ExternalBookResult> searchExternalBooks(String keyword, Pageable pageable) {
+        return aladinBookApiClient.search(keyword, pageable);
     }
 
-    public List<Book> searchInternalBooks(String keyword) {
-        return bookRepository.findByTitleContainingIgnoreCase(keyword);
+    public Page<Book> searchInternalBooks(String keyword, Pageable pageable) {
+        return bookRepository.findByTitleContainingIgnoreCase(keyword, pageable);
     }
 
     @Transactional
@@ -48,18 +48,19 @@ public class BookService {
         return bookRepository.save(book);
     }
 
-    public List<BookActivityProjection> getHomeCarouselBooks() {
-        return bookQueryRepository.findCarouselBooks();
+    public Page<BookActivityProjection> getHomeCarouselBooks(Pageable pageable) {
+        return bookQueryRepository.findCarouselBooks(pageable);
     }
 
-    public List<Book> getRecentBooks(Long userId) {
-        List<Long> bookIds = bookQueryRepository.findRecentlyActiveBookIds(userId, RECENT_BOOKS_LIMIT);
-        Map<Long, Book> booksById = bookRepository.findAllById(bookIds).stream()
+    public Page<Book> getRecentBooks(Long userId, Pageable pageable) {
+        Page<Long> bookIds = bookQueryRepository.findRecentlyActiveBookIds(userId, pageable);
+        Map<Long, Book> booksById = bookRepository.findAllById(bookIds.getContent()).stream()
                 .collect(Collectors.toMap(Book::getId, book -> book));
-        return bookIds.stream().map(booksById::get).filter(Objects::nonNull).toList();
+        List<Book> books = bookIds.getContent().stream().map(booksById::get).filter(Objects::nonNull).toList();
+        return new PageImpl<>(books, pageable, bookIds.getTotalElements());
     }
 
-    public List<BookActivityProjection> getPopularBooks() {
-        return bookQueryRepository.findPopularBooks(POPULAR_BOOKS_LIMIT);
+    public Page<BookActivityProjection> getPopularBooks(Pageable pageable) {
+        return bookQueryRepository.findPopularBooks(pageable);
     }
 }

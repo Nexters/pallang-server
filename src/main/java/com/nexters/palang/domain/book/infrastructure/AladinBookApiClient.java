@@ -5,6 +5,9 @@ import com.nexters.palang.domain.book.infrastructure.dto.AladinItem;
 import com.nexters.palang.domain.book.infrastructure.dto.AladinItemSearchResponse;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -12,7 +15,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 public class AladinBookApiClient {
 
     private static final String VERSION = "20131101";
-    private static final int MAX_RESULTS = 20;
 
     private final WebClient aladinWebClient;
     private final String ttbKey;
@@ -22,15 +24,19 @@ public class AladinBookApiClient {
         this.ttbKey = ttbKey;
     }
 
-    public List<ExternalBookResult> search(String keyword) {
+    public Page<ExternalBookResult> search(String keyword, Pageable pageable) {
+        // 알라딘 start는 1부터 시작하는 인덱스
+        int start = (int) pageable.getOffset() + 1;
+        int maxResults = pageable.getPageSize();
+
         AladinItemSearchResponse response = aladinWebClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/ItemSearch.aspx")
                         .queryParam("ttbkey", ttbKey)
                         .queryParam("Query", keyword)
                         .queryParam("QueryType", "Title")
-                        .queryParam("MaxResults", MAX_RESULTS)
-                        .queryParam("start", 1)
+                        .queryParam("MaxResults", maxResults)
+                        .queryParam("start", start)
                         .queryParam("SearchTarget", "Book")
                         .queryParam("output", "js")
                         .queryParam("Version", VERSION)
@@ -40,9 +46,11 @@ public class AladinBookApiClient {
                 .block();
 
         if (response == null || response.item() == null) {
-            return List.of();
+            return new PageImpl<>(List.of(), pageable, 0);
         }
-        return response.item().stream().map(this::toExternalBookResult).toList();
+        List<ExternalBookResult> content = response.item().stream().map(this::toExternalBookResult).toList();
+        long totalResults = response.totalResults() != null ? response.totalResults() : content.size();
+        return new PageImpl<>(content, pageable, totalResults);
     }
 
     private ExternalBookResult toExternalBookResult(AladinItem item) {

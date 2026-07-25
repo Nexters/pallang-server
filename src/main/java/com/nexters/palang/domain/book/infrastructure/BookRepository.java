@@ -1,10 +1,11 @@
 package com.nexters.palang.domain.book.infrastructure;
 
 import com.nexters.palang.domain.book.domain.Book;
-import java.util.List;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface BookRepository extends JpaRepository<Book, Long> {
 
-    List<Book> findByTitleContainingIgnoreCase(String keyword);
+    Page<Book> findByTitleContainingIgnoreCase(String keyword, Pageable pageable);
 }

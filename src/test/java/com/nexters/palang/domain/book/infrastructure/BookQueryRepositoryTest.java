@@ -8,17 +8,22 @@ import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.user.domain.SnsProvider;
 import com.nexters.palang.domain.user.domain.User;
+import com.nexters.palang.global.config.JpaAuditingConfig;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.LocalDateTime;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
+import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @DataJpaTest
+@Import(JpaAuditingConfig.class)
 class BookQueryRepositoryTest {
 
     @Autowired
@@ -79,14 +84,30 @@ class BookQueryRepositoryTest {
         opinion(passage1, writer);
         opinion(passage1, writer);
 
-        List<BookActivityProjection> results = bookQueryRepository.findCarouselBooks();
+        Page<BookActivityProjection> results = bookQueryRepository.findCarouselBooks(PageRequest.of(0, 20));
 
-        assertThat(results).extracting(BookActivityProjection::bookId)
+        assertThat(results.getContent()).extracting(BookActivityProjection::bookId)
                 .containsExactly(bookWithPassages.getId());
-        assertThat(results.get(0).passageCount()).isEqualTo(2);
-        assertThat(results.get(0).opinionCount()).isEqualTo(2);
+        assertThat(results.getContent().get(0).passageCount()).isEqualTo(2);
+        assertThat(results.getContent().get(0).opinionCount()).isEqualTo(2);
         assertThat(bookWithoutPassages.getId()).isNotIn(
                 results.stream().map(BookActivityProjection::bookId).toList());
+    }
+
+    @Test
+    @DisplayName("캐러셀 조회는 요청한 페이지 크기만큼만 반환하고 전체 개수를 함께 알려준다")
+    void findCarouselBooksRespectsPageSize() {
+        User writer = user("writer-page");
+        Book book1 = book("책1");
+        Book book2 = book("책2");
+        passage(book1, writer, 1);
+        passage(book2, writer, 1);
+
+        Page<BookActivityProjection> firstPage = bookQueryRepository.findCarouselBooks(PageRequest.of(0, 1));
+
+        assertThat(firstPage.getContent()).hasSize(1);
+        assertThat(firstPage.getTotalElements()).isEqualTo(2);
+        assertThat(firstPage.hasNext()).isTrue();
     }
 
     @Test
@@ -101,9 +122,9 @@ class BookQueryRepositoryTest {
         opinion(popularPassage, writer);
         opinion(lessPopularPassage, writer);
 
-        List<BookActivityProjection> results = bookQueryRepository.findPopularBooks(10);
+        Page<BookActivityProjection> results = bookQueryRepository.findPopularBooks(PageRequest.of(0, 10));
 
-        assertThat(results).extracting(BookActivityProjection::bookId)
+        assertThat(results.getContent()).extracting(BookActivityProjection::bookId)
                 .containsExactly(popularBook.getId(), lessPopularBook.getId());
     }
 
@@ -117,8 +138,10 @@ class BookQueryRepositoryTest {
         passage(myBook, me, 1);
         passage(othersBook, other, 1);
 
-        List<Long> results = bookQueryRepository.findRecentlyActiveBookIds(me.getId(), 10);
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Long> results = bookQueryRepository.findRecentlyActiveBookIds(me.getId(), pageable);
 
-        assertThat(results).containsExactly(myBook.getId());
+        assertThat(results.getContent()).containsExactly(myBook.getId());
+        assertThat(results.getTotalElements()).isEqualTo(1);
     }
 }
