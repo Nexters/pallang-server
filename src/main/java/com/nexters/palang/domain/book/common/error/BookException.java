@@ -7,4 +7,9 @@ public class BookException extends AppException {
     public BookException(BookErrorCode errorCode) {
         super(errorCode);
     }
+
+    public BookException(BookErrorCode errorCode, Throwable cause) {
+        super(errorCode);
+        initCause(cause);
+    }
 }

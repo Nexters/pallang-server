@@ -3,3 +3,7 @@ spring:
     name: palang
   profiles:
     active: local
+
+aladin:
+  base-url: https://www.aladin.co.kr/ttb/api
+  ttb-key: ${ALADIN_TTB_KEY:}
