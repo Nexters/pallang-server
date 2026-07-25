@@ -269,7 +269,7 @@ PLANNED  → passage.pageNumber == MIN(pageNumber) (해당 책의 첫 대목만)
 |---|---|---|---|
 | GET | /api/books/search?keyword= | - | 알라딘 외부 검색 |
 | GET | /api/books/internal-search?keyword= | - | 내부 DB 검색 (FR-HOME-03) |
-| POST | /api/books | 필요* | 직접 등록 |
+| POST | /api/books | - | 직접 등록 (누구나 등록 가능, 인증 불필요) |
 | GET | /api/home/books | - | 홈 캐러셀 (FR-HOME-01,02) |
 | GET | /api/books/recent | 필요* | 내가 최근 남긴 책 목록 (FR-WRITE-01) |
 | GET | /api/books/popular | - | 흔적 많은 책 순 |
