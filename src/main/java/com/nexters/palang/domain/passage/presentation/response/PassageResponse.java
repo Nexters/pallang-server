@@ -1,28 +1,27 @@
 package com.nexters.palang.domain.passage.presentation.response;
 
+import com.nexters.palang.domain.passage.application.SimilarPassageProjection;
 import com.nexters.palang.domain.passage.application.dto.OcrResultDto;
-import com.nexters.palang.domain.passage.domain.Passage;
-import java.time.LocalDateTime;
 import java.util.List;
 
 public class PassageResponse {
 
-    public record Detail(
-            Long id,
-            Long bookId,
-            int pageNumber,
-            String quotedText,
-            boolean isSpoiler,
-            LocalDateTime createdAt
-    ) {
-        public static Detail from(Passage passage) {
-            return new Detail(
-                    passage.getId(),
-                    passage.getBook().getId(),
-                    passage.getPageNumber(),
-                    passage.getQuotedText(),
-                    passage.isSpoiler(),
-                    passage.getCreatedAt()
+    public record SimilarCandidates(List<SimilarCandidate> passages) {
+        public static SimilarCandidates from(List<SimilarPassageProjection> projections) {
+            List<SimilarCandidate> candidates = projections.stream()
+                    .map(SimilarCandidate::from)
+                    .toList();
+            return new SimilarCandidates(candidates);
+        }
+    }
+
+    public record SimilarCandidate(Long passageId, String quotedText, int pageNumber, long opinionCount) {
+        public static SimilarCandidate from(SimilarPassageProjection projection) {
+            return new SimilarCandidate(
+                    projection.passageId(),
+                    projection.quotedText(),
+                    projection.pageNumber(),
+                    projection.opinionCount()
             );
         }
     }
