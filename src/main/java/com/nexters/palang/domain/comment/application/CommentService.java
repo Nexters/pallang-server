@@ -15,7 +15,6 @@ import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -40,18 +39,19 @@ public class CommentService {
 
         Page<Comment> roots = commentQueryRepository.findRootComments(opinionId, pageable);
         List<Long> rootIds = roots.getContent().stream().map(Comment::getId).toList();
-        Map<Long, List<Comment>> repliesByParentId = commentQueryRepository.findRepliesByParentIds(rootIds).stream()
-                .collect(Collectors.groupingBy(reply -> reply.getParentComment().getId()));
+        Map<Long, Long> replyCounts = commentQueryRepository.countRepliesByParentIds(rootIds);
+        Map<Long, List<Comment>> replyPreviews =
+                commentQueryRepository.findReplyPreviewsByParentIds(rootIds, REPLY_PREVIEW_SIZE);
 
-        return roots.map(root -> {
-            List<Comment> replies = repliesByParentId.getOrDefault(root.getId(), List.of());
-            List<Comment> preview = replies.stream().limit(REPLY_PREVIEW_SIZE).toList();
-            return new RootCommentGroup(root, preview, replies.size());
-        });
+        return roots.map(root -> new RootCommentGroup(
+                root,
+                replyPreviews.getOrDefault(root.getId(), List.of()),
+                replyCounts.getOrDefault(root.getId(), 0L)));
     }
 
     public Page<Comment> getReplies(Long parentCommentId, Pageable pageable) {
-        getExistingComment(parentCommentId);
+        Comment parent = getExistingComment(parentCommentId);
+        getExistingOpinion(parent.getOpinion().getId());
         return commentQueryRepository.findReplies(parentCommentId, pageable);
     }
 
@@ -64,7 +64,7 @@ public class CommentService {
             return commentRepository.save(Comment.root(opinion, user, request.content()));
         }
 
-        Comment parent = getExistingComment(request.parentCommentId());
+        Comment parent = getEditableComment(request.parentCommentId());
         if (!parent.getOpinion().getId().equals(opinionId)) {
             throw new CommentException(CommentErrorCode.COMMENT_NOT_FOUND);
         }

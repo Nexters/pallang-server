@@ -54,7 +54,8 @@ public interface CommentApi {
 
     @Operation(summary = "댓글/답글 작성",
             description = "흔적에 댓글 또는 답글을 작성합니다. parentCommentId가 없으면 원댓글, 있으면 답글로 생성됩니다. "
-                    + "답글에는 다시 답글을 남길 수 없습니다(1-depth). X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
+                    + "답글에는 다시 답글을 남길 수 없습니다(1-depth). 삭제된 댓글을 부모로 답글을 작성할 수 없습니다. "
+                    + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "작성 성공"),
             @ApiResponse(responseCode = "400", description = "내용 누락/500자 초과 (COMMON_400_1) "

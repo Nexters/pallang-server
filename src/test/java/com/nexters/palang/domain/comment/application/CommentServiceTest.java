@@ -18,6 +18,7 @@ import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -55,8 +56,8 @@ class CommentServiceTest {
     @BeforeEach
     void setUp() {
         commentService = new CommentService(commentRepository, commentQueryRepository, opinionRepository, userRepository);
-        opinion = opinion(1L);
         writer = user(10L);
+        opinion = opinion(1L);
         otherUser = user(20L);
     }
 
@@ -113,11 +114,14 @@ class CommentServiceTest {
         given(commentQueryRepository.findRootComments(1L, pageable))
                 .willReturn(new PageImpl<>(List.of(root1, root2), pageable, 2));
 
-        List<Comment> root1Replies = List.of(
+        List<Comment> root1Preview = List.of(
                 replyComment(11L, root1, writer), replyComment(12L, root1, writer),
                 replyComment(13L, root1, writer), replyComment(14L, root1, writer),
-                replyComment(15L, root1, writer), replyComment(16L, root1, writer));
-        given(commentQueryRepository.findRepliesByParentIds(List.of(1L, 2L))).willReturn(root1Replies);
+                replyComment(15L, root1, writer));
+        given(commentQueryRepository.countRepliesByParentIds(List.of(1L, 2L)))
+                .willReturn(Map.of(1L, 6L));
+        given(commentQueryRepository.findReplyPreviewsByParentIds(List.of(1L, 2L), 5))
+                .willReturn(Map.of(1L, root1Preview));
 
         Page<RootCommentGroup> results = commentService.getRootComments(1L, pageable);
 
@@ -146,6 +150,7 @@ class CommentServiceTest {
     void getRepliesReturnsPageFromQueryRepository() {
         Comment root = rootComment(1L, opinion, writer);
         given(commentRepository.findById(1L)).willReturn(Optional.of(root));
+        given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
         Pageable pageable = PageRequest.of(0, 5);
         Page<Comment> expected = new PageImpl<>(List.of(replyComment(11L, root, writer)), pageable, 1);
         given(commentQueryRepository.findReplies(1L, pageable)).willReturn(expected);
@@ -153,6 +158,18 @@ class CommentServiceTest {
         Page<Comment> results = commentService.getReplies(1L, pageable);
 
         assertThat(results).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("삭제된 흔적의 답글을 조회하면 예외가 발생한다")
+    void getRepliesFailsWhenOpinionDeleted() {
+        Comment root = rootComment(1L, opinion, writer);
+        given(commentRepository.findById(1L)).willReturn(Optional.of(root));
+        opinion.delete();
+        given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
+
+        assertThatThrownBy(() -> commentService.getReplies(1L, PageRequest.of(0, 20)))
+                .isInstanceOf(OpinionException.class);
     }
 
     @Test
@@ -210,6 +227,18 @@ class CommentServiceTest {
         Comment parentOfOtherOpinion = rootComment(1L, otherOpinion, writer);
         given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
         given(commentRepository.findById(1L)).willReturn(Optional.of(parentOfOtherOpinion));
+
+        assertThatThrownBy(() -> commentService.createComment(1L, 10L, new CreateCommentRequest(1L, "내용")))
+                .isInstanceOf(CommentException.class);
+    }
+
+    @Test
+    @DisplayName("삭제된 부모 댓글에 답글을 작성하면 예외가 발생한다")
+    void createReplyFailsWhenParentIsDeleted() {
+        Comment root = rootComment(1L, opinion, writer);
+        root.delete();
+        given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
+        given(commentRepository.findById(1L)).willReturn(Optional.of(root));
 
         assertThatThrownBy(() -> commentService.createComment(1L, 10L, new CreateCommentRequest(1L, "내용")))
                 .isInstanceOf(CommentException.class);

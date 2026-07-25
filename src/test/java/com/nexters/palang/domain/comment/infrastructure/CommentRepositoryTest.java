@@ -53,6 +53,8 @@ class CommentRepositoryTest {
     @DisplayName("원댓글을 저장하면 부모 댓글 없이 조회된다")
     void saveRootComment() {
         Comment saved = commentRepository.save(Comment.root(opinion, writer, "원댓글"));
+        entityManager.flush();
+        entityManager.clear();
 
         Optional<Comment> found = commentRepository.findById(saved.getId());
 
@@ -66,6 +68,8 @@ class CommentRepositoryTest {
     void saveReplyComment() {
         Comment root = commentRepository.save(Comment.root(opinion, writer, "원댓글"));
         Comment reply = commentRepository.save(Comment.reply(root, writer, "답글"));
+        entityManager.flush();
+        entityManager.clear();
 
         Optional<Comment> found = commentRepository.findById(reply.getId());
 
