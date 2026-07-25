@@ -8,6 +8,7 @@ public record AladinItem(
         String author,
         String publisher,
         String isbn13,
-        String cover
+        String cover,
+        AladinSubInfo subInfo
 ) {
 }

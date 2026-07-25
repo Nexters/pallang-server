@@ -60,7 +60,7 @@ class BookServiceTest {
     void searchExternalBooks() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<ExternalBookResult> expected = new PageImpl<>(
-                List.of(new ExternalBookResult("제목", "작가", "출판사", "isbn", "cover")), pageable, 1);
+                List.of(new ExternalBookResult("제목", "작가", "출판사", 300, "isbn", "cover")), pageable, 1);
         given(aladinBookApiClient.search("제목", pageable)).willReturn(expected);
 
         Page<ExternalBookResult> results = bookService.searchExternalBooks("제목", pageable);
