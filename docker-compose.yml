@@ -2,15 +2,18 @@
 # Nginx는 컨테이너로 띄우지 않고 호스트에 직접 설치한다 (deploy/nginx, deploy/scripts 참고).
 #
 # 사용법:
-#   cp deploy/.env.example .env   # 값 채운 뒤
-#   docker compose up -d --build
+#   - 수동 배포: cp deploy/.env.example .env 후 값 채우고 docker compose up -d --build
+#     (IMAGE_TAG 미지정 시 latest로 로컬 빌드)
+#   - CD(.github/workflows/cd.yml) 배포: 서버에서 IMAGE_TAG를 export한 뒤
+#     docker compose pull && docker compose up -d --remove-orphans 실행
+#     (ghcr.io/nexters/palang-server 이미지를 그대로 pull, 로컬 재빌드 없음)
 
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    image: pallang-app:latest
+    image: ghcr.io/nexters/palang-server:${IMAGE_TAG:-latest}
     container_name: pallang-app
     restart: unless-stopped
     env_file:
