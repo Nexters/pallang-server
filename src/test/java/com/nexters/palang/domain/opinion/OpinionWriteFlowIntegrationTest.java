@@ -117,7 +117,7 @@ class OpinionWriteFlowIntegrationTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("DECORATION_400_2"));
 
-        // 5. 읽기상태 설정 (upsert 확인을 위해 두 번 호출)
+        // 5. 읽기상태 최초 설정 (레코드가 없으므로 생성 경로)
         String bookStatusBody = """
                 {"bookId": %d, "status": "READING", "currentPage": 50}
                 """.formatted(bookId);
@@ -129,6 +129,19 @@ class OpinionWriteFlowIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.currentPage").value(50));
 
+        // 6. 같은 유저/도서로 다시 설정 (이번엔 레코드가 있으므로 갱신 경로 — currentPage가 새 값으로 바뀌어야 한다)
+        String bookStatusUpdateBody = """
+                {"bookId": %d, "status": "READING", "currentPage": 80}
+                """.formatted(bookId);
+
+        mockMvc.perform(put("/api/users/me/book-status")
+                        .header("X-Debug-User-Id", userId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(bookStatusUpdateBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.currentPage").value(80));
+
+        // 7. 현재 페이지가 도서의 전체 페이지 수(300)를 초과하면 400
         String bookStatusOverflowBody = """
                 {"bookId": %d, "status": "READING", "currentPage": 9999}
                 """.formatted(bookId);

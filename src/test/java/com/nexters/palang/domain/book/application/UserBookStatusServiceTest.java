@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -84,6 +85,26 @@ class UserBookStatusServiceTest {
         assertThat(result).isSameAs(existing);
         assertThat(result.getStatus()).isEqualTo(ReadingStatus.READING);
         assertThat(result.getCurrentPage()).isEqualTo(100);
+    }
+
+    @Test
+    @DisplayName("동시 요청이 먼저 레코드를 생성해 유니크 제약 위반이 나면, 그 레코드를 다시 조회해 갱신으로 폴백한다")
+    void updateBookStatusFallsBackToUpdateWhenConcurrentInsertViolatesUniqueConstraint() {
+        Book book = book(10L, 300);
+        UserBookStatus winnerOfRace = UserBookStatus.builder()
+                .user(user(1L)).book(book).status(ReadingStatus.PLANNED).currentPage(null).build();
+        given(bookRepository.findById(10L)).willReturn(Optional.of(book));
+        given(userBookStatusRepository.findByUserIdAndBookId(1L, 10L))
+                .willReturn(Optional.empty(), Optional.of(winnerOfRace));
+        given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+        given(userBookStatusRepository.save(any())).willThrow(new DataIntegrityViolationException("duplicate"));
+
+        UserBookStatus result = userBookStatusService.updateBookStatus(
+                1L, new UpdateUserBookStatusRequest(10L, ReadingStatus.READING, 70));
+
+        assertThat(result).isSameAs(winnerOfRace);
+        assertThat(result.getStatus()).isEqualTo(ReadingStatus.READING);
+        assertThat(result.getCurrentPage()).isEqualTo(70);
     }
 
     @Test

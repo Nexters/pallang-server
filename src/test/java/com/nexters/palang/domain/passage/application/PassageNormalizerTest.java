@@ -27,6 +27,24 @@ class PassageNormalizerTest {
     }
 
     @Test
+    @DisplayName("전각 구두점만 다른 두 문장은 같은 정규화 해시를 갖는다")
+    void fullWidthPunctuationDifferenceProducesSameHash() {
+        String hash1 = PassageNormalizer.normalizedHash("나는 오늘도 걷는다");
+        String hash2 = PassageNormalizer.normalizedHash("나는， 오늘도 걷는다！");
+
+        assertThat(hash1).isEqualTo(hash2);
+    }
+
+    @Test
+    @DisplayName("NBSP(줄바꿈 없는 공백)만 다른 두 문장은 같은 정규화 해시를 갖는다")
+    void nonBreakingSpaceDifferenceProducesSameHash() {
+        String hash1 = PassageNormalizer.normalizedHash("나는 오늘도 걷는다");
+        String hash2 = PassageNormalizer.normalizedHash("나는 오늘도 걷는다");
+
+        assertThat(hash1).isEqualTo(hash2);
+    }
+
+    @Test
     @DisplayName("NFC/NFD 정규화 형태가 다른 두 문장은 같은 정규화 해시를 갖는다")
     void unicodeNormalizationFormDifferenceProducesSameHash() {
         String nfc = Normalizer.normalize("나는 오늘도 걷는다", Normalizer.Form.NFC);

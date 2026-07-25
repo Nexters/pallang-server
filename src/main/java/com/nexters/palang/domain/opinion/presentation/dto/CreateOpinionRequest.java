@@ -20,7 +20,7 @@ public record CreateOpinionRequest(
         int pageNumber,
 
         @NotBlank(message = "인용 문구는 비어 있을 수 없습니다.")
-        @Size(max = Passage.QUOTED_TEXT_MAX_LENGTH, message = "인용 문구는 150자를 초과할 수 없습니다.")
+        @Size(max = Passage.QUOTED_TEXT_MAX_LENGTH, message = "인용 문구는 {max}자를 초과할 수 없습니다.")
         String quotedText,
 
         boolean isSpoiler,
@@ -29,7 +29,7 @@ public record CreateOpinionRequest(
         Long passageId,
 
         @NotBlank(message = "흔적 내용은 비어 있을 수 없습니다.")
-        @Size(max = Opinion.CONTENT_MAX_LENGTH, message = "흔적 내용은 500자를 초과할 수 없습니다.")
+        @Size(max = Opinion.CONTENT_MAX_LENGTH, message = "흔적 내용은 {max}자를 초과할 수 없습니다.")
         String content,
 
         @NotEmpty(message = "꾸밈 효과는 최소 1개 이상이어야 합니다.")

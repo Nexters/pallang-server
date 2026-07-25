@@ -16,7 +16,7 @@ public class PassageRequest {
             int pageNumber,
 
             @NotBlank(message = "인용 문구는 비어 있을 수 없습니다.")
-            @Size(max = Passage.QUOTED_TEXT_MAX_LENGTH, message = "인용 문구는 150자를 초과할 수 없습니다.")
+            @Size(max = Passage.QUOTED_TEXT_MAX_LENGTH, message = "인용 문구는 {max}자를 초과할 수 없습니다.")
             String quotedText
     ) {
     }

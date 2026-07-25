@@ -11,7 +11,8 @@ public final class PassageNormalizer {
 
     // 한글은 입력 환경에 따라 조합형/완성형(NFC/NFD)이 섞여 들어올 수 있어 해싱 전에 NFC로 통일한다.
     // \p{Punct}는 ASCII 전용이라 한글 문장에 흔한 전각 구두점을 놓치므로 유니코드 구두점 카테고리를 사용한다.
-    private static final String NORMALIZE_STRIP_PATTERN = "[\\s\\p{IsPunctuation}]";
+    // \s만으로는 복사/붙여넣기로 섞여 들어오는 NBSP(U+00A0) 같은 유니코드 공백을 못 거르므로 \p{Z}(구분자 카테고리)도 함께 제거한다.
+    private static final String NORMALIZE_STRIP_PATTERN = "[\\s\\p{Z}\\p{IsPunctuation}]";
 
     private PassageNormalizer() {
     }
