@@ -86,8 +86,18 @@ fi
 # ---------------------------------------------------------------------------
 # 방화벽 (UFW) — SSH, HTTP/HTTPS만 허용
 # ---------------------------------------------------------------------------
-log "UFW 방화벽 설정 (OpenSSH, Nginx Full만 허용)"
-ufw allow OpenSSH
+# sshd가 22번이 아닌 포트로 설정돼 있을 수 있으므로, 'OpenSSH' 프로필(22/tcp) 대신
+# 실제 리스닝 포트를 확인해서 허용한다. 안 그러면 ufw enable 직후 SSH 접속이 끊길 수 있다.
+SSH_PORT="22"
+if command -v sshd >/dev/null 2>&1; then
+    DETECTED_PORT="$(sshd -T 2>/dev/null | awk '/^port /{print $2; exit}')"
+    if [[ -n "${DETECTED_PORT}" ]]; then
+        SSH_PORT="${DETECTED_PORT}"
+    fi
+fi
+
+log "UFW 방화벽 설정 (SSH ${SSH_PORT}/tcp, Nginx Full만 허용)"
+ufw allow "${SSH_PORT}/tcp"
 ufw allow 'Nginx Full'
 ufw --force enable
 ufw status verbose
@@ -96,6 +106,13 @@ ufw status verbose
 # Nginx 사이트 등록 + SSL 발급 (domain/email이 주어진 경우에만)
 # ---------------------------------------------------------------------------
 if [[ -n "${DOMAIN}" && -n "${EMAIL}" ]]; then
+    # sed 치환식에 그대로 끼워 넣으므로, 호스트명 형식이 아니면 특수문자를 통한
+    # sed 명령 주입/치환 오염을 막기 위해 미리 형식을 검증한다.
+    if ! [[ "${DOMAIN}" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+$ ]]; then
+        echo "유효하지 않은 도메인 형식입니다: ${DOMAIN}" >&2
+        exit 1
+    fi
+
     log "Nginx 사이트(${DOMAIN}) 등록"
     sed "s/__DOMAIN__/${DOMAIN}/g" "${REPO_ROOT}/deploy/nginx/pallang.conf.template" \
         > "/etc/nginx/sites-available/pallang"
