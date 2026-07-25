@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.book.infrastructure;
 
 import com.nexters.palang.domain.book.application.ExternalBookResult;
+import com.nexters.palang.domain.book.common.ExternalBookSearchException;
 import com.nexters.palang.domain.book.infrastructure.dto.AladinItem;
 import com.nexters.palang.domain.book.infrastructure.dto.AladinItemSearchResponse;
 import java.util.List;
@@ -34,30 +35,36 @@ public class AladinBookApiClient {
         int start = (int) pageable.getOffset() + 1;
         int maxResults = pageable.getPageSize();
 
-        AladinItemSearchResponse response = aladinWebClient.get()
-                .uri(uriBuilder -> uriBuilder
-                        .path("/ItemSearch.aspx")
-                        .queryParam("ttbkey", ttbKey)
-                        .queryParam("Query", keyword)
-                        .queryParam("QueryType", "Title")
-                        .queryParam("MaxResults", maxResults)
-                        .queryParam("start", start)
-                        .queryParam("SearchTarget", "Book")
-                        .queryParam("output", "js")
-                        .queryParam("Version", VERSION)
-                        .build())
-                .retrieve()
-                .bodyToMono(AladinItemSearchResponse.class)
-                .block();
+        AladinItemSearchResponse response;
+        List<ExternalBookResult> content;
+        try {
+            response = aladinWebClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/ItemSearch.aspx")
+                            .queryParam("ttbkey", ttbKey)
+                            .queryParam("Query", keyword)
+                            .queryParam("QueryType", "Title")
+                            .queryParam("MaxResults", maxResults)
+                            .queryParam("start", start)
+                            .queryParam("SearchTarget", "Book")
+                            .queryParam("output", "js")
+                            .queryParam("Version", VERSION)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(AladinItemSearchResponse.class)
+                    .block();
 
-        if (response == null || response.item() == null || response.item().isEmpty()) {
-            return new PageImpl<>(List.of(), pageable, 0);
+            if (response == null || response.item() == null || response.item().isEmpty()) {
+                return new PageImpl<>(List.of(), pageable, 0);
+            }
+
+            content = Flux.fromIterable(response.item())
+                    .flatMap(this::toExternalBookResultWithPageCount, PAGE_COUNT_LOOKUP_CONCURRENCY)
+                    .collectList()
+                    .block();
+        } catch (RuntimeException e) {
+            throw new ExternalBookSearchException(e);
         }
-
-        List<ExternalBookResult> content = Flux.fromIterable(response.item())
-                .flatMap(this::toExternalBookResultWithPageCount, PAGE_COUNT_LOOKUP_CONCURRENCY)
-                .collectList()
-                .block();
 
         long totalResults = response.totalResults() != null ? response.totalResults() : content.size();
         return new PageImpl<>(content, pageable, totalResults);
