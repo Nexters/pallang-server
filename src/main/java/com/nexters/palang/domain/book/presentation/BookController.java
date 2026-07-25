@@ -28,8 +28,6 @@ public class BookController implements BookApi {
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 100;
-    // 외부 검색은 결과마다 알라딘 ItemLookUp을 추가 호출하므로 일일 호출 한도 보호를 위해 더 낮게 제한한다.
-    private static final int EXTERNAL_SEARCH_MAX_SIZE = 20;
 
     private final BookService bookService;
     private final CurrentUserProvider currentUserProvider;
@@ -40,9 +38,8 @@ public class BookController implements BookApi {
             @RequestParam String keyword,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
-        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, EXTERNAL_SEARCH_MAX_SIZE));
         return ResponseEntity.ok(DataResponse.from(
-                BookMapper.toExternalListResponse(bookService.searchExternalBooks(keyword, pageable))));
+                BookMapper.toExternalListResponse(bookService.searchExternalBooks(keyword, pageable(page, size)))));
     }
 
     @Override

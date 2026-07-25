@@ -44,25 +44,14 @@ class AladinBookApiClientTest {
                 .build();
     }
 
-    /**
-     * ItemSearch.aspx 요청에는 검색 결과를, ItemLookUp.aspx 요청에는 페이지수 조회 결과를 반환하도록
-     * 요청 경로에 따라 분기한다 (검색 1회 + 결과별 ItemLookUp 추가 호출 구조를 반영).
-     */
-    private void stubSearchAndLookup(String searchJson, String lookupJson) {
-        given(exchangeFunction.exchange(any())).willAnswer(invocation -> {
-            ClientRequest request = invocation.getArgument(0);
-            String path = request.url().getPath();
-            if (path.endsWith("ItemLookUp.aspx")) {
-                return Mono.just(jsonResponse(lookupJson));
-            }
-            return Mono.just(jsonResponse(searchJson));
-        });
+    private void stubSearch(String searchJson) {
+        given(exchangeFunction.exchange(any())).willReturn(Mono.just(jsonResponse(searchJson)));
     }
 
     @Test
-    @DisplayName("검색 결과마다 ItemLookUp을 추가 호출해 페이지수를 채우고, totalResults를 전체 개수로 사용한다")
-    void searchEnrichesResultsWithPageCountFromItemLookUp() {
-        stubSearchAndLookup("""
+    @DisplayName("검색 결과를 반환하며, 응답 속도를 위해 pageCount는 채우지 않고 항상 null이다")
+    void searchDoesNotEnrichPageCount() {
+        stubSearch("""
                 {
                   "totalResults": 1,
                   "item": [
@@ -75,44 +64,20 @@ class AladinBookApiClientTest {
                     }
                   ]
                 }
-                """, """
-                {
-                  "item": [
-                    { "subInfo": { "itemPage": 550 } }
-                  ]
-                }
                 """);
 
         Page<ExternalBookResult> results = aladinBookApiClient().search("프랑켄슈타인", PageRequest.of(0, 20));
 
         assertThat(results.getContent()).containsExactly(
-                new ExternalBookResult("프랑켄슈타인", "메리 셸리", "문학동네", 550, "9788954429721",
+                new ExternalBookResult("프랑켄슈타인", "메리 셸리", "문학동네", null, "9788954429721",
                         "https://image.aladin.co.kr/cover.jpg"));
         assertThat(results.getTotalElements()).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("ISBN이 없는 결과는 ItemLookUp을 호출하지 않고 페이지수를 null로 둔다")
-    void searchSkipsLookupWhenIsbnMissing() {
-        stubSearchAndLookup("""
-                {
-                  "totalResults": 1,
-                  "item": [
-                    { "title": "ISBN 없는 책", "author": "작가", "publisher": "출판사" }
-                  ]
-                }
-                """, "{}");
-
-        Page<ExternalBookResult> results = aladinBookApiClient().search("ISBN 없는 책", PageRequest.of(0, 20));
-
-        assertThat(results.getContent()).containsExactly(
-                new ExternalBookResult("ISBN 없는 책", "작가", "출판사", null, null, null));
-    }
-
-    @Test
     @DisplayName("검색 결과가 없으면 빈 페이지를 반환한다")
     void searchReturnsEmptyPageWhenNoItems() {
-        stubSearchAndLookup("{}", "{}");
+        stubSearch("{}");
 
         Page<ExternalBookResult> results = aladinBookApiClient().search("없는 책", PageRequest.of(0, 20));
 
