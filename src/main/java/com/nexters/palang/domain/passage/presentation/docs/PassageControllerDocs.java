@@ -51,17 +51,17 @@ public interface PassageControllerDocs {
             @ApiResponse(
                     responseCode = "400",
                     description = "필수값 누락 또는 인용 문구 150자 초과 (COMMON_400_1)",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(value = "{\"type\":\"/api/passages/similar-check\",\"title\":\"COMMON_400_1\",\"status\":400,\"detail\":\"인용 문구는 150자를 초과할 수 없습니다.\"}"))
             ),
             @ApiResponse(
                     responseCode = "401",
                     description = "AUTH_401_1: 로그인이 필요합니다.",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(value = "{\"type\":\"/api/passages/similar-check\",\"title\":\"AUTH_401_1\",\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))
             ),
             @ApiResponse(
                     responseCode = "404",
                     description = "BOOK_404_1: 해당 도서를 찾을 수 없습니다.",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(value = "{\"type\":\"/api/v1/passages/similar-check\",\"title\":\"BOOK_404_1\",\"status\":404,\"detail\":\"해당 도서를 찾을 수 없습니다.\"}"))
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(value = "{\"type\":\"/api/passages/similar-check\",\"title\":\"BOOK_404_1\",\"status\":404,\"detail\":\"해당 도서를 찾을 수 없습니다.\"}"))
             )
     })
     DataResponse<PassageResponse.SimilarCandidates> checkSimilarPassages(

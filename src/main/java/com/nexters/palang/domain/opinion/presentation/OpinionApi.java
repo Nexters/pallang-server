@@ -6,6 +6,7 @@ import com.nexters.palang.global.common.error.ErrorResponse;
 import com.nexters.palang.global.common.response.DataResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -27,12 +28,29 @@ public interface OpinionApi {
                     description = "필수값 누락, 인용 문구/내용 길이 초과(COMMON_400_1), "
                             + "선택한 대목이 지정한 도서와 불일치(PASSAGE_400_2), "
                             + "꾸밈 효과 범위 오류(DECORATION_400_1) 또는 겹침(DECORATION_400_2)",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = {
+                                    @ExampleObject(name = "COMMON_400_1: 필수값 누락/길이 초과", value = "{\"type\":\"/api/opinions\",\"title\":\"COMMON_400_1\",\"status\":400,\"detail\":\"인용 문구는 150자를 초과할 수 없습니다.\"}"),
+                                    @ExampleObject(name = "PASSAGE_400_2: 도서 불일치", value = "{\"type\":\"/api/opinions\",\"title\":\"PASSAGE_400_2\",\"status\":400,\"detail\":\"선택한 대목이 지정한 도서와 일치하지 않습니다.\"}"),
+                                    @ExampleObject(name = "DECORATION_400_1: 꾸밈 범위 오류", value = "{\"type\":\"/api/opinions\",\"title\":\"DECORATION_400_1\",\"status\":400,\"detail\":\"꾸밈 효과의 시작 위치는 끝 위치보다 작아야 합니다.\"}"),
+                                    @ExampleObject(name = "DECORATION_400_2: 꾸밈 영역 겹침", value = "{\"type\":\"/api/opinions\",\"title\":\"DECORATION_400_2\",\"status\":400,\"detail\":\"같은 흔적 안에서는 꾸밈 효과 영역이 겹칠 수 없습니다.\"}")
+                            })
+            ),
             @ApiResponse(responseCode = "401", description = "X-Debug-User-Id 헤더 누락 (AUTH_401_1)",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"type\":\"/api/opinions\",\"title\":\"AUTH_401_1\",\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))
+            ),
             @ApiResponse(responseCode = "404",
                     description = "해당 도서를 찾을 수 없음(BOOK_404_1) 또는 해당 대목을 찾을 수 없음(PASSAGE_404_1)",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = {
+                                    @ExampleObject(name = "BOOK_404_1: 도서 없음", value = "{\"type\":\"/api/opinions\",\"title\":\"BOOK_404_1\",\"status\":404,\"detail\":\"해당 도서를 찾을 수 없습니다.\"}"),
+                                    @ExampleObject(name = "PASSAGE_404_1: 대목 없음", value = "{\"type\":\"/api/opinions\",\"title\":\"PASSAGE_404_1\",\"status\":404,\"detail\":\"해당 대목을 찾을 수 없습니다.\"}")
+                            })
+            )
     })
     ResponseEntity<DataResponse<OpinionResponse>> createOpinion(
             @Valid CreateOpinionRequest request
