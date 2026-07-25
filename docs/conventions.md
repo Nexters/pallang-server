@@ -18,11 +18,7 @@ reference: 파트너플랫폼 스쿼드 코드 컨벤션
 
 | Method | Controller and Service | Repository |
 | --- | --- | --- |
-| Data Read | getUser | findByUser
-
-countByUser
-
-existsByUser |
+| Data Read | getUser | findByUser<br>countByUser<br>existsByUser |
 | Data Insert | createUser | insertUser |
 | Data Delete | removeUser | deleteUser |
 | Data Modify | modifyUser | updateUser |
@@ -443,17 +439,11 @@ HttpStatus를 아래와 같은 기준에 따라 설정합니다.
 
 | code | **의미** | **예시** |
 | --- | --- | --- |
-| 400 | `BAD_REQUEST`
-잘못된 요청이나 문법 | ticketId로 빈 문자열로 요청함 |
-| 401 | `UNAUTHORIZED`
-인증되지 않은 접근 | JWT가 없이 요청함 |
-| 403 | `FORBIDDEN`
-권한 문제 | 다른 사용자가 `요청`한 `티켓`의 ticketId로 요청함 |
-| 404 | `NOT_FOUND`
-존재하지 않는 객체 | 요청된 ticketId의 복호화 값을 ticketId로 갖는 `티켓`이 존재하지 않음 |
-| 409 | `CONFLICT`
-현재 상태와 충돌 | 중복되는 `닉네임`으로 `회원 등록`을 요청함
-현재 `티켓 상태`에서 요청될 수 없는 작업을 요청함 |
+| 400 | `BAD_REQUEST`<br>잘못된 요청이나 문법 | ticketId로 빈 문자열로 요청함 |
+| 401 | `UNAUTHORIZED`<br>인증되지 않은 접근 | JWT가 없이 요청함 |
+| 403 | `FORBIDDEN`<br>권한 문제 | 다른 사용자가 `요청`한 `티켓`의 ticketId로 요청함 |
+| 404 | `NOT_FOUND`<br>존재하지 않는 객체 | 요청된 ticketId의 복호화 값을 ticketId로 갖는 `티켓`이 존재하지 않음 |
+| 409 | `CONFLICT`<br>현재 상태와 충돌 | 중복되는 `닉네임`으로 `회원 등록`을 요청함<br>현재 `티켓 상태`에서 요청될 수 없는 작업을 요청함 |
 
 ### 🔗 Reference
 
