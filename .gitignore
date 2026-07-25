@@ -67,4 +67,7 @@ desktop.ini
 *.log
 logs/
 
+### QueryDSL ###
+src/main/generated/
+
 *.env
