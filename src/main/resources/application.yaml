@@ -5,5 +5,5 @@ spring:
     active: local
 
 aladin:
-  base-url: http://www.aladin.co.kr/ttb/api
+  base-url: https://www.aladin.co.kr/ttb/api
   ttb-key: ${ALADIN_TTB_KEY:}
