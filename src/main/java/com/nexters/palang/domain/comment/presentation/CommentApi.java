@@ -43,7 +43,8 @@ public interface CommentApi {
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "해당 댓글을 찾을 수 없음 (COMMENT_404_1)",
+            @ApiResponse(responseCode = "404", description = "해당 댓글을 찾을 수 없음 (COMMENT_404_1) "
+                    + "또는 해당 댓글이 속한 흔적이 삭제됨 (OPINION_404_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     ResponseEntity<DataResponse<CommentListResponse>> getReplies(
