@@ -18,6 +18,7 @@ import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.book.presentation.dto.CreateBookRequest;
 import com.nexters.palang.global.security.CurrentUserProvider;
+import com.nexters.palang.global.security.LoginRequiredException;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -72,6 +73,22 @@ class BookControllerTest {
                 .andExpect(jsonPath("$.data.books[0].title").value("제목"))
                 .andExpect(jsonPath("$.data.books[0].pageCount").value(300))
                 .andExpect(jsonPath("$.data.pageInfo.totalElements").value(1));
+    }
+
+    @Test
+    @DisplayName("keyword 없이 도서 외부 검색을 요청하면 400 에러가 발생한다")
+    void searchExternalBooksFailsWhenKeywordIsMissing() throws Exception {
+        mockMvc.perform(get("/api/books/search"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("COMMON_400_1"));
+    }
+
+    @Test
+    @DisplayName("size에 숫자가 아닌 값을 주면 400 에러가 발생한다")
+    void searchExternalBooksFailsWhenSizeIsNotNumber() throws Exception {
+        mockMvc.perform(get("/api/books/search").param("keyword", "제목").param("size", "abc"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("COMMON_400_1"));
     }
 
     @Test
@@ -134,6 +151,16 @@ class BookControllerTest {
         mockMvc.perform(get("/api/books/recent"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.books[0].title").value("최근 책"));
+    }
+
+    @Test
+    @DisplayName("인증 없이 내가 최근에 남긴 도서 목록을 요청하면 401 에러가 발생한다")
+    void getRecentBooksFailsWhenUnauthenticated() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willThrow(new LoginRequiredException());
+
+        mockMvc.perform(get("/api/books/recent"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("AUTH_401_1"));
     }
 
     @Test

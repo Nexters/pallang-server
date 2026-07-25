@@ -7,8 +7,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @Slf4j
 @RestControllerAdvice
@@ -35,6 +37,29 @@ public class GlobalExceptionHandler {
         log.error("MethodArgumentNotValidException 발생: {}", detail);
         log.error("에러가 발생한 지점: {} {}", request.getMethod(), request.getRequestURI());
         
+        return ResponseEntity.badRequest()
+                .body(ErrorResponse.of(request.getRequestURI(), GlobalErrorCode.INVALID_INPUT_VALUE, detail));
+    }
+
+    // 필수 쿼리 파라미터가 누락된 경우를 잡는 핸들러 (ex. keyword 없이 검색 요청)
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingServletRequestParameterException(
+            MissingServletRequestParameterException e, HttpServletRequest request) {
+        log.warn("MissingServletRequestParameterException 발생: {}", e.getMessage());
+        log.warn("에러가 발생한 지점: {} {}", request.getMethod(), request.getRequestURI());
+
+        return ResponseEntity.badRequest()
+                .body(ErrorResponse.of(request.getRequestURI(), GlobalErrorCode.INVALID_INPUT_VALUE, e.getMessage()));
+    }
+
+    // 쿼리 파라미터의 타입이 맞지 않는 경우를 잡는 핸들러 (ex. page/size에 숫자가 아닌 값)
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatchException(
+            MethodArgumentTypeMismatchException e, HttpServletRequest request) {
+        log.warn("MethodArgumentTypeMismatchException 발생: {}", e.getMessage());
+        log.warn("에러가 발생한 지점: {} {}", request.getMethod(), request.getRequestURI());
+
+        String detail = "'%s' 파라미터의 값이 올바르지 않습니다.".formatted(e.getName());
         return ResponseEntity.badRequest()
                 .body(ErrorResponse.of(request.getRequestURI(), GlobalErrorCode.INVALID_INPUT_VALUE, detail));
     }
