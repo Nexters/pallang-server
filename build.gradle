@@ -22,7 +22,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
 	// 알라딘 외부 API 호출용 WebClient (WebMVC와 병행 사용, reactive 서버로 전환 아님)
-	implementation 'org.springframework.boot:spring-boot-starter-webflux'
+	implementation 'org.springframework.boot:spring-boot-starter-webclient'
 
 	// Database & Cache
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'

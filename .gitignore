@@ -57,6 +57,8 @@ out/
 *.jks
 *.pem
 *.key
+application-local.yaml
+application-local.yml
 
 ### OS ###
 .DS_Store
