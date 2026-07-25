@@ -34,4 +34,28 @@ class CommentTest {
         assertThatThrownBy(() -> Comment.reply(reply, user, "대댓글의 답글"))
                 .isInstanceOf(NestedReplyNotAllowedException.class);
     }
+
+    @Test
+    @DisplayName("댓글 내용을 수정하면 content가 변경된다")
+    void updateContentChangesContent() {
+        Opinion opinion = Opinion.builder().build();
+        User user = User.builder().build();
+        Comment comment = Comment.root(opinion, user, "원댓글");
+
+        comment.updateContent("수정된 댓글");
+
+        assertThat(comment.getContent()).isEqualTo("수정된 댓글");
+    }
+
+    @Test
+    @DisplayName("댓글을 삭제하면 deletedAt이 설정되고 isDeleted가 true다")
+    void deleteMarksCommentAsDeleted() {
+        Opinion opinion = Opinion.builder().build();
+        User user = User.builder().build();
+        Comment comment = Comment.root(opinion, user, "원댓글");
+
+        comment.delete();
+
+        assertThat(comment.isDeleted()).isTrue();
+    }
 }

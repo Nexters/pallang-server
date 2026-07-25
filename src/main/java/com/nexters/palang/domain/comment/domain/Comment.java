@@ -76,6 +76,10 @@ public class Comment extends BaseEntity {
         return new Comment(parent.opinion, user, parent, content);
     }
 
+    public void updateContent(String content) {
+        this.content = content;
+    }
+
     public void delete() {
         this.deletedAt = LocalDateTime.now();
     }
