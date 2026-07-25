@@ -129,19 +129,34 @@ class BookQueryRepositoryTest {
     }
 
     @Test
-    @DisplayName("내가 최근에 대목을 남긴 도서 id만 조회하고 다른 사용자의 도서는 제외한다")
+    @DisplayName("내가 최근에 흔적을 남긴 도서 id만 조회하고 다른 사용자의 도서는 제외한다")
     void findRecentlyActiveBookIdsOnlyIncludesGivenUser() {
         User me = user("me");
         User other = user("other");
         Book myBook = book("내가 남긴 책");
         Book othersBook = book("다른 사람이 남긴 책");
-        passage(myBook, me, 1);
-        passage(othersBook, other, 1);
+        opinion(passage(myBook, me, 1), me);
+        opinion(passage(othersBook, other, 1), other);
 
         Pageable pageable = PageRequest.of(0, 10);
         Page<Long> results = bookQueryRepository.findRecentlyActiveBookIds(me.getId(), pageable);
 
         assertThat(results.getContent()).containsExactly(myBook.getId());
         assertThat(results.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("직접 대목을 만들지 않고 기존 대목에 흔적만 남긴 도서도 포함한다")
+    void findRecentlyActiveBookIdsIncludesBooksWhereUserOnlyLeftOpinion() {
+        User creator = user("creator");
+        User me = user("opinion-only");
+        Book book = book("다른 사람이 만든 대목에 흔적만 남긴 책");
+        Passage existingPassage = passage(book, creator, 1);
+
+        opinion(existingPassage, me);
+
+        Page<Long> results = bookQueryRepository.findRecentlyActiveBookIds(me.getId(), PageRequest.of(0, 10));
+
+        assertThat(results.getContent()).containsExactly(book.getId());
     }
 }

@@ -32,7 +32,7 @@ public class BookQueryRepository {
                 .innerJoin(passage).on(passage.book.eq(book))
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .groupBy(book.id, book.title, book.author, book.coverImageUrl)
-                .orderBy(passage.createdAt.max().desc())
+                .orderBy(passage.createdAt.max().desc(), book.id.asc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
@@ -53,7 +53,7 @@ public class BookQueryRepository {
                 .innerJoin(passage).on(passage.book.eq(book))
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .groupBy(book.id, book.title, book.author, book.coverImageUrl)
-                .orderBy(opinion.countDistinct().desc())
+                .orderBy(opinion.countDistinct().desc(), book.id.asc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
@@ -61,23 +61,28 @@ public class BookQueryRepository {
         return new PageImpl<>(content, pageable, countBooksWithPassages());
     }
 
+    // "최근에 남긴 책"은 Passage를 새로 만든 책이 아니라 흔적(Opinion)을 남긴 책 기준이다 (FR-WRITE-01).
+    // 기존 Passage에 Opinion만 추가한 경우도 포함해야 하므로 Opinion을 기준으로 조회한다.
     public Page<Long> findRecentlyActiveBookIds(Long userId, Pageable pageable) {
+        QOpinion opinion = QOpinion.opinion;
         QPassage passage = QPassage.passage;
 
         List<Long> content = queryFactory
                 .select(passage.book.id)
-                .from(passage)
-                .where(passage.creator.id.eq(userId))
+                .from(opinion)
+                .join(opinion.passage, passage)
+                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull())
                 .groupBy(passage.book.id)
-                .orderBy(passage.createdAt.max().desc())
+                .orderBy(opinion.createdAt.max().desc(), passage.book.id.asc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
 
         Long total = queryFactory
                 .select(passage.book.countDistinct())
-                .from(passage)
-                .where(passage.creator.id.eq(userId))
+                .from(opinion)
+                .join(opinion.passage, passage)
+                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull())
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
