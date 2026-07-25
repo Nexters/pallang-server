@@ -15,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -26,6 +27,8 @@ public class BookService {
     private final BookQueryRepository bookQueryRepository;
     private final AladinBookApiClient aladinBookApiClient;
 
+    // DB를 사용하지 않고 알라딘 API 호출(최대 수 초)만 하므로, DB 커넥션을 불필요하게 오래 붙잡지 않도록 트랜잭션에서 제외한다.
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Page<ExternalBookResult> searchExternalBooks(String keyword, Pageable pageable) {
         return aladinBookApiClient.search(keyword, pageable);
     }
