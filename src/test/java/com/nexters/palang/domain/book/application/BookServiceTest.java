@@ -57,7 +57,7 @@ class BookServiceTest {
     @DisplayName("키워드로 외부 검색을 하면 알라딘 API 클라이언트의 결과를 그대로 반환한다")
     void searchExternalBooks() {
         List<ExternalBookResult> expected = List.of(
-                new ExternalBookResult("제목", "작가", "출판사", 300, "isbn", "cover"));
+                new ExternalBookResult("제목", "작가", "출판사", "isbn", "cover"));
         given(aladinBookApiClient.search("제목")).willReturn(expected);
 
         List<ExternalBookResult> results = bookService.searchExternalBooks("제목");

@@ -34,8 +34,6 @@ public class AladinBookApiClient {
                         .queryParam("SearchTarget", "Book")
                         .queryParam("output", "js")
                         .queryParam("Version", VERSION)
-                        // subInfo.itemPage(페이지수)는 이 옵션 없이는 응답에 포함되지 않는다.
-                        .queryParam("OptResult", "itemPage")
                         .build())
                 .retrieve()
                 .bodyToMono(AladinItemSearchResponse.class)
@@ -48,7 +46,6 @@ public class AladinBookApiClient {
     }
 
     private ExternalBookResult toExternalBookResult(AladinItem item) {
-        Integer pageCount = item.subInfo() != null ? item.subInfo().itemPage() : null;
-        return new ExternalBookResult(item.title(), item.author(), item.publisher(), pageCount, item.isbn13(), item.cover());
+        return new ExternalBookResult(item.title(), item.author(), item.publisher(), item.isbn13(), item.cover());
     }
 }

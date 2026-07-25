@@ -55,7 +55,7 @@ class BookControllerTest {
     @DisplayName("키워드로 도서 외부 검색을 요청하면 결과 목록을 반환한다")
     void searchExternalBooks() throws Exception {
         given(bookService.searchExternalBooks(anyString())).willReturn(
-                List.of(new ExternalBookResult("제목", "작가", "출판사", 300, "isbn", "cover")));
+                List.of(new ExternalBookResult("제목", "작가", "출판사", "isbn", "cover")));
 
         mockMvc.perform(get("/api/books/search").param("keyword", "제목"))
                 .andExpect(status().isOk())

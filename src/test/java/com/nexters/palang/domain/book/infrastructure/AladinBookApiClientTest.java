@@ -42,8 +42,7 @@ class AladinBookApiClientTest {
                       "author": "메리 셸리",
                       "publisher": "문학동네",
                       "isbn13": "9788954429721",
-                      "cover": "https://image.aladin.co.kr/cover.jpg",
-                      "subInfo": { "itemPage": 550 }
+                      "cover": "https://image.aladin.co.kr/cover.jpg"
                     }
                   ]
                 }
@@ -57,7 +56,7 @@ class AladinBookApiClientTest {
         List<ExternalBookResult> results = aladinBookApiClient().search("프랑켄슈타인");
 
         assertThat(results).containsExactly(
-                new ExternalBookResult("프랑켄슈타인", "메리 셸리", "문학동네", 550, "9788954429721",
+                new ExternalBookResult("프랑켄슈타인", "메리 셸리", "문학동네", "9788954429721",
                         "https://image.aladin.co.kr/cover.jpg"));
     }
 
