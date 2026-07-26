@@ -115,6 +115,18 @@ public class OpinionService {
         return existing;
     }
 
+    public Page<MyOpinionProjection> getMyOpinions(Long userId, Pageable pageable) {
+        return opinionQueryRepository.findMyOpinions(userId, pageable);
+    }
+
+    public Page<LikedOpinionProjection> getLikedOpinions(Long userId, Pageable pageable) {
+        return opinionQueryRepository.findLikedOpinions(userId, pageable);
+    }
+
+    public long getMyOpinionCount(Long userId) {
+        return opinionRepository.countByUserIdAndDeletedAtIsNull(userId);
+    }
+
     private Passage createNewPassage(CreateOpinionRequest request, User creator) {
         Book book = bookRepository.findById(request.bookId())
                 .orElseThrow(() -> new BookException(BookErrorCode.BOOK_NOT_FOUND));
