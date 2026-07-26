@@ -244,13 +244,10 @@ private List<Decoration> decorations = new ArrayList<>();
 ```
 순수 함수로 작성해 단위 테스트 용이하게 분리.
 
-### 5.7 읽기 상태 기반 노출 필터 (FR-WRITE-08)
-```
-READING  → passage.pageNumber <= userBookStatus.currentPage
-PLANNED  → passage.pageNumber == MIN(pageNumber) (해당 책의 첫 대목만)
-미설정   → PLANNED와 동일 취급
-```
-`isSpoiler` 조건이 AND로 추가 적용. 비로그인 사용자는 항상 PLANNED와 동일 로직. QueryDSL predicate로 구성해 재사용.
+### 5.7 대목 노출 (스포일러, FR-VIEW-03) — 확정 (이슈 #42)
+읽기 상태(`UserBookStatus.status/currentPage`) 기반으로 대목 노출 범위를 제한하던 필터는 삭제된 기획으로 확인되어 제거했다. 대목 조회 API는 로그인 여부와 무관하게 항상 책의 전체 페이지/대목을 반환한다.
+
+스포일러는 대목 단위 `Passage.isSpoiler` 플래그로만 판단하며, 서버는 항상 전체 데이터 + `isSpoiler` 플래그를 내려주고 블러 처리/확인은 프론트에서 서버 왕복 없이 처리한다. 상세는 `docs/spoiler-visibility-design.md` 참고.
 
 ---
 
@@ -276,7 +273,7 @@ PLANNED  → passage.pageNumber == MIN(pageNumber) (해당 책의 첫 대목만)
 | POST | /api/passages/similar-check | 필요* | 유사 문장 후보 조회 (FR-WRITE-07) |
 | PUT | /api/users/me/book-status | 필요* | 읽기상태/현재페이지 설정 |
 | POST | /api/opinions | 필요* | Passage(신규/병합)+Opinion+Decoration 원자적 생성 — **직접 입력만, OCR 제외** |
-| GET | /api/books/{bookId}/passages?page=&size= | soft | 페이지 목록(오름차순), 스포일러/읽기상태 필터 |
+| GET | /api/books/{bookId}/passages?page=&size= | soft | 페이지 목록(오름차순), 전체 노출 (스포일러 여부는 isSpoiler 플래그로만 표시) |
 | GET | /api/books/{bookId}/pages/{page}/passages | soft | 대목 전환 + 꾸밈 병합 결과 포함 |
 | GET | /api/passages/{passageId}/opinions?sortType=&page=&size= | soft | 흔적 목록 (최신/좋아요순) |
 | GET | /api/opinions/{opinionId} | soft | 흔적 상세 + 작성자 꾸밈(FR-OPINION-05) |

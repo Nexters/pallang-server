@@ -20,7 +20,6 @@ import com.nexters.palang.global.security.CurrentUserProvider;
 import com.nexters.palang.global.security.LoginRequiredException;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -119,8 +118,7 @@ class PassageControllerTest {
     @Test
     @DisplayName("페이지 번호 목록을 조회하면 오름차순으로 반환한다")
     void getPageNumbers() throws Exception {
-        given(currentUserProvider.findCurrentUserId()).willReturn(Optional.empty());
-        given(passageService.getVisiblePageNumbers(any(), any(), any()))
+        given(passageService.getPageNumbers(any(), any()))
                 .willReturn(new PageImpl<>(List.of(2, 5), PageRequest.of(0, 20), 2));
 
         mockMvc.perform(get("/api/books/1/passages"))
@@ -132,8 +130,7 @@ class PassageControllerTest {
     @Test
     @DisplayName("비로그인 사용자로 페이지 번호를 조회해도 401 없이 조회된다 (soft auth)")
     void getPageNumbersDoesNotRequireAuthentication() throws Exception {
-        given(currentUserProvider.findCurrentUserId()).willReturn(Optional.empty());
-        given(passageService.getVisiblePageNumbers(any(), any(), any()))
+        given(passageService.getPageNumbers(any(), any()))
                 .willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
 
         mockMvc.perform(get("/api/books/1/passages"))
@@ -143,9 +140,8 @@ class PassageControllerTest {
     @Test
     @DisplayName("특정 페이지의 대목과 병합된 꾸밈을 함께 반환한다")
     void getPassagesByPage() throws Exception {
-        given(currentUserProvider.findCurrentUserId()).willReturn(Optional.of(1L));
         Passage passage = passage(10L, 3);
-        given(passageService.getVisiblePassagesByPage(any(), anyInt(), any())).willReturn(List.of(passage));
+        given(passageService.getPassagesByPage(any(), anyInt())).willReturn(List.of(passage));
         given(passageService.getMergedDecorationsByPassageId(any())).willReturn(Map.of(10L, List.of()));
 
         mockMvc.perform(get("/api/books/1/pages/3/passages"))
@@ -155,14 +151,14 @@ class PassageControllerTest {
     }
 
     @Test
-    @DisplayName("비로그인 사용자가 첫 페이지가 아닌 페이지를 요청하면 401 에러가 발생한다")
-    void getPassagesByPageFailsWhenAnonymousRequestsNonFirstPage() throws Exception {
-        given(currentUserProvider.findCurrentUserId()).willReturn(Optional.empty());
-        given(passageService.getVisiblePassagesByPage(any(), anyInt(), any()))
-                .willThrow(new LoginRequiredException());
+    @DisplayName("비로그인 사용자도 아무 페이지나 조회할 수 있다 (soft auth)")
+    void getPassagesByPageDoesNotRequireAuthentication() throws Exception {
+        Passage passage = passage(10L, 5);
+        given(passageService.getPassagesByPage(any(), anyInt())).willReturn(List.of(passage));
+        given(passageService.getMergedDecorationsByPassageId(any())).willReturn(Map.of(10L, List.of()));
 
         mockMvc.perform(get("/api/books/1/pages/5/passages"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.title").value("AUTH_401_1"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.passages[0].passageId").value(10));
     }
 }

@@ -8,12 +8,9 @@ import com.nexters.palang.domain.decoration.application.DecorationMergeSelector;
 import com.nexters.palang.domain.decoration.infrastructure.DecorationQueryRepository;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.infrastructure.PassageQueryRepository;
-import com.nexters.palang.global.security.LoginRequiredException;
-import com.querydsl.core.types.dsl.BooleanExpression;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,28 +24,18 @@ public class PassageService {
 
     private final PassageQueryRepository passageQueryRepository;
     private final DecorationQueryRepository decorationQueryRepository;
-    private final PassageVisibilityFilter passageVisibilityFilter;
     private final BookRepository bookRepository;
 
-    // 대목/흔적 보기 페이지 네비게이션(FR-VIEW-02): 읽기상태 노출 필터를 만족하는 페이지 번호 목록 (스포일러 포함).
-    public Page<Integer> getVisiblePageNumbers(Long bookId, Long currentUserId, Pageable pageable) {
+    // 대목/흔적 보기 페이지 네비게이션: 발췌된 페이지 번호 목록 (스포일러 포함).
+    public Page<Integer> getPageNumbers(Long bookId, Pageable pageable) {
         validateBookExists(bookId);
-        BooleanExpression visibilityFilter = passageVisibilityFilter.build(bookId, currentUserId);
-        return passageQueryRepository.findVisiblePageNumbers(bookId, visibilityFilter, pageable);
+        return passageQueryRepository.findPageNumbers(bookId, pageable);
     }
 
-    // 대목 전환(FR-VIEW-03): 특정 페이지의 대목들과 각 대목의 꾸밈 병합 결과.
-    // 비로그인 사용자가 첫 대목이 아닌 페이지를 요청하면 로그인을 유도한다(FR-OPINION-08, backend-plan.md §4.2).
-    public List<Passage> getVisiblePassagesByPage(Long bookId, int pageNumber, Long currentUserId) {
+    // 대목 전환: 특정 페이지의 대목들과 각 대목의 꾸밈 병합 결과.
+    public List<Passage> getPassagesByPage(Long bookId, int pageNumber) {
         validateBookExists(bookId);
-        if (currentUserId == null) {
-            Optional<Integer> firstPage = passageVisibilityFilter.firstVisiblePageNumber(bookId);
-            if (firstPage.isPresent() && pageNumber != firstPage.get()) {
-                throw new LoginRequiredException();
-            }
-        }
-        BooleanExpression visibilityFilter = passageVisibilityFilter.build(bookId, currentUserId);
-        return passageQueryRepository.findVisiblePassagesByPage(bookId, pageNumber, visibilityFilter);
+        return passageQueryRepository.findPassagesByPage(bookId, pageNumber);
     }
 
     public Map<Long, List<DecorationMergeCandidate>> getMergedDecorationsByPassageId(List<Passage> passages) {
