@@ -10,6 +10,7 @@ import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.decoration.domain.EffectType;
 import com.nexters.palang.domain.opinion.domain.Opinion;
+import com.nexters.palang.domain.opinion.infrastructure.OpinionQueryRepository;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
 import com.nexters.palang.domain.opinion.presentation.dto.CreateOpinionRequest;
 import com.nexters.palang.domain.opinion.presentation.dto.CreateOpinionRequest.DecorationRequest;
@@ -18,6 +19,7 @@ import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.infrastructure.PassageRepository;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +28,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,6 +39,9 @@ class OpinionServiceTest {
 
     @Mock
     private OpinionRepository opinionRepository;
+
+    @Mock
+    private OpinionQueryRepository opinionQueryRepository;
 
     @Mock
     private PassageRepository passageRepository;
@@ -47,7 +56,8 @@ class OpinionServiceTest {
 
     @BeforeEach
     void setUp() {
-        opinionService = new OpinionService(opinionRepository, passageRepository, bookRepository, userRepository);
+        opinionService = new OpinionService(
+                opinionRepository, opinionQueryRepository, passageRepository, bookRepository, userRepository);
     }
 
     private User user(Long id) {
@@ -123,5 +133,44 @@ class OpinionServiceTest {
 
         assertThatThrownBy(() -> opinionService.createOpinion(1L, request(10L, null)))
                 .isInstanceOf(BookException.class);
+    }
+
+    @Test
+    @DisplayName("내가 남긴 흔적 목록을 조회하면 QueryRepository 결과를 그대로 반환한다")
+    void getMyOpinionsReturnsPageFromQueryRepository() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<MyOpinionProjection> expected = new PageImpl<>(
+                List.of(new MyOpinionProjection(1L, 10L, "제목", "cover", 100L, "발췌", 5, "흔적", 0, LocalDateTime.now())),
+                pageable, 1);
+        given(opinionQueryRepository.findMyOpinions(1L, pageable)).willReturn(expected);
+
+        Page<MyOpinionProjection> results = opinionService.getMyOpinions(1L, pageable);
+
+        assertThat(results).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("좋아요 누른 흔적 목록을 조회하면 QueryRepository 결과를 그대로 반환한다")
+    void getLikedOpinionsReturnsPageFromQueryRepository() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<LikedOpinionProjection> expected = new PageImpl<>(
+                List.of(new LikedOpinionProjection(1L, 10L, "제목", "cover", 100L, "발췌", 5, "흔적", 0,
+                        LocalDateTime.now(), LocalDateTime.now())),
+                pageable, 1);
+        given(opinionQueryRepository.findLikedOpinions(1L, pageable)).willReturn(expected);
+
+        Page<LikedOpinionProjection> results = opinionService.getLikedOpinions(1L, pageable);
+
+        assertThat(results).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("내가 남긴 흔적 수를 조회하면 Repository의 카운트를 그대로 반환한다")
+    void getMyOpinionCountReturnsRepositoryCount() {
+        given(opinionRepository.countByUserIdAndDeletedAtIsNull(1L)).willReturn(3L);
+
+        long count = opinionService.getMyOpinionCount(1L);
+
+        assertThat(count).isEqualTo(3L);
     }
 }
