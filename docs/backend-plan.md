@@ -217,8 +217,8 @@ public class Comment extends BaseEntity {
 
 ### 5.4 좋아요 카운트 동기화 — 서비스 계층에서 처리
 `Opinion.likeCount`는 `OpinionLike`라는 **다른 엔티티의 생성/삭제**에 맞춰 갱신되어야 하는 값이라, 댓글 1-depth와 달리 단일 엔티티의 정적 팩토리로는 표현할 수 없다 (두 엔티티/트랜잭션의 조율이 필요). 그래서 이건 그대로 서비스 계층에 둔다:
-- `OpinionLikeService.like()/unlike()`가 같은 트랜잭션 안에서 `OpinionLike`를 생성/삭제하면서 `Opinion.likeCount`를 직접 증감.
-- DB 트리거 방식은 채택하지 않는다 — 같은 영속성 컨텍스트에서 `opinion.getLikeCount()`를 즉시 읽을 때 stale한 값이 나올 수 있고, H2/MySQL에 트리거를 각각 유지해야 해서 테스트 비용이 늘어난다.
+- `OpinionLikeService.toggleLike()`(내부적으로 `like()`/`unlike()`)가 같은 트랜잭션 안에서 `OpinionLike`를 생성/삭제하면서 `Opinion.increaseLikeCount()`/`decreaseLikeCount()`로 `likeCount`를 직접 증감.
+- DB 트리거 방식은 채택하지 않는다 — 같은 영속성 컨텍스트에서 `opinion.getLikeCount()`를 즉시 읽을 때 stale한 값이 나올 수 있고, H2/MySQL에 트리거를 각각 유지해야 해서 테스트 비용이 늘어난다. (한 차례 DB 트리거로 구현했다가 이 이유로 되돌렸다 — 특히 H2는 컴파일된 `org.h2.api.Trigger` 클래스만 등록 가능해 로컬/CI(H2 vs 실제 MySQL) 환경 차이에 따라 트리거 등록 방식 자체가 갈리는 등 복잡도가 실제로 문제였다.)
 
 ### 5.5 Decoration 집계 경계 — cascade + orphanRemoval
 `Decoration`은 `Opinion` 없이 존재할 이유가 없는 컴포지션 관계지만, 독립 엔티티/테이블 자체는 유지한다. 이유는 §5.6의 꾸밈 병합 알고리즘이 **여러 Opinion에 걸친 Decoration을 가로질러 조회하고, `Decoration.id`를 정렬 tiebreaker로 사용**하기 때문 — `@ElementCollection`으로 바꾸면 own PK가 없어져서 이 정렬 자체가 불가능해진다.
@@ -337,6 +337,7 @@ OCR이 붙기 전까지 흔적 작성은 "직접 입력" 경로만 지원한다 
 | `USER_409_1` | 409 | 이미 사용 중인 닉네임입니다. |
 | `PASSAGE_400_1` | 400 | 발췌 문장은 150자를 초과할 수 없습니다. |
 | `OPINION_403_1` | 403 | 본인이 작성한 흔적만 수정/삭제할 수 있습니다. |
+| `OPINION_404_1` | 404 | 해당 흔적을 찾을 수 없습니다. |
 | `COMMENT_400_1` | 400 | 답글에는 답글을 남길 수 없습니다. |
 | `BOOK_404_1` | 404 | 해당 도서를 찾을 수 없습니다. |
 
@@ -347,7 +348,7 @@ OCR이 붙기 전까지 흔적 작성은 "직접 입력" 경로만 지원한다 
 ## 9. 후속 확인 필요 (백엔드 착수를 막지는 않음)
 
 - **OCR 벤더 미정**: `OcrClient` 인터페이스로 추상화, Phase 4(OCR) 착수 시점에 벤더 선정 — 지금 당장은 필요 없음.
-- **댓글 1-depth(정적 팩토리)·좋아요 카운트(서비스 계층) 방식**: 이 문서에서는 확정했지만 PR #6 코드는 DB 트리거를 전제로 작성돼 있어 PR 리뷰에서 작성자와 합의 필요 (§5.3, §5.4).
+- **댓글 1-depth(정적 팩토리)·좋아요 카운트(서비스 계층) 방식**: 이 문서에서는 확정했지만 PR #6 코드는 DB 트리거를 전제로 작성돼 있어 PR 리뷰에서 작성자와 합의 필요 (§5.3, §5.4). #16에서 DB 트리거 방식을 먼저 시도해봤으나 stale read 처리와 H2/MySQL 이중 유지 복잡도 때문에 서비스 계층 방식으로 되돌렸다.
 - Q-06(병합 거부 시 별도 Passage), Q-08(탈퇴 닉네임 포맷), Q-09(같은 Opinion 내 Decoration 겹침 허용 여부)는 Phase 1 흔적 작성 로직을 짤 때 재확인.
 - **`NicknameGenerator`(§5.1)는 Phase 3(인증)에서만 쓰이지만, 지금 단계에 미리 만들어 단위 테스트로 검증해두면** 인증 착수 시 바로 회원가입 플로우에 꽂아 넣을 수 있다. 급하지 않으면 스킵해도 무방.
 

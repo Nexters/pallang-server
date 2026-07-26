@@ -19,6 +19,15 @@ public class WebClientConfig {
 
     @Bean
     public WebClient aladinWebClient(WebClient.Builder builder, @Value("${aladin.base-url}") String baseUrl) {
+        return webClient(builder, baseUrl);
+    }
+
+    @Bean
+    public WebClient kakaoWebClient(WebClient.Builder builder, @Value("${kakao.base-url}") String baseUrl) {
+        return webClient(builder, baseUrl);
+    }
+
+    private WebClient webClient(WebClient.Builder builder, String baseUrl) {
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MILLIS)
                 .responseTimeout(RESPONSE_TIMEOUT)

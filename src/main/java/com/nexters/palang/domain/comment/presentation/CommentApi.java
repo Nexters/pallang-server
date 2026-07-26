@@ -70,7 +70,7 @@ public interface CommentApi {
     @Operation(summary = "댓글/답글 작성",
             description = "흔적에 댓글 또는 답글을 작성합니다. parentCommentId가 없으면 원댓글, 있으면 답글로 생성됩니다. "
                     + "답글에는 다시 답글을 남길 수 없습니다(1-depth). 삭제된 댓글을 부모로 답글을 작성할 수 없습니다. "
-                    + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
+                    + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "작성 성공"),
             @ApiResponse(responseCode = "400", description = "내용 누락/500자 초과 (COMMON_400_1) "
@@ -83,7 +83,7 @@ public interface CommentApi {
                                     + "\"title\":\"COMMENT_400_1\",\"status\":400,"
                                     + "\"detail\":\"답글에는 답글을 남길 수 없습니다.\"}")
                     })),
-            @ApiResponse(responseCode = "401", description = "X-Debug-User-Id 헤더 누락 (AUTH_401_1)",
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/opinions/1/comments\",\"title\":\"AUTH_401_1\","
                                     + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
@@ -104,14 +104,14 @@ public interface CommentApi {
     );
 
     @Operation(summary = "댓글/답글 수정", description = "본인이 작성한 댓글/답글의 내용을 수정합니다. "
-            + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
+            + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정 성공"),
             @ApiResponse(responseCode = "400", description = "내용 누락/500자 초과 (COMMON_400_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/comments/1\",\"title\":\"COMMON_400_1\","
                                     + "\"status\":400,\"detail\":\"댓글 내용은 필수입니다.\"}"))),
-            @ApiResponse(responseCode = "401", description = "X-Debug-User-Id 헤더 누락 (AUTH_401_1)",
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/comments/1\",\"title\":\"AUTH_401_1\","
                                     + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
@@ -130,10 +130,10 @@ public interface CommentApi {
     );
 
     @Operation(summary = "댓글/답글 삭제", description = "본인이 작성한 댓글/답글을 소프트 삭제합니다. "
-            + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
+            + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "삭제 성공"),
-            @ApiResponse(responseCode = "401", description = "X-Debug-User-Id 헤더 누락 (AUTH_401_1)",
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/comments/1\",\"title\":\"AUTH_401_1\","
                                     + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),

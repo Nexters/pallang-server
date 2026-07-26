@@ -46,7 +46,7 @@ public interface PassageControllerDocs {
     );
 
     @Operation(summary = "유사 문장 후보 조회", description = "저장 전 같은 도서의 인접 페이지(±1)에서 정규화 해시가 같은 대목 후보를 조회합니다. "
-            + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
+            + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공 (후보가 없으면 빈 배열)"),
             @ApiResponse(

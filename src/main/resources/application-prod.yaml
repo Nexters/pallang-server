@@ -22,7 +22,7 @@ spring:
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
       # 운영에서는 스키마를 자동 변경하지 않는다. 마이그레이션 도구(Flyway/Liquibase) 도입 전까지는
-      # 스키마를 미리 반영해두고 검증만 수행한다.
+      # 스키마를 미리 반영해두고 검증만 수행한다. 스키마가 자주 바뀌는 환경은 application-dev.yaml을 쓸 것.
       ddl-auto: validate
     show-sql: false
     properties:
@@ -54,6 +54,14 @@ spring:
 aladin:
   base-url: https://www.aladin.co.kr/ttb/api
   ttb-key: ${ALADIN_TTB_KEY:}
+
+kakao:
+  base-url: https://kapi.kakao.com
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration-seconds: ${JWT_ACCESS_EXPIRATION_SECONDS:3600}
+  refresh-token-expiration-seconds: ${JWT_REFRESH_EXPIRATION_SECONDS:1209600}
 
 logging:
   level:
