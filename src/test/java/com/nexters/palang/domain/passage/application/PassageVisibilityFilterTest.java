@@ -68,12 +68,12 @@ class PassageVisibilityFilterTest {
     }
 
     @Test
-    @DisplayName("비로그인 사용자에게는 스포일러가 아닌 첫 페이지의 대목만 보인다")
-    void anonymousUserSeesOnlyFirstNonSpoilerPage() {
+    @DisplayName("비로그인 사용자에게는 첫 페이지의 대목만 보인다 (스포일러여도 페이지 자체는 노출 대상에 포함된다)")
+    void anonymousUserSeesOnlyFirstPageEvenIfItIsSpoiler() {
         User writer = user("writer-1");
         Book book = book();
-        passage(book, writer, 1, true);
-        Passage firstVisible = passage(book, writer, 3, false);
+        Passage firstVisible = passage(book, writer, 1, true);
+        passage(book, writer, 3, false);
         passage(book, writer, 5, false);
 
         List<Passage> visible = fetchWithFilter(passageVisibilityFilter.build(book.getId(), null));
@@ -145,19 +145,19 @@ class PassageVisibilityFilterTest {
     }
 
     @Test
-    @DisplayName("스포일러로 표기된 대목은 읽기상태와 무관하게 항상 제외된다")
-    void spoilerPassagesAreAlwaysExcluded() {
+    @DisplayName("스포일러로 표기된 대목도 읽기상태 범위 안이면 노출 대상에 포함된다 (내용 마스킹은 응답 단계의 책임)")
+    void spoilerPassagesAreIncludedWhenWithinVisibleRange() {
         User writer = user("writer-6");
         User reader = user("reader-5");
         Book book = book();
-        passage(book, writer, 2, true);
-        Passage nonSpoiler = passage(book, writer, 2, false);
+        Passage spoiler = passage(book, writer, 2, true);
+        Passage nonSpoiler = passage(book, writer, 4, false);
         entityManager.persistAndFlush(UserBookStatus.builder()
                 .user(reader).book(book).status(ReadingStatus.READING).currentPage(10).build());
 
         List<Passage> visible = fetchWithFilter(passageVisibilityFilter.build(book.getId(), reader.getId()));
 
-        assertThat(visible).extracting(Passage::getId).containsExactly(nonSpoiler.getId());
+        assertThat(visible).extracting(Passage::getId).containsExactly(spoiler.getId(), nonSpoiler.getId());
     }
 
     @Test

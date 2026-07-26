@@ -40,13 +40,14 @@ public class PassageQueryRepository {
                 .fetch();
     }
 
-    // 읽기상태/스포일러 노출 필터(FR-WRITE-08)의 "PLANNED/미설정/비로그인" 기준 페이지: 스포일러가 아닌 대목 중 가장 작은 페이지 번호.
+    // 읽기상태 노출 필터(FR-WRITE-08)의 "PLANNED/미설정/비로그인" 기준 페이지: 가장 작은 페이지 번호.
+    // 스포일러 여부는 여기서 걸러내지 않는다 (내용 마스킹은 응답을 만드는 쪽의 책임, FR-VIEW-03).
     public Integer findFirstVisiblePageNumber(Long bookId) {
         QPassage passage = QPassage.passage;
         return queryFactory
                 .select(passage.pageNumber.min())
                 .from(passage)
-                .where(passage.book.id.eq(bookId), passage.isSpoiler.isFalse())
+                .where(passage.book.id.eq(bookId))
                 .fetchOne();
     }
 

@@ -37,16 +37,21 @@ public class PassageResponse {
             return new PassagesByPage(details);
         }
 
+        // 스포일러 대목(isSpoiler=true)은 존재 자체는 노출하되 quotedText/decorations는 내려주지 않는다.
+        // 프론트가 블러 처리 후 [버튼]을 눌러야 확인 가능한 화면을 그릴 수 있도록 한다 (FR-VIEW-03 스포일러 처리).
         public record Detail(Long passageId, int pageNumber, String quotedText, boolean isSpoiler,
                               List<DecorationResponse> decorations) {
             public static Detail from(Passage passage, List<DecorationMergeCandidate> merged) {
+                if (passage.isSpoiler()) {
+                    return new Detail(passage.getId(), passage.getPageNumber(), null, true, List.of());
+                }
                 List<DecorationResponse> decorations = merged.stream()
                         .map(candidate -> new DecorationResponse(
                                 candidate.decorationId(), candidate.startOffset(), candidate.endOffset(),
                                 candidate.effectType(), candidate.color()))
                         .toList();
                 return new Detail(passage.getId(), passage.getPageNumber(), passage.getQuotedText(),
-                        passage.isSpoiler(), decorations);
+                        false, decorations);
             }
         }
     }

@@ -30,7 +30,7 @@ public class PassageService {
     private final PassageVisibilityFilter passageVisibilityFilter;
     private final BookRepository bookRepository;
 
-    // 대목/흔적 보기 페이지 네비게이션(FR-VIEW-02): 노출 필터(읽기상태+스포일러)를 만족하는 페이지 번호 목록.
+    // 대목/흔적 보기 페이지 네비게이션(FR-VIEW-02): 읽기상태 노출 필터를 만족하는 페이지 번호 목록 (스포일러 포함).
     public Page<Integer> getVisiblePageNumbers(Long bookId, Long currentUserId, Pageable pageable) {
         validateBookExists(bookId);
         BooleanExpression visibilityFilter = passageVisibilityFilter.build(bookId, currentUserId);
@@ -51,9 +51,14 @@ public class PassageService {
         return passageQueryRepository.findVisiblePassagesByPage(bookId, pageNumber, visibilityFilter);
     }
 
+    // 스포일러 대목은 응답 단계에서 어차피 가려지므로(PassageResponse), 그 내용을 드러낼 수 있는
+    // 꾸밈 데이터는 여기서부터 아예 조회하지 않는다 (방어적으로 한 겹 더 막아둔다).
     public Map<Long, List<DecorationMergeCandidate>> getMergedDecorationsByPassageId(List<Passage> passages) {
         Map<Long, List<DecorationMergeCandidate>> mergedByPassageId = new LinkedHashMap<>();
         for (Passage passage : passages) {
+            if (passage.isSpoiler()) {
+                continue;
+            }
             List<DecorationMergeCandidate> candidates = decorationQueryRepository.findMergeCandidates(passage.getId());
             mergedByPassageId.put(passage.getId(), DecorationMergeSelector.select(candidates));
         }

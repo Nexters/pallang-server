@@ -89,24 +89,31 @@ class PassageReadFlowIntegrationTest {
     }
 
     @Test
-    @DisplayName("비로그인 사용자는 스포일러가 아닌 첫 페이지만 볼 수 있고, 다른 페이지를 요청하면 401이다")
-    void anonymousUserSeesOnlyFirstNonSpoilerPage() throws Exception {
+    @DisplayName("비로그인 사용자는 첫 페이지만 볼 수 있고, 다른 페이지를 요청하면 401이다 (첫 페이지가 스포일러여도 페이지 자체는 노출된다)")
+    void anonymousUserSeesOnlyFirstPageEvenIfSpoiler() throws Exception {
         mockMvc.perform(get("/api/books/" + bookId + "/passages"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.pageNumbers[0]").value(3))
+                .andExpect(jsonPath("$.data.pageNumbers[0]").value(1))
                 .andExpect(jsonPath("$.data.pageNumbers.length()").value(1));
 
         mockMvc.perform(get("/api/books/" + bookId + "/pages/3/passages"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.passages[0].passageId").value(page3.getId()));
-
-        mockMvc.perform(get("/api/books/" + bookId + "/pages/6/passages"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.title").value("AUTH_401_1"));
     }
 
     @Test
-    @DisplayName("읽는 중(READING) 상태의 로그인 사용자는 현재 페이지까지의 대목을 볼 수 있다")
+    @DisplayName("스포일러로 표기된 대목은 존재는 노출되지만 quotedText/꾸밈은 가려진다")
+    void spoilerPassageContentIsMaskedInPageDetail() throws Exception {
+        mockMvc.perform(get("/api/books/" + bookId + "/pages/1/passages"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.passages[0].passageId").value(spoilerPage1.getId()))
+                .andExpect(jsonPath("$.data.passages[0].isSpoiler").value(true))
+                .andExpect(jsonPath("$.data.passages[0].quotedText").doesNotExist())
+                .andExpect(jsonPath("$.data.passages[0].decorations.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("읽는 중(READING) 상태의 로그인 사용자는 현재 페이지까지의 대목을 볼 수 있다 (스포일러 포함)")
     void readingUserSeesUpToCurrentPage() throws Exception {
         mockMvc.perform(put("/api/users/me/book-status")
                         .header("X-Debug-User-Id", readerId)
@@ -116,12 +123,14 @@ class PassageReadFlowIntegrationTest {
 
         mockMvc.perform(get("/api/books/" + bookId + "/passages").header("X-Debug-User-Id", readerId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.pageNumbers[0]").value(3))
-                .andExpect(jsonPath("$.data.pageNumbers[1]").value(6));
+                .andExpect(jsonPath("$.data.pageNumbers[0]").value(1))
+                .andExpect(jsonPath("$.data.pageNumbers[1]").value(3))
+                .andExpect(jsonPath("$.data.pageNumbers[2]").value(6));
 
         mockMvc.perform(get("/api/books/" + bookId + "/pages/6/passages").header("X-Debug-User-Id", readerId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.passages[0].passageId").value(page6.getId()));
+                .andExpect(jsonPath("$.data.passages[0].passageId").value(page6.getId()))
+                .andExpect(jsonPath("$.data.passages[0].quotedText").value("6페이지 문장"));
     }
 
     @Test
@@ -134,7 +143,13 @@ class PassageReadFlowIntegrationTest {
         Opinion another = opinion(page3, readerId, "또 다른 흔적", 5);
         decoration(another, 10, 15);
 
-        mockMvc.perform(get("/api/books/" + bookId + "/pages/3/passages"))
+        mockMvc.perform(put("/api/users/me/book-status")
+                        .header("X-Debug-User-Id", readerId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"bookId\": " + bookId + ", \"status\": \"READING\", \"currentPage\": 6}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/books/" + bookId + "/pages/3/passages").header("X-Debug-User-Id", readerId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.passages[0].decorations.length()").value(2))
                 .andExpect(jsonPath("$.data.passages[0].decorations[0].startOffset").value(3))

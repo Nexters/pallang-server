@@ -123,8 +123,8 @@ class PassageQueryRepositoryTest {
     }
 
     @Test
-    @DisplayName("스포일러가 아닌 대목 중 가장 작은 페이지 번호를 첫 노출 페이지로 조회한다")
-    void findFirstVisiblePageNumberIgnoresSpoilerPassages() {
+    @DisplayName("스포일러 대목도 존재로 취급되어 가장 작은 페이지 번호에 포함된다 (내용 마스킹은 응답 단계의 책임)")
+    void findFirstVisiblePageNumberIncludesSpoilerPassages() {
         User writer = user("writer-4");
         Book book = book("책");
         passage(book, writer, 1, true);
@@ -133,7 +133,7 @@ class PassageQueryRepositoryTest {
 
         Integer firstPage = passageQueryRepository.findFirstVisiblePageNumber(book.getId());
 
-        assertThat(firstPage).isEqualTo(3);
+        assertThat(firstPage).isEqualTo(1);
     }
 
     @Test

@@ -13,8 +13,10 @@ import org.springframework.stereotype.Component;
 
 // 읽기 상태 기반 노출 필터(FR-WRITE-08, backend-plan.md §5.7):
 // READING  -> pageNumber <= currentPage
-// PLANNED / 미설정 / 비로그인 -> 스포일러가 아닌 대목 중 가장 작은 페이지(첫 대목)만
-// 여기에 isSpoiler=false 조건이 AND로 항상 함께 적용된다.
+// PLANNED / 미설정 / 비로그인 -> 가장 작은 페이지(첫 대목)만
+//
+// 스포일러(isSpoiler)는 여기서 걸러내지 않는다. 스포일러 대목도 "존재 자체"는 이 필터를 그대로 통과하고,
+// 실제 내용(quotedText/꾸밈)을 가리는 건 응답을 만드는 쪽(PassageResponse)의 책임이다 (FR-VIEW-03 블러+확인 버튼).
 @Component
 @RequiredArgsConstructor
 public class PassageVisibilityFilter {
@@ -23,11 +25,10 @@ public class PassageVisibilityFilter {
     private final PassageQueryRepository passageQueryRepository;
 
     public BooleanExpression build(Long bookId, Long currentUserId) {
-        QPassage passage = QPassage.passage;
-        return passage.isSpoiler.isFalse().and(pageNumberCondition(bookId, currentUserId));
+        return pageNumberCondition(bookId, currentUserId);
     }
 
-    // 스포일러가 아닌 대목 중 가장 작은 페이지 번호 (책에 노출 가능한 대목이 하나도 없으면 empty).
+    // 노출 가능한 대목 중 가장 작은 페이지 번호 (책에 대목이 하나도 없으면 empty).
     // 비로그인 사용자가 이 페이지가 아닌 다른 페이지를 요청했는지 판단하는 데 쓰인다(§4.2, FR-OPINION-08).
     public Optional<Integer> firstVisiblePageNumber(Long bookId) {
         return Optional.ofNullable(passageQueryRepository.findFirstVisiblePageNumber(bookId));
