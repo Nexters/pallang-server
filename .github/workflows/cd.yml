@@ -6,11 +6,13 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     outputs:
       image-tag: ${{ steps.meta.outputs.tag }}
     steps:
@@ -51,6 +53,12 @@ jobs:
     if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     environment: dev
+    permissions:
+      contents: read
+      packages: read
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: false
     steps:
       - name: Deploy to dev server
         uses: appleboy/ssh-action@v1.0.3
@@ -61,9 +69,12 @@ jobs:
           script: |
             set -e
             cd ~/pallang-server
-            git pull origin develop
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             export IMAGE_TAG=${{ needs.build-and-push.outputs.image-tag }}
+            # 배포 시점의 브랜치 HEAD가 아니라, 이 워크플로우를 트리거한 커밋으로 고정한다
+            # (동시 배포 시 compose 소스와 이미지 태그가 어긋나는 것을 방지).
+            git fetch origin
+            git checkout "${IMAGE_TAG}"
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans
             docker image prune -f
@@ -73,6 +84,12 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: prod
+    permissions:
+      contents: read
+      packages: read
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
     steps:
       - name: Deploy to prod server
         uses: appleboy/ssh-action@v1.0.3
@@ -83,9 +100,12 @@ jobs:
           script: |
             set -e
             cd ~/pallang-server
-            git pull origin main
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             export IMAGE_TAG=${{ needs.build-and-push.outputs.image-tag }}
+            # 배포 시점의 브랜치 HEAD가 아니라, 이 워크플로우를 트리거한 커밋으로 고정한다
+            # (동시 배포 시 compose 소스와 이미지 태그가 어긋나는 것을 방지).
+            git fetch origin
+            git checkout "${IMAGE_TAG}"
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans
             docker image prune -f
