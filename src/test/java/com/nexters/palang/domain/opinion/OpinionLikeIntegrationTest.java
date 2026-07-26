@@ -14,6 +14,7 @@ import com.nexters.palang.domain.passage.infrastructure.PassageRepository;
 import com.nexters.palang.domain.user.domain.SnsProvider;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
+import com.nexters.palang.global.security.jwt.JwtTokenProvider;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -46,6 +47,9 @@ class OpinionLikeIntegrationTest {
     @Autowired
     private OpinionRepository opinionRepository;
 
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
     private Long opinionId;
     private Long likerId;
     private Long anotherLikerId;
@@ -74,11 +78,15 @@ class OpinionLikeIntegrationTest {
         anotherLikerId = anotherLiker.getId();
     }
 
+    private String bearerToken(Long userId) {
+        return "Bearer " + jwtTokenProvider.createAccessToken(userId);
+    }
+
     @Test
     @DisplayName("좋아요를 누르면 likeCount가 1 증가하고, 다시 누르면 취소되며 0으로 돌아온다")
     void toggleLikeSyncsLikeCount() throws Exception {
         mockMvc.perform(post("/api/opinions/{opinionId}/like", opinionId)
-                        .header("X-Debug-User-Id", likerId))
+                        .header("Authorization", bearerToken(likerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.liked").value(true))
                 .andExpect(jsonPath("$.data.likeCount").value(1));
@@ -86,7 +94,7 @@ class OpinionLikeIntegrationTest {
         assertThat(opinionRepository.findById(opinionId).orElseThrow().getLikeCount()).isEqualTo(1);
 
         mockMvc.perform(post("/api/opinions/{opinionId}/like", opinionId)
-                        .header("X-Debug-User-Id", likerId))
+                        .header("Authorization", bearerToken(likerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.liked").value(false))
                 .andExpect(jsonPath("$.data.likeCount").value(0));
@@ -98,12 +106,12 @@ class OpinionLikeIntegrationTest {
     @DisplayName("서로 다른 두 사용자가 좋아요를 누르면 likeCount가 각각 반영되어 2가 된다")
     void multipleUsersLikeIncrementsLikeCountIndependently() throws Exception {
         mockMvc.perform(post("/api/opinions/{opinionId}/like", opinionId)
-                        .header("X-Debug-User-Id", likerId))
+                        .header("Authorization", bearerToken(likerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.likeCount").value(1));
 
         mockMvc.perform(post("/api/opinions/{opinionId}/like", opinionId)
-                        .header("X-Debug-User-Id", anotherLikerId))
+                        .header("Authorization", bearerToken(anotherLikerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.likeCount").value(2));
 
@@ -114,7 +122,7 @@ class OpinionLikeIntegrationTest {
     @DisplayName("존재하지 않는 흔적에 좋아요를 시도하면 404 에러가 발생한다")
     void toggleLikeFailsWhenOpinionNotFound() throws Exception {
         mockMvc.perform(post("/api/opinions/{opinionId}/like", 999999L)
-                        .header("X-Debug-User-Id", likerId))
+                        .header("Authorization", bearerToken(likerId)))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("OPINION_404_1"));
     }
