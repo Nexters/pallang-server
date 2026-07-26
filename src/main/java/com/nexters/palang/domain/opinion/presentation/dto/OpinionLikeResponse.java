@@ -1,8 +1,13 @@
 package com.nexters.palang.domain.opinion.presentation.dto;
 
 import com.nexters.palang.domain.opinion.application.OpinionLikeResult;
+import io.swagger.v3.oas.annotations.media.Schema;
 
-public record OpinionLikeResponse(Long opinionId, boolean liked, int likeCount) {
+public record OpinionLikeResponse(
+        @Schema(example = "1") Long opinionId,
+        @Schema(example = "true") boolean liked,
+        @Schema(example = "42") int likeCount
+) {
 
     public static OpinionLikeResponse from(OpinionLikeResult result) {
         return new OpinionLikeResponse(result.opinionId(), result.liked(), result.likeCount());
