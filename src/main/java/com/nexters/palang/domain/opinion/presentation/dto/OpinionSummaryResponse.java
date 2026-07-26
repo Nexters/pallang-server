@@ -1,0 +1,25 @@
+package com.nexters.palang.domain.opinion.presentation.dto;
+
+import com.nexters.palang.domain.opinion.application.OpinionSummaryProjection;
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.LocalDateTime;
+
+public record OpinionSummaryResponse(
+        @Schema(example = "1") Long opinionId,
+        @Schema(example = "7") Long userId,
+        @Schema(example = "책읽는고양이") String nickname,
+        @Schema(example = "이 문장에서 작가의 의도가 느껴져서 좋았어요.") String content,
+        @Schema(example = "5") int likeCount,
+        @Schema(example = "2026-07-20T14:32:00") LocalDateTime createdAt
+) {
+    public static OpinionSummaryResponse from(OpinionSummaryProjection projection) {
+        return new OpinionSummaryResponse(
+                projection.opinionId(),
+                projection.userId(),
+                projection.nickname(),
+                projection.content(),
+                projection.likeCount(),
+                projection.createdAt()
+        );
+    }
+}

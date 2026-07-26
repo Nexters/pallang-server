@@ -22,7 +22,7 @@ import org.springframework.http.ResponseEntity;
 public interface UserApi {
 
     @Operation(summary = "내 프로필 조회", description = "닉네임, 프로필 이미지, 배경색, 가입 경로(SNS), "
-            + "지금까지 남긴 흔적 수를 조회합니다. X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인). (FR-MY-01)")
+            + "지금까지 남긴 흔적 수를 조회합니다. X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "401", description = "X-Debug-User-Id 헤더 누락 (AUTH_401_1)",
@@ -37,7 +37,7 @@ public interface UserApi {
     ResponseEntity<DataResponse<MeResponse>> getMe();
 
     @Operation(summary = "닉네임 변경", description = "최대 15자, 중복 불가, 하루 1회만 변경할 수 있습니다(달력일 기준). "
-            + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인). (FR-MY-05)")
+            + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "변경 성공"),
             @ApiResponse(responseCode = "400", description = "닉네임 누락/15자 초과 (COMMON_400_1) "
@@ -66,7 +66,7 @@ public interface UserApi {
     ResponseEntity<DataResponse<MeResponse>> modifyNickname(@Valid UpdateNicknameRequest request);
 
     @Operation(summary = "배경색 변경", description = "흔적 보기 화면의 배경색을 변경합니다. "
-            + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인). (FR-MY-04)")
+            + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "변경 성공"),
             @ApiResponse(responseCode = "400", description = "배경색 누락/20자 초과 (COMMON_400_1)",
@@ -85,7 +85,7 @@ public interface UserApi {
     ResponseEntity<DataResponse<MeResponse>> modifyBackgroundColor(@Valid UpdateBackgroundColorRequest request);
 
     @Operation(summary = "회원 탈퇴", description = "소프트 삭제 처리하고 닉네임을 익명화합니다(다른 이용자의 대화 맥락 유지를 위해 "
-            + "공개된 발췌·의견·댓글은 남습니다). X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인). (NFR-PRIVACY)")
+            + "공개된 발췌·의견·댓글은 남습니다). X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "탈퇴 성공"),
             @ApiResponse(responseCode = "401", description = "X-Debug-User-Id 헤더 누락 (AUTH_401_1)",
@@ -100,7 +100,7 @@ public interface UserApi {
     ResponseEntity<DataResponse<Void>> withdraw();
 
     @Operation(summary = "내가 남긴 흔적 목록", description = "내가 작성한 흔적을 최신순으로 조회합니다. "
-            + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인). (FR-MY-04)")
+            + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
@@ -119,7 +119,7 @@ public interface UserApi {
 
     @Operation(summary = "좋아요 누른 흔적 목록", description = "내가 좋아요를 누른 흔적을 좋아요 누른 순서대로(최신순) 조회합니다. "
             + "좋아요 취소는 이 API가 아니라 흔적 좋아요 토글 API가 담당합니다. "
-            + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인). (FR-MY-04)")
+            + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",

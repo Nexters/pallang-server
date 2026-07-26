@@ -90,6 +90,10 @@ public class Opinion extends BaseEntity {
         return opinion;
     }
 
+    public void updateContent(String content) {
+        this.content = content;
+    }
+
     public void addDecoration(Decoration decoration) {
         decoration.assignOpinion(this);
         this.decorations.add(decoration);
