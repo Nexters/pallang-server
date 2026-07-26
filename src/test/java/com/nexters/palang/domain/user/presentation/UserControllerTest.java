@@ -29,6 +29,7 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -39,6 +40,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(UserController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class UserControllerTest {
 
     @Autowired
@@ -203,6 +205,28 @@ class UserControllerTest {
         mockMvc.perform(delete("/api/users/me"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("USER_404_1"));
+    }
+
+    @Test
+    @DisplayName("온보딩 완료를 요청하면 완료 상태를 반환한다")
+    void completeOnboarding() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+
+        mockMvc.perform(patch("/api/users/me/onboarding-complete"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.hasCompletedOnboarding").value(true));
+
+        verify(userService).completeOnboarding(1L);
+    }
+
+    @Test
+    @DisplayName("인증 없이 온보딩 완료를 요청하면 401 에러가 발생한다")
+    void completeOnboardingFailsWhenUnauthenticated() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willThrow(new LoginRequiredException());
+
+        mockMvc.perform(patch("/api/users/me/onboarding-complete"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("AUTH_401_1"));
     }
 
     @Test

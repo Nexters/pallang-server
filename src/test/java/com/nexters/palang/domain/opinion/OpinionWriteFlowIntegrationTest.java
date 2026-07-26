@@ -11,6 +11,7 @@ import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.user.domain.SnsProvider;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
+import com.nexters.palang.global.security.jwt.JwtTokenProvider;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,6 +39,9 @@ class OpinionWriteFlowIntegrationTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private Long bookId;
@@ -54,6 +58,10 @@ class OpinionWriteFlowIntegrationTest {
         userId = user.getId();
     }
 
+    private String bearerToken(Long userId) {
+        return "Bearer " + jwtTokenProvider.createAccessToken(userId);
+    }
+
     @Test
     @DisplayName("직접 입력으로 흔적을 작성하면 새 Passage가 생성되고, 인접 페이지에서 유사 문장으로 조회되며, 병합 흔적을 남길 수 있고, 겹치는 꾸밈은 거부된다")
     void directEntryWriteFlow() throws Exception {
@@ -65,7 +73,7 @@ class OpinionWriteFlowIntegrationTest {
                 """.formatted(bookId);
 
         String createResponse = mockMvc.perform(post("/api/opinions")
-                        .header("X-Debug-User-Id", userId)
+                        .header("Authorization", bearerToken(userId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createBody))
                 .andExpect(status().isOk())
@@ -79,7 +87,7 @@ class OpinionWriteFlowIntegrationTest {
                 """.formatted(bookId);
 
         mockMvc.perform(post("/api/passages/similar-check")
-                        .header("X-Debug-User-Id", userId)
+                        .header("Authorization", bearerToken(userId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(similarCheckBody))
                 .andExpect(status().isOk())
@@ -93,7 +101,7 @@ class OpinionWriteFlowIntegrationTest {
                 """.formatted(bookId, passageId);
 
         mockMvc.perform(post("/api/opinions")
-                        .header("X-Debug-User-Id", userId)
+                        .header("Authorization", bearerToken(userId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mergeBody))
                 .andExpect(status().isOk())
@@ -111,7 +119,7 @@ class OpinionWriteFlowIntegrationTest {
                 """.formatted(bookId);
 
         mockMvc.perform(post("/api/opinions")
-                        .header("X-Debug-User-Id", userId)
+                        .header("Authorization", bearerToken(userId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(overlappingBody))
                 .andExpect(status().isBadRequest())
@@ -123,7 +131,7 @@ class OpinionWriteFlowIntegrationTest {
                 """.formatted(bookId);
 
         mockMvc.perform(put("/api/users/me/book-status")
-                        .header("X-Debug-User-Id", userId)
+                        .header("Authorization", bearerToken(userId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookStatusBody))
                 .andExpect(status().isOk())
@@ -135,7 +143,7 @@ class OpinionWriteFlowIntegrationTest {
                 """.formatted(bookId);
 
         mockMvc.perform(put("/api/users/me/book-status")
-                        .header("X-Debug-User-Id", userId)
+                        .header("Authorization", bearerToken(userId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookStatusUpdateBody))
                 .andExpect(status().isOk())
@@ -147,7 +155,7 @@ class OpinionWriteFlowIntegrationTest {
                 """.formatted(bookId);
 
         mockMvc.perform(put("/api/users/me/book-status")
-                        .header("X-Debug-User-Id", userId)
+                        .header("Authorization", bearerToken(userId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(bookStatusOverflowBody))
                 .andExpect(status().isBadRequest())

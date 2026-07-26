@@ -55,4 +55,44 @@ class UserTest {
 
         assertThat(user.getBackgroundColor()).isEqualTo("#FFFFFF");
     }
+
+    @Test
+    @DisplayName("가입 직후에는 약관에 동의하지 않은 상태다")
+    void termsAgreedAtIsNullRightAfterSignUp() {
+        User user = user();
+
+        assertThat(user.getTermsAgreedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("약관에 동의하면 동의 시각이 기록된다")
+    void agreeToTermsRecordsTimestamp() {
+        User user = user();
+
+        user.agreeToTerms();
+
+        assertThat(user.getTermsAgreedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("이미 약관에 동의한 사용자가 다시 동의해도 에러 없이 시각만 갱신된다")
+    void agreeToTermsIsIdempotent() {
+        User user = user();
+        user.agreeToTerms();
+        LocalDateTime firstAgreedAt = user.getTermsAgreedAt();
+
+        user.agreeToTerms();
+
+        assertThat(user.getTermsAgreedAt()).isNotNull().isAfterOrEqualTo(firstAgreedAt);
+    }
+
+    @Test
+    @DisplayName("온보딩을 완료하면 완료 상태가 된다")
+    void completeOnboardingMarksCompleted() {
+        User user = user();
+
+        user.completeOnboarding();
+
+        assertThat(user.isHasCompletedOnboarding()).isTrue();
+    }
 }

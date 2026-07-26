@@ -7,6 +7,7 @@ import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.presentation.dto.LikedOpinionListResponse;
 import com.nexters.palang.domain.user.presentation.dto.MeResponse;
 import com.nexters.palang.domain.user.presentation.dto.MyOpinionListResponse;
+import com.nexters.palang.domain.user.presentation.dto.OnboardingCompleteResponse;
 import com.nexters.palang.domain.user.presentation.dto.UpdateBackgroundColorRequest;
 import com.nexters.palang.domain.user.presentation.dto.UpdateNicknameRequest;
 import com.nexters.palang.global.common.response.DataResponse;
@@ -66,6 +67,14 @@ public class UserController implements UserApi {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         userService.withdraw(currentUserId);
         return ResponseEntity.ok(DataResponse.from(null));
+    }
+
+    @Override
+    @PatchMapping("/api/users/me/onboarding-complete")
+    public ResponseEntity<DataResponse<OnboardingCompleteResponse>> completeOnboarding() {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        userService.completeOnboarding(currentUserId);
+        return ResponseEntity.ok(DataResponse.from(new OnboardingCompleteResponse(true)));
     }
 
     @Override

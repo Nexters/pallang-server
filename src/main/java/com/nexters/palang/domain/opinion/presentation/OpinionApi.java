@@ -27,7 +27,7 @@ public interface OpinionApi {
             description = "Passage(신규 생성 또는 기존 병합) + Opinion + Decoration을 원자적으로 생성합니다. "
                     + "passageId가 없으면 새 Passage를 만들고, 있으면 해당 Passage에 병합합니다(Q-06). "
                     + "OCR 입력은 별도 플로우이며 이 API는 직접 입력만 지원합니다. "
-                    + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
+                    + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "흔적 생성 성공"),
             @ApiResponse(responseCode = "400",
@@ -43,7 +43,7 @@ public interface OpinionApi {
                                     @ExampleObject(name = "DECORATION_400_2: 꾸밈 영역 겹침", value = "{\"type\":\"/api/opinions\",\"title\":\"DECORATION_400_2\",\"status\":400,\"detail\":\"같은 흔적 안에서는 꾸밈 효과 영역이 겹칠 수 없습니다.\"}")
                             })
             ),
-            @ApiResponse(responseCode = "401", description = "X-Debug-User-Id 헤더 누락 (AUTH_401_1)",
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
                     content = @Content(
                             schema = @Schema(implementation = ErrorResponse.class),
                             examples = @ExampleObject(value = "{\"type\":\"/api/opinions\",\"title\":\"AUTH_401_1\",\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))
@@ -96,7 +96,7 @@ public interface OpinionApi {
             @ApiResponse(responseCode = "400", description = "내용 누락/길이 초과 (COMMON_400_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/opinions/1\",\"title\":\"COMMON_400_1\",\"status\":400,\"detail\":\"흔적 내용은 500자를 초과할 수 없습니다.\"}"))),
-            @ApiResponse(responseCode = "401", description = "X-Debug-User-Id 헤더 누락 (AUTH_401_1)",
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/opinions/1\",\"title\":\"AUTH_401_1\",\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
             @ApiResponse(responseCode = "403", description = "OPINION_403_1: 본인이 작성한 흔적만 수정/삭제할 수 있습니다.",
@@ -114,7 +114,7 @@ public interface OpinionApi {
     @Operation(summary = "흔적 삭제", description = "본인이 작성한 흔적을 소프트 삭제합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "삭제 성공"),
-            @ApiResponse(responseCode = "401", description = "X-Debug-User-Id 헤더 누락 (AUTH_401_1)",
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/opinions/1\",\"title\":\"AUTH_401_1\",\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
             @ApiResponse(responseCode = "403", description = "OPINION_403_1: 본인이 작성한 흔적만 수정/삭제할 수 있습니다.",

@@ -69,12 +69,12 @@ public interface BookApi {
 
     @Operation(summary = "내가 최근에 남긴 도서 목록",
             description = "현재 로그인한 사용자가 최근에 대목을 남긴 도서 목록입니다. "
-                    + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
+                    + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "401", description = "X-Debug-User-Id 헤더 누락 (AUTH_401_1)",
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     ResponseEntity<DataResponse<BookListResponse>> getRecentBooks(

@@ -58,7 +58,9 @@ public class User extends BaseEntity {
     @Column(name = "sns_id", nullable = false)
     private String snsId;
 
-    @Column(name = "terms_agreed_at", nullable = false)
+    // SNS 로그인 시점에는 아직 약관에 동의하지 않았을 수 있어(FR-AUTH-03) nullable이다.
+    // POST /api/auth/terms 호출 시 agreeToTerms()로 채워진다.
+    @Column(name = "terms_agreed_at")
     private LocalDateTime termsAgreedAt;
 
     @Column(name = "has_completed_onboarding", nullable = false)
@@ -91,6 +93,11 @@ public class User extends BaseEntity {
 
     public void completeOnboarding() {
         this.hasCompletedOnboarding = true;
+    }
+
+    // 이용약관 동의(FR-AUTH-03): 재동의 요청이 와도 그냥 최신 시각으로 갱신한다(멱등).
+    public void agreeToTerms() {
+        this.termsAgreedAt = LocalDateTime.now();
     }
 
     // 하루 1회 제한(FR-MY-05): 마지막 변경일이 오늘이면 재변경을 막는다. 이 사용자 한 명의 상태만으로

@@ -55,6 +55,14 @@ aladin:
   base-url: https://www.aladin.co.kr/ttb/api
   ttb-key: ${ALADIN_TTB_KEY:}
 
+kakao:
+  base-url: https://kapi.kakao.com
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration-seconds: ${JWT_ACCESS_EXPIRATION_SECONDS:3600}
+  refresh-token-expiration-seconds: ${JWT_REFRESH_EXPIRATION_SECONDS:1209600}
+
 logging:
   level:
     root: INFO
