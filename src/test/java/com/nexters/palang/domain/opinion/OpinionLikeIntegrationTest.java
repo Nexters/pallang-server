@@ -24,8 +24,8 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-// 좋아요 토글이 opinion_likes에 걸린 DB 트리거(schema-h2.sql)를 통해 opinions.like_count를
-// 실제로 동기화하는지 end-to-end로 검증한다 (backend-plan.md §5.4의 DB 트리거 방식).
+// 좋아요 토글이 OpinionLikeService를 거쳐 opinions.like_count를 실제로 동기화하는지
+// end-to-end로 검증한다 (backend-plan.md §5.4).
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
@@ -76,7 +76,7 @@ class OpinionLikeIntegrationTest {
 
     @Test
     @DisplayName("좋아요를 누르면 likeCount가 1 증가하고, 다시 누르면 취소되며 0으로 돌아온다")
-    void toggleLikeSyncsLikeCountViaTrigger() throws Exception {
+    void toggleLikeSyncsLikeCount() throws Exception {
         mockMvc.perform(post("/api/opinions/{opinionId}/like", opinionId)
                         .header("X-Debug-User-Id", likerId))
                 .andExpect(status().isOk())

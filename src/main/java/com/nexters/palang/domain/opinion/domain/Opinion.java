@@ -58,7 +58,7 @@ public class Opinion extends BaseEntity {
     @Column(name = "content", length = CONTENT_MAX_LENGTH, nullable = false)
     private String content;
 
-    // opinion_likes 테이블에 대한 INSERT/DELETE 트리거로 DB에서 직접 동기화되는 캐시 값
+    // OpinionLike 생성/삭제에 맞춰 OpinionLikeService가 증감시키는 캐시 값 (backend-plan.md §5.4)
     @Column(name = "like_count", nullable = false)
     private int likeCount;
 
@@ -92,6 +92,14 @@ public class Opinion extends BaseEntity {
 
     public void updateContent(String content) {
         this.content = content;
+    }
+
+    public void increaseLikeCount() {
+        this.likeCount++;
+    }
+
+    public void decreaseLikeCount() {
+        this.likeCount = Math.max(0, this.likeCount - 1);
     }
 
     public void addDecoration(Decoration decoration) {

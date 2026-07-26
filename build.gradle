@@ -28,9 +28,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 	implementation 'org.springframework.boot:spring-boot-h2console'
-	// H2는 CREATE TRIGGER가 org.h2.api.Trigger를 구현한 컴파일된 클래스만 등록할 수 있어(schema-h2.sql),
-	// 좋아요 카운트 동기화 트리거 구현체가 org.h2.api.Trigger를 컴파일 타임에 참조할 수 있도록 implementation으로 둔다.
-	implementation 'com.h2database:h2'
+	runtimeOnly 'com.h2database:h2'
 	runtimeOnly 'com.mysql:mysql-connector-j'
 
 	// QueryDSL

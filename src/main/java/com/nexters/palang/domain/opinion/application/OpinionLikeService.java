@@ -8,15 +8,12 @@ import com.nexters.palang.domain.opinion.infrastructure.OpinionLikeRepository;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
-import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// 좋아요 카운트 동기화(backend-plan.md §5.4): opinions.like_count는 opinion_likes에 걸린
-// DB 트리거(schema-h2.sql/schema-mysql.sql)가 갱신한다. 서비스는 OpinionLike 행만 생성/삭제하면 되지만,
-// 트리거가 UPDATE한 값을 같은 트랜잭션의 영속성 컨텍스트가 모르는 stale read 문제가 있어
-// flush 직후 refresh로 opinion을 다시 읽어야 정확한 likeCount를 응답할 수 있다.
+// 좋아요 카운트 동기화(backend-plan.md §5.4): OpinionLike는 다른 엔티티(Opinion)의 캐시 값을
+// 조율해야 하므로 정적 팩토리로는 표현할 수 없어 서비스 계층에서 같은 트랜잭션 안에 처리한다.
 @Service
 @RequiredArgsConstructor
 public class OpinionLikeService {
@@ -24,7 +21,6 @@ public class OpinionLikeService {
     private final OpinionRepository opinionRepository;
     private final OpinionLikeRepository opinionLikeRepository;
     private final UserRepository userRepository;
-    private final EntityManager entityManager;
 
     @Transactional
     public OpinionLikeResult toggleLike(Long userId, Long opinionId) {
@@ -38,18 +34,14 @@ public class OpinionLikeService {
     private OpinionLikeResult like(Long userId, Opinion opinion) {
         User user = userRepository.getReferenceById(userId);
         opinionLikeRepository.save(OpinionLike.builder().user(user).opinion(opinion).build());
-        return syncLikeState(opinion, true);
+        opinion.increaseLikeCount();
+        return new OpinionLikeResult(opinion.getId(), true, opinion.getLikeCount());
     }
 
     private OpinionLikeResult unlike(Long userId, Opinion opinion) {
         opinionLikeRepository.deleteByUserIdAndOpinionId(userId, opinion.getId());
-        return syncLikeState(opinion, false);
-    }
-
-    private OpinionLikeResult syncLikeState(Opinion opinion, boolean liked) {
-        opinionLikeRepository.flush();
-        entityManager.refresh(opinion);
-        return new OpinionLikeResult(opinion.getId(), liked, opinion.getLikeCount());
+        opinion.decreaseLikeCount();
+        return new OpinionLikeResult(opinion.getId(), false, opinion.getLikeCount());
     }
 
     private Opinion getExistingOpinion(Long opinionId) {

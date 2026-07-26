@@ -130,7 +130,6 @@ public interface OpinionApi {
 
     @Operation(summary = "흔적 좋아요 토글",
             description = "좋아요를 누르지 않은 상태면 좋아요를 남기고, 이미 눌렀다면 취소합니다. "
-                    + "likeCount는 opinion_likes 테이블에 걸린 DB 트리거로 동기화됩니다. "
                     + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "좋아요 토글 성공"),
