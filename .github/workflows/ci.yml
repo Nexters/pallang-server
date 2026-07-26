@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: pallang_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # application-local.yaml은 .gitignore 대상이라 CI 체크아웃본에는 존재하지 않는다.
+      # 그래서 datasource/redis 값을 프로파일 파일이 아니라 Spring Boot 표준 env로 직접 주입한다.
+      # 프로파일 "이름"은 그대로 local을 써야 한다 — HeaderCurrentUserProvider가 @Profile("local")로
+      # 제한돼 있어서, 다른 이름(test 등)을 쓰면 CurrentUserProvider 빈을 찾지 못해
+      # 컨트롤러 생성 단계에서 NoSuchBeanDefinitionException이 난다.
+      - name: Build and run tests
+        run: ./gradlew build
+        env:
+          SPRING_PROFILES_ACTIVE: local
+          SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/pallang_test?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+          SPRING_DATASOURCE_USERNAME: root
+          SPRING_DATASOURCE_PASSWORD: root
+          SPRING_DATASOURCE_DRIVER_CLASS_NAME: com.mysql.cj.jdbc.Driver
+          # 마이그레이션 도구(Flyway/Liquibase) 도입 전까지, CI에서는 매 실행마다 스키마를 새로 생성한다.
+          SPRING_JPA_HIBERNATE_DDL_AUTO: create-drop
+          SPRING_DATA_REDIS_HOST: localhost
+          SPRING_DATA_REDIS_PORT: 6379
+
+      - name: Upload test report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: build/reports/tests/test
+          retention-days: 5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify Docker image builds
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: pallang-ci-check:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
