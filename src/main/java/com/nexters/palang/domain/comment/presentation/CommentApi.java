@@ -24,7 +24,7 @@ public interface CommentApi {
     @Operation(summary = "댓글 목록 조회",
             description = "흔적에 달린 원댓글과 답글을 조회합니다. 원댓글은 page/size로 페이지네이션되며, "
                     + "각 원댓글에는 답글이 최대 5개까지 미리보기로 포함됩니다. 5개를 초과하면 hasMoreReplies=true이며, "
-                    + "나머지는 GET /api/comments/{commentId}/replies로 조회합니다. (FR-OPINION-07)")
+                    + "나머지는 GET /api/comments/{commentId}/replies로 조회합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
@@ -43,7 +43,7 @@ public interface CommentApi {
     );
 
     @Operation(summary = "답글 더보기",
-            description = "특정 원댓글에 달린 답글을 page/size로 페이지네이션 조회합니다. (FR-OPINION-07)")
+            description = "특정 원댓글에 달린 답글을 page/size로 페이지네이션 조회합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
