@@ -54,10 +54,13 @@ jobs:
 
       # application-local.yaml은 .gitignore 대상이라 CI 체크아웃본에는 존재하지 않는다.
       # 그래서 datasource/redis 값을 프로파일 파일이 아니라 Spring Boot 표준 env로 직접 주입한다.
+      # 프로파일 "이름"은 그대로 local을 써야 한다 — HeaderCurrentUserProvider가 @Profile("local")로
+      # 제한돼 있어서, 다른 이름(test 등)을 쓰면 CurrentUserProvider 빈을 찾지 못해
+      # 컨트롤러 생성 단계에서 NoSuchBeanDefinitionException이 난다.
       - name: Build and run tests
         run: ./gradlew build
         env:
-          SPRING_PROFILES_ACTIVE: test
+          SPRING_PROFILES_ACTIVE: local
           SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/pallang_test?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
           SPRING_DATASOURCE_USERNAME: root
           SPRING_DATASOURCE_PASSWORD: root
