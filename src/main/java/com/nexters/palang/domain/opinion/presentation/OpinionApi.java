@@ -3,6 +3,7 @@ package com.nexters.palang.domain.opinion.presentation;
 import com.nexters.palang.domain.opinion.domain.OpinionSortType;
 import com.nexters.palang.domain.opinion.presentation.dto.CreateOpinionRequest;
 import com.nexters.palang.domain.opinion.presentation.dto.OpinionDetailResponse;
+import com.nexters.palang.domain.opinion.presentation.dto.OpinionLikeResponse;
 import com.nexters.palang.domain.opinion.presentation.dto.OpinionListResponse;
 import com.nexters.palang.domain.opinion.presentation.dto.OpinionResponse;
 import com.nexters.palang.domain.opinion.presentation.dto.UpdateOpinionRequest;
@@ -124,6 +125,26 @@ public interface OpinionApi {
                             value = "{\"type\":\"/api/opinions/1\",\"title\":\"OPINION_404_1\",\"status\":404,\"detail\":\"해당 흔적을 찾을 수 없습니다.\"}")))
     })
     ResponseEntity<DataResponse<Void>> removeOpinion(
+            @Parameter(description = "흔적 ID", required = true) Long opinionId
+    );
+
+    @Operation(summary = "흔적 좋아요 토글",
+            description = "좋아요를 누르지 않은 상태면 좋아요를 남기고, 이미 눌렀다면 취소합니다. "
+                    + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "좋아요 토글 성공"),
+            @ApiResponse(responseCode = "401", description = "X-Debug-User-Id 헤더 누락 (AUTH_401_1)",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"type\":\"/api/opinions/1/like\",\"title\":\"AUTH_401_1\",\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))
+            ),
+            @ApiResponse(responseCode = "404", description = "해당 흔적을 찾을 수 없음 (OPINION_404_1)",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"type\":\"/api/opinions/1/like\",\"title\":\"OPINION_404_1\",\"status\":404,\"detail\":\"해당 흔적을 찾을 수 없습니다.\"}"))
+            )
+    })
+    ResponseEntity<DataResponse<OpinionLikeResponse>> toggleOpinionLike(
             @Parameter(description = "흔적 ID", required = true) Long opinionId
     );
 }

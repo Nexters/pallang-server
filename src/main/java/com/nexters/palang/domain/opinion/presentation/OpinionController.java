@@ -1,10 +1,13 @@
 package com.nexters.palang.domain.opinion.presentation;
 
+import com.nexters.palang.domain.opinion.application.OpinionLikeResult;
+import com.nexters.palang.domain.opinion.application.OpinionLikeService;
 import com.nexters.palang.domain.opinion.application.OpinionService;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.opinion.domain.OpinionSortType;
 import com.nexters.palang.domain.opinion.presentation.dto.CreateOpinionRequest;
 import com.nexters.palang.domain.opinion.presentation.dto.OpinionDetailResponse;
+import com.nexters.palang.domain.opinion.presentation.dto.OpinionLikeResponse;
 import com.nexters.palang.domain.opinion.presentation.dto.OpinionListResponse;
 import com.nexters.palang.domain.opinion.presentation.dto.OpinionResponse;
 import com.nexters.palang.domain.opinion.presentation.dto.UpdateOpinionRequest;
@@ -33,6 +36,7 @@ public class OpinionController implements OpinionApi {
     private static final int MAX_SIZE = 100;
 
     private final OpinionService opinionService;
+    private final OpinionLikeService opinionLikeService;
     private final CurrentUserProvider currentUserProvider;
 
     @Override
@@ -78,6 +82,14 @@ public class OpinionController implements OpinionApi {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         opinionService.removeOpinion(opinionId, currentUserId);
         return ResponseEntity.ok(DataResponse.from(null));
+    }
+
+    @Override
+    @PostMapping("/api/opinions/{opinionId}/like")
+    public ResponseEntity<DataResponse<OpinionLikeResponse>> toggleOpinionLike(@PathVariable Long opinionId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        OpinionLikeResult result = opinionLikeService.toggleLike(currentUserId, opinionId);
+        return ResponseEntity.ok(DataResponse.from(OpinionLikeResponse.from(result)));
     }
 
     private Pageable pageable(int page, int size) {
