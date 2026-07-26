@@ -26,7 +26,7 @@ public interface OpinionApi {
             description = "Passage(신규 생성 또는 기존 병합) + Opinion + Decoration을 원자적으로 생성합니다. "
                     + "passageId가 없으면 새 Passage를 만들고, 있으면 해당 Passage에 병합합니다(Q-06). "
                     + "OCR 입력은 별도 플로우이며 이 API는 직접 입력만 지원합니다. "
-                    + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인). (FR-WRITE-06~10)")
+                    + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "흔적 생성 성공"),
             @ApiResponse(responseCode = "400",
@@ -61,7 +61,7 @@ public interface OpinionApi {
             @Valid CreateOpinionRequest request
     );
 
-    @Operation(summary = "흔적 목록 조회", description = "특정 대목에 남겨진 흔적을 정렬 기준(최신순 기본/좋아요순)으로 조회합니다. (FR-OPINION-03)")
+    @Operation(summary = "흔적 목록 조회", description = "특정 대목에 남겨진 흔적을 정렬 기준(최신순 기본/좋아요순)으로 조회합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
@@ -78,7 +78,7 @@ public interface OpinionApi {
             @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
     );
 
-    @Operation(summary = "흔적 상세 조회", description = "흔적 작성자가 기록한 꾸밈을 그대로 확인합니다(병합된 결과가 아님). (FR-OPINION-05)")
+    @Operation(summary = "흔적 상세 조회", description = "흔적 작성자가 기록한 꾸밈을 그대로 확인합니다(병합된 결과가 아님).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "404", description = "해당 흔적을 찾을 수 없음 (OPINION_404_1)",
