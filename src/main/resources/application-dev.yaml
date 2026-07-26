@@ -21,13 +21,12 @@ spring:
     database: mysql
     database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
-      # 운영에서는 스키마를 자동 변경하지 않는다. 마이그레이션 도구(Flyway/Liquibase) 도입 전까지는
-      # 스키마를 미리 반영해두고 검증만 수행한다. 스키마가 자주 바뀌는 환경은 application-dev.yaml을 쓸 것.
-      ddl-auto: validate
-    show-sql: false
+      # dev는 스키마가 자주 바뀌는 실험 환경이라 자동 반영한다 (prod는 validate 유지).
+      ddl-auto: update
+    show-sql: true
     properties:
       hibernate:
-        format_sql: false
+        format_sql: true
         jdbc:
           time_zone: Asia/Seoul
     open-in-view: false
@@ -58,4 +57,4 @@ aladin:
 logging:
   level:
     root: INFO
-    com.nexters.palang: INFO
+    com.nexters.palang: DEBUG
