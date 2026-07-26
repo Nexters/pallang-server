@@ -53,6 +53,17 @@ public class AuthService {
         getActiveUser(userId).agreeToTerms();
     }
 
+    // local 프로파일 전용 개발 편의 기능(DevAuthController). 카카오 서버를 타지 않고 바로 JWT를 발급한다.
+    // userId가 주어지면 그 유저로, 없으면 매번 새 테스트 유저를 만들어 로그인 처리한다.
+    @Transactional
+    public AuthResult devLogin(Long userId) {
+        boolean isNewUser = userId == null;
+        User user = isNewUser
+                ? userRegistrationService.registerViaSns(SnsProvider.KAKAO, "dev-" + System.nanoTime())
+                : getActiveUser(userId);
+        return issueTokens(user, isNewUser);
+    }
+
     @Transactional
     public AuthResult refresh(String refreshToken) {
         Long userId = parseUserId(refreshToken);

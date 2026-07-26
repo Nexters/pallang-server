@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -111,6 +112,44 @@ class AuthServiceTest {
                 .willReturn(Optional.of(withdrawnUser));
 
         assertThatThrownBy(() -> authService.loginWithKakao("kakao-token")).isInstanceOf(AuthException.class);
+    }
+
+    @Test
+    @DisplayName("[개발용] userId 없이 devLogin을 호출하면 새 테스트 유저를 만들어 로그인 처리한다")
+    void devLoginCreatesNewUserWhenUserIdOmitted() {
+        User newUser = user(400L);
+        given(userRegistrationService.registerViaSns(eq(SnsProvider.KAKAO), anyString())).willReturn(newUser);
+        given(jwtTokenProvider.createAccessToken(400L)).willReturn("access-token");
+        given(jwtTokenProvider.createRefreshToken(400L)).willReturn("refresh-token");
+        given(jwtTokenProvider.refreshTokenExpiryFromNow()).willReturn(LocalDateTime.now().plusDays(14));
+
+        AuthResult result = authService.devLogin(null);
+
+        assertThat(result.isNewUser()).isTrue();
+        assertThat(result.accessToken()).isEqualTo("access-token");
+    }
+
+    @Test
+    @DisplayName("[개발용] userId를 주고 devLogin을 호출하면 해당 유저로 로그인 처리한다")
+    void devLoginUsesExistingUserWhenUserIdGiven() {
+        User existingUser = user(500L);
+        given(userRepository.findById(500L)).willReturn(Optional.of(existingUser));
+        given(jwtTokenProvider.createAccessToken(500L)).willReturn("access-token");
+        given(jwtTokenProvider.createRefreshToken(500L)).willReturn("refresh-token");
+        given(jwtTokenProvider.refreshTokenExpiryFromNow()).willReturn(LocalDateTime.now().plusDays(14));
+
+        AuthResult result = authService.devLogin(500L);
+
+        assertThat(result.isNewUser()).isFalse();
+        verify(userRegistrationService, never()).registerViaSns(any(), anyString());
+    }
+
+    @Test
+    @DisplayName("[개발용] 존재하지 않는 userId로 devLogin을 호출하면 예외가 발생한다")
+    void devLoginFailsWhenUserIdNotFound() {
+        given(userRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.devLogin(999L)).isInstanceOf(UserException.class);
     }
 
     @Test
