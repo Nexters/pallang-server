@@ -74,6 +74,11 @@ jobs:
             # (동시 배포 시 compose 소스와 이미지 태그가 어긋나는 것을 방지).
             git fetch origin
             git checkout "${IMAGE_TAG}"
+            # GitHub Secrets(dev Environment)에 등록해둔 .env 전체 내용을 그대로 받아 쓴다.
+            # 따옴표 처리된 heredoc이라 값 안의 $, ", ' 등을 신경 쓸 필요가 없다.
+            cat > .env <<'PALANG_ENV_EOF'
+            ${{ secrets.APP_ENV_FILE }}
+            PALANG_ENV_EOF
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans
@@ -105,6 +110,10 @@ jobs:
             # (동시 배포 시 compose 소스와 이미지 태그가 어긋나는 것을 방지).
             git fetch origin
             git checkout "${IMAGE_TAG}"
+            # GitHub Secrets(prod Environment)에 등록해둔 .env 전체 내용을 그대로 받아 쓴다.
+            cat > .env <<'PALANG_ENV_EOF'
+            ${{ secrets.APP_ENV_FILE }}
+            PALANG_ENV_EOF
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans
