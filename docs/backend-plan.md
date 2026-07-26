@@ -98,7 +98,7 @@ PR #6에서 이미 확정된 좋은 패턴은 그대로 따른다: `Like` 대신
 | `UserBookStatus` | user, book, status(READING/PLANNED), currentPage, unique(user,book) | 변경 없음 (그대로 사용) |
 | `Book` | title, author, publisher, pageCount(`@Check`>0), isbn(nullable), coverImageUrl(nullable), source(API/MANUAL) | 변경 없음 |
 | `Passage` | book, creator(User), pageNumber, quotedText(150), isSpoiler | **`normalizedHash` 추가** + `(book_id, normalized_hash)` 인덱스 (유사 문장 판정, FR-WRITE-07) / 150자 제한은 `PassagePolicy.QUOTED_TEXT_MAX_LENGTH` 상수 참조 (§3.1) |
-| `Opinion` | passage, user, content(500), likeCount(int) | **`deletedAt` 추가** (수정/삭제) / **`likeCount` 동기화는 애플리케이션 서비스 트랜잭션에서 처리** (DB 트리거 방식은 채택하지 않음 — 이유는 §5.4 참고) / `(passage_id, created_at)` 인덱스 추가 (최신순 정렬 전용, 기존 `idx_opinions_passage_sort`는 좋아요순 전용) / `@OneToMany(mappedBy="opinion", cascade=ALL, orphanRemoval=true) decorations` 추가 (§5.5) |
+| `Opinion` | passage, user, content(500), likeCount(int) | **`deletedAt` 추가** (수정/삭제) / **`likeCount` 동기화는 `opinion_likes` INSERT/DELETE DB 트리거로 처리** (이유는 §5.4 참고) / `(passage_id, created_at)` 인덱스 추가 (최신순 정렬 전용, 기존 `idx_opinions_passage_sort`는 좋아요순 전용) / `@OneToMany(mappedBy="opinion", cascade=ALL, orphanRemoval=true) decorations` 추가 (§5.5) |
 | `Decoration` | opinion, startOffset, endOffset(`@Check`), effectType(**String**), color(**"#PRIMARY" 문자열**) | **`effectType` → `enum EffectType{UNDERLINE,WAVY,HIGHLIGHT}`** / **`color`를 저장 시점에 실제 hex로 resolve**하거나 `ColorToken` enum 도입 / 독립 테이블·엔티티는 유지하되 `Opinion` 쪽 연관관계에 `cascade=ALL, orphanRemoval=true`로 "Opinion 없이 존재 불가"를 표현 (§5.5) |
 | `Comment` | opinion, user, parentComment(self FK), content(1000) | **`deletedAt` 추가** (수정/삭제) / **1-depth 제약은 정적 팩토리(`Comment.root()`/`Comment.reply()`)에서 생성 시점에 차단** (DB 트리거 방식 채택 안 함 — §5.3) |
 | `OpinionLike` | user, opinion, unique(user,opinion) | 변경 없음 |
@@ -215,10 +215,14 @@ public class Comment extends BaseEntity {
 
 `NestedReplyNotAllowedException`은 `domain/comment/common`에 두고 `COMMENT_400_1`(§8)과 매핑한다. DB 트리거는 최후 방어선으로 남겨둘 수는 있지만, 1차 방어는 이 팩토리 메서드가 맡는다 — 트리거 없이도 H2/MySQL 어디서든 동일하게 JUnit으로 검증 가능하다는 게 핵심 이점.
 
-### 5.4 좋아요 카운트 동기화 — 서비스 계층에서 처리
-`Opinion.likeCount`는 `OpinionLike`라는 **다른 엔티티의 생성/삭제**에 맞춰 갱신되어야 하는 값이라, 댓글 1-depth와 달리 단일 엔티티의 정적 팩토리로는 표현할 수 없다 (두 엔티티/트랜잭션의 조율이 필요). 그래서 이건 그대로 서비스 계층에 둔다:
-- `OpinionLikeService.like()/unlike()`가 같은 트랜잭션 안에서 `OpinionLike`를 생성/삭제하면서 `Opinion.likeCount`를 직접 증감.
-- DB 트리거 방식은 채택하지 않는다 — 같은 영속성 컨텍스트에서 `opinion.getLikeCount()`를 즉시 읽을 때 stale한 값이 나올 수 있고, H2/MySQL에 트리거를 각각 유지해야 해서 테스트 비용이 늘어난다.
+### 5.4 좋아요 카운트 동기화 — DB 트리거로 처리
+`Opinion.likeCount`는 `OpinionLike`라는 **다른 엔티티의 생성/삭제**에 맞춰 갱신되어야 하는 값이라, 댓글 1-depth와 달리 단일 엔티티의 정적 팩토리로는 표현할 수 없다. PR #6 코드가 이미 `opinion_likes` INSERT/DELETE 트리거를 전제로 작성돼 있었고, 이번 구현(#16)에서 DB 트리거 방식으로 확정했다.
+
+- `OpinionLikeService.toggleLike()`가 `OpinionLike`를 생성/삭제만 하고, `opinions.like_count` 증감은 DB 트리거가 담당한다.
+  - MySQL(운영): `src/main/resources/schema-mysql.sql` — `AFTER INSERT`/`AFTER DELETE` 트리거 2개, 마이그레이션 도구 도입 전까지 배포 전 수동 반영 필요 (`ddl-auto: validate`).
+  - H2(로컬/테스트): `src/main/resources/schema-h2.sql` + `OpinionLikeCountH2Trigger`(`org.h2.api.Trigger` 구현체, 컴파일된 클래스만 등록 가능해 인라인 SQL 트리거 본문은 쓸 수 없음). `application.yaml`의 `local` 프로파일 문서(`spring.sql.init.mode=always`, `platform=h2`) + `spring.jpa.defer-datasource-initialization=true`로 Hibernate가 테이블을 만든 뒤 자동 등록된다. (`application-local.yaml`은 개인 설정용으로 `.gitignore` 대상이라 여기 두지 않는다.)
+- **stale read 대응**: 트리거는 별도 UPDATE로 DB 값을 바꾸지만, 같은 트랜잭션의 영속성 컨텍스트가 들고 있는 `Opinion` 엔티티는 이 변경을 모른다. `OpinionLikeService`는 `OpinionLike` 저장/삭제 후 `flush()` → `entityManager.refresh(opinion)` 순서로 다시 읽어 응답에 정확한 `likeCount`를 담는다.
+- **트레이드오프**: H2/MySQL에 트리거를 각각 유지해야 해서 테스트 비용이 늘고(H2는 컴파일된 Java 클래스, MySQL은 SQL 트리거로 로직이 이중화됨), MySQL 트리거는 마이그레이션 도구가 없어 배포 전 수동 반영에 의존한다. 이 비용을 감수하고 트리거를 선택한 이유는 PR #6 베이스라인과의 일치, 그리고 동시성 상황에서 `likeCount` 증감을 애플리케이션 레이어의 낙관적 락/재시도 없이 DB가 원자적으로 보장하기 때문이다.
 
 ### 5.5 Decoration 집계 경계 — cascade + orphanRemoval
 `Decoration`은 `Opinion` 없이 존재할 이유가 없는 컴포지션 관계지만, 독립 엔티티/테이블 자체는 유지한다. 이유는 §5.6의 꾸밈 병합 알고리즘이 **여러 Opinion에 걸친 Decoration을 가로질러 조회하고, `Decoration.id`를 정렬 tiebreaker로 사용**하기 때문 — `@ElementCollection`으로 바꾸면 own PK가 없어져서 이 정렬 자체가 불가능해진다.
@@ -340,6 +344,7 @@ OCR이 붙기 전까지 흔적 작성은 "직접 입력" 경로만 지원한다 
 | `USER_409_1` | 409 | 이미 사용 중인 닉네임입니다. |
 | `PASSAGE_400_1` | 400 | 발췌 문장은 150자를 초과할 수 없습니다. |
 | `OPINION_403_1` | 403 | 본인이 작성한 흔적만 수정/삭제할 수 있습니다. |
+| `OPINION_404_1` | 404 | 해당 흔적을 찾을 수 없습니다. |
 | `COMMENT_400_1` | 400 | 답글에는 답글을 남길 수 없습니다. |
 | `BOOK_404_1` | 404 | 해당 도서를 찾을 수 없습니다. |
 
@@ -350,7 +355,7 @@ OCR이 붙기 전까지 흔적 작성은 "직접 입력" 경로만 지원한다 
 ## 9. 후속 확인 필요 (백엔드 착수를 막지는 않음)
 
 - **OCR 벤더 미정**: `OcrClient` 인터페이스로 추상화, Phase 4(OCR) 착수 시점에 벤더 선정 — 지금 당장은 필요 없음.
-- **댓글 1-depth(정적 팩토리)·좋아요 카운트(서비스 계층) 방식**: 이 문서에서는 확정했지만 PR #6 코드는 DB 트리거를 전제로 작성돼 있어 PR 리뷰에서 작성자와 합의 필요 (§5.3, §5.4).
+- **댓글 1-depth(정적 팩토리)·좋아요 카운트(DB 트리거) 방식**: 댓글 1-depth는 정적 팩토리로 확정(§5.3). 좋아요 카운트 동기화는 초안에서 "서비스 계층 처리"로 검토했으나, PR #6 코드가 이미 DB 트리거를 전제로 작성돼 있었고 #16에서 DB 트리거 방식으로 최종 확정했다(§5.4).
 - Q-06(병합 거부 시 별도 Passage), Q-08(탈퇴 닉네임 포맷), Q-09(같은 Opinion 내 Decoration 겹침 허용 여부)는 Phase 1 흔적 작성 로직을 짤 때 재확인.
 - **`NicknameGenerator`(§5.1)는 Phase 3(인증)에서만 쓰이지만, 지금 단계에 미리 만들어 단위 테스트로 검증해두면** 인증 착수 시 바로 회원가입 플로우에 꽂아 넣을 수 있다. 급하지 않으면 스킵해도 무방.
 
