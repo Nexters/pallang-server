@@ -3,7 +3,23 @@ spring:
     name: palang
   profiles:
     active: local
+  jpa:
+    # Hibernate가 테이블을 만든 뒤에 schema-*.sql(좋아요 카운트 동기화 트리거)을 실행하기 위함.
+    defer-datasource-initialization: true
 
 aladin:
   base-url: https://www.aladin.co.kr/ttb/api
   ttb-key: ${ALADIN_TTB_KEY:}
+
+---
+# application-local.yaml은 .gitignore 대상(개인 로컬 설정용)이라 여기 별도 문서로 둔다.
+# 로컬/테스트는 임베디드 H2를 쓰므로 schema-h2.sql(좋아요 카운트 동기화 트리거)을 항상 실행한다.
+# 운영(MySQL)은 이 프로파일을 타지 않으므로 schema-mysql.sql은 자동 실행되지 않는다 (수동 반영, backend-plan.md §5.4).
+spring:
+  config:
+    activate:
+      on-profile: local
+  sql:
+    init:
+      mode: always
+      platform: h2
