@@ -79,6 +79,12 @@ jobs:
             cat > .env <<'PALANG_ENV_EOF'
             ${{ secrets.APP_ENV_FILE }}
             PALANG_ENV_EOF
+            # IMAGE_TAG를 .env에도 남겨둔다. docker compose는 이 파일을 변수 치환에
+            # 자동으로 쓰므로, 나중에 사람이 export 없이 수동으로 docker compose 명령을
+            # 돌려도 항상 "마지막으로 CD가 배포한 태그"를 쓰게 되어 존재하지 않는
+            # latest 태그로 조용히 빠지는 사고를 막는다.
+            sed -i '/^IMAGE_TAG=/d' .env
+            echo "IMAGE_TAG=${IMAGE_TAG}" >> .env
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans
@@ -114,6 +120,9 @@ jobs:
             cat > .env <<'PALANG_ENV_EOF'
             ${{ secrets.APP_ENV_FILE }}
             PALANG_ENV_EOF
+            # IMAGE_TAG를 .env에도 남겨둔다 (deploy-dev와 동일한 이유).
+            sed -i '/^IMAGE_TAG=/d' .env
+            echo "IMAGE_TAG=${IMAGE_TAG}" >> .env
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans
