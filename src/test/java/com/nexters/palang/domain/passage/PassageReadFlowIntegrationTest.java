@@ -102,14 +102,13 @@ class PassageReadFlowIntegrationTest {
     }
 
     @Test
-    @DisplayName("스포일러로 표기된 대목은 존재는 노출되지만 quotedText/꾸밈은 가려진다")
-    void spoilerPassageContentIsMaskedInPageDetail() throws Exception {
+    @DisplayName("스포일러로 표기된 대목도 isSpoiler 플래그와 함께 실제 내용을 그대로 내려준다 (블러/확인은 프론트 담당)")
+    void spoilerPassageContentIsReturnedAsIsWithSpoilerFlag() throws Exception {
         mockMvc.perform(get("/api/books/" + bookId + "/pages/1/passages"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.passages[0].passageId").value(spoilerPage1.getId()))
                 .andExpect(jsonPath("$.data.passages[0].isSpoiler").value(true))
-                .andExpect(jsonPath("$.data.passages[0].quotedText").doesNotExist())
-                .andExpect(jsonPath("$.data.passages[0].decorations.length()").value(0));
+                .andExpect(jsonPath("$.data.passages[0].quotedText").value("스포일러 문장"));
     }
 
     @Test
