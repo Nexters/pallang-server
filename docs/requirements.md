@@ -407,20 +407,12 @@
 - 안내: `문장이 있는 페이지와 스포일러 유무를 선택해주세요!`
 - 입력: `페이지` (숫자, `000 P`), `스포일러` 토글
 
-#### 읽기 상태 표기 ★★
+#### 읽기 상태 표기 ★★ — 대목 노출 필터 아님 (기획 확인, 이슈 #42)
 > **책 흔적을 남길 때 상태 표기 (읽는 중 / 읽을 예정)**
 > - **읽는 중**: 어디까지 읽었는지 페이지 표시. **그 이후 페이지는 내용이 보이지 않음**
 > - **읽을 예정**: **첫 부분만 보여주고 이후는 보이지 않음** (스포 방지)
 
-> **ERD 정합**: `UserBookStatus.status = READING / PLANNED`, `currentPage`와 정확히 대응한다. ✓
->
-> **이게 흔적 조회의 핵심 필터다.** 조회 로직:
-> ```text
-> READING  → passage.pageNumber <= userBookStatus.currentPage 인 것만 노출
-> PLANNED  → 첫 페이지(최소 pageNumber) 대목만 노출
-> 미설정   → PLANNED와 동일 취급 (첫 페이지만 노출) — backend-plan.md에서 확정
-> ```
-> 여기에 `isSpoiler` 필터가 **추가로** 적용된다. 두 조건은 AND 관계.
+> **기획 확인 결과 (이슈 #42): 위 인용문 기반으로 구현했던 "읽기 상태로 대목 노출 범위를 제한하는 필터"는 삭제된 기획이었다.** 유저가 책을 어디까지 읽었는지 서버가 저장하거나 그 값을 조회 API의 필터 기준으로 쓸 필요가 없다. `UserBookStatus.status/currentPage`는 유지되지만 대목 노출과는 무관하며, 스포일러 여부는 오직 대목 단위 `isSpoiler` 플래그(FR-VIEW-03)로만 판단한다. 상세는 `docs/spoiler-visibility-design.md` 참고.
 
 ### FR-WRITE-09 꾸밈 효과 (2/3)
 
@@ -554,7 +546,7 @@
 
 | 항목 | 근거 |
 |---|---|
-| `UserBookStatus.status/currentPage` | 읽는 중/읽을 예정 + 페이지 필터와 정확히 대응 |
+| `UserBookStatus.status/currentPage` | 읽는 중/읽을 예정 상태값 저장용 (대목 노출 필터로는 쓰이지 않음 — 이슈 #42) |
 | `Book.pageCount NOT NULL` | 직접 등록 시 페이지수 필수 확인됨 |
 | `Book.isbn` nullable | ISBN 선택 항목 확인됨 |
 | `Book.coverImageUrl` nullable | 이미지 선택 항목 확인됨 |

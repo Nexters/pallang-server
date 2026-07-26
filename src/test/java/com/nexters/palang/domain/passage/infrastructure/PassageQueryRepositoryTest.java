@@ -6,11 +6,9 @@ import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.passage.application.SimilarPassageProjection;
 import com.nexters.palang.domain.passage.domain.Passage;
-import com.nexters.palang.domain.passage.domain.QPassage;
 import com.nexters.palang.domain.user.domain.SnsProvider;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.global.config.JpaAuditingConfig;
-import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -78,8 +76,6 @@ class PassageQueryRepositoryTest {
                 .build());
     }
 
-    private static final BooleanExpression NOT_SPOILER = QPassage.passage.isSpoiler.isFalse();
-
     @Test
     @DisplayName("같은 책의 인접 페이지(±1)에서 정규화 해시가 같은 대목을 후보로 조회한다")
     void findSimilarCandidatesReturnsPassagesWithinAdjacentPages() {
@@ -123,32 +119,8 @@ class PassageQueryRepositoryTest {
     }
 
     @Test
-    @DisplayName("스포일러 대목도 존재로 취급되어 가장 작은 페이지 번호에 포함된다 (내용 마스킹은 응답 단계의 책임)")
-    void findFirstVisiblePageNumberIncludesSpoilerPassages() {
-        User writer = user("writer-4");
-        Book book = book("책");
-        passage(book, writer, 1, true);
-        passage(book, writer, 3, false);
-        passage(book, writer, 5, false);
-
-        Integer firstPage = passageQueryRepository.findFirstVisiblePageNumber(book.getId());
-
-        assertThat(firstPage).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("노출 대상 대목이 하나도 없으면 첫 노출 페이지는 null이다")
-    void findFirstVisiblePageNumberReturnsNullWhenNoPassages() {
-        Book book = book("빈 책");
-
-        Integer firstPage = passageQueryRepository.findFirstVisiblePageNumber(book.getId());
-
-        assertThat(firstPage).isNull();
-    }
-
-    @Test
-    @DisplayName("노출 필터를 만족하는 서로 다른 페이지 번호만 오름차순으로 조회한다")
-    void findVisiblePageNumbersReturnsDistinctPagesInAscendingOrder() {
+    @DisplayName("서로 다른 페이지 번호만 오름차순으로 조회한다 (스포일러 페이지도 포함)")
+    void findPageNumbersReturnsDistinctPagesInAscendingOrderIncludingSpoilers() {
         User writer = user("writer-5");
         Book book = book("책");
         passage(book, writer, 5, false);
@@ -156,22 +128,33 @@ class PassageQueryRepositoryTest {
         passage(book, writer, 2, false);
         passage(book, writer, 1, true);
 
-        Page<Integer> result = passageQueryRepository.findVisiblePageNumbers(book.getId(), NOT_SPOILER, PageRequest.of(0, 10));
+        Page<Integer> result = passageQueryRepository.findPageNumbers(book.getId(), PageRequest.of(0, 10));
 
-        assertThat(result.getContent()).containsExactly(2, 5);
+        assertThat(result.getContent()).containsExactly(1, 2, 5);
     }
 
     @Test
-    @DisplayName("특정 페이지에 걸친 대목을 노출 필터에 맞춰 등록 순으로 조회한다")
-    void findVisiblePassagesByPageReturnsPassagesInCreationOrder() {
+    @DisplayName("책에 대목이 하나도 없으면 빈 결과가 조회된다")
+    void findPageNumbersReturnsEmptyWhenNoPassages() {
+        Book book = book("빈 책");
+
+        Page<Integer> result = passageQueryRepository.findPageNumbers(book.getId(), PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("특정 페이지에 걸친 대목을 등록 순으로 조회한다 (스포일러 대목도 포함)")
+    void findPassagesByPageReturnsPassagesInCreationOrderIncludingSpoilers() {
         User writer = user("writer-6");
         Book book = book("책");
         Passage first = passage(book, writer, 3, false);
         Passage second = passage(book, writer, 3, false);
-        passage(book, writer, 3, true);
+        Passage spoiler = passage(book, writer, 3, true);
 
-        List<Passage> result = passageQueryRepository.findVisiblePassagesByPage(book.getId(), 3, NOT_SPOILER);
+        List<Passage> result = passageQueryRepository.findPassagesByPage(book.getId(), 3);
 
-        assertThat(result).extracting(Passage::getId).containsExactly(first.getId(), second.getId());
+        assertThat(result).extracting(Passage::getId)
+                .containsExactly(first.getId(), second.getId(), spoiler.getId());
     }
 }

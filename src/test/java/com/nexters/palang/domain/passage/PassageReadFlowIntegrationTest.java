@@ -1,12 +1,10 @@
 package com.nexters.palang.domain.passage;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.nexters.palang.domain.book.domain.Book;
-import com.nexters.palang.domain.book.domain.ReadingStatus;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.decoration.domain.Decoration;
 import com.nexters.palang.domain.decoration.domain.EffectType;
@@ -17,7 +15,6 @@ import com.nexters.palang.domain.passage.infrastructure.PassageRepository;
 import com.nexters.palang.domain.user.domain.SnsProvider;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
-import com.nexters.palang.global.security.jwt.JwtTokenProvider;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -25,13 +22,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 // 대목/흔적 조회 플로우를 실제 Spring 컨텍스트 + H2 DB로 end-to-end 검증한다.
-// (읽기상태 노출 필터 → 꾸밈 병합 → 흔적 정렬)
+// (전체 페이지 노출 → 꾸밈 병합 → 흔적 정렬. 스포일러는 isSpoiler 플래그로만 표시하고 서버는 항상 전체 노출한다)
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
@@ -51,9 +47,6 @@ class PassageReadFlowIntegrationTest {
 
     @Autowired
     private OpinionRepository opinionRepository;
-
-    @Autowired
-    private JwtTokenProvider jwtTokenProvider;
 
     private Long bookId;
     private Long writerId;
@@ -85,10 +78,6 @@ class PassageReadFlowIntegrationTest {
                 .normalizedHash("hash-6").build());
     }
 
-    private String bearerToken(Long userId) {
-        return "Bearer " + jwtTokenProvider.createAccessToken(userId);
-    }
-
     private Opinion opinion(Passage passage, Long userId, String content, int likeCount) {
         User user = userRepository.findById(userId).orElseThrow();
         Opinion opinion = Opinion.builder().passage(passage).user(user).content(content).build();
@@ -97,16 +86,18 @@ class PassageReadFlowIntegrationTest {
     }
 
     @Test
-    @DisplayName("비로그인 사용자는 첫 페이지만 볼 수 있고, 다른 페이지를 요청하면 401이다 (첫 페이지가 스포일러여도 페이지 자체는 노출된다)")
-    void anonymousUserSeesOnlyFirstPageEvenIfSpoiler() throws Exception {
+    @DisplayName("비로그인 사용자도 책의 모든 페이지 번호를 볼 수 있다 (스포일러 페이지 포함)")
+    void anonymousUserSeesAllPagesIncludingSpoilerPage() throws Exception {
         mockMvc.perform(get("/api/books/" + bookId + "/passages"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.pageNumbers[0]").value(1))
-                .andExpect(jsonPath("$.data.pageNumbers.length()").value(1));
+                .andExpect(jsonPath("$.data.pageNumbers[1]").value(3))
+                .andExpect(jsonPath("$.data.pageNumbers[2]").value(6));
 
-        mockMvc.perform(get("/api/books/" + bookId + "/pages/3/passages"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.title").value("AUTH_401_1"));
+        mockMvc.perform(get("/api/books/" + bookId + "/pages/6/passages"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.passages[0].passageId").value(page6.getId()))
+                .andExpect(jsonPath("$.data.passages[0].quotedText").value("6페이지 문장"));
     }
 
     @Test
@@ -120,27 +111,6 @@ class PassageReadFlowIntegrationTest {
     }
 
     @Test
-    @DisplayName("읽는 중(READING) 상태의 로그인 사용자는 현재 페이지까지의 대목을 볼 수 있다 (스포일러 포함)")
-    void readingUserSeesUpToCurrentPage() throws Exception {
-        mockMvc.perform(put("/api/users/me/book-status")
-                        .header("Authorization", bearerToken(readerId))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"bookId\": " + bookId + ", \"status\": \"READING\", \"currentPage\": 6}"))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(get("/api/books/" + bookId + "/passages").header("Authorization", bearerToken(readerId)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.pageNumbers[0]").value(1))
-                .andExpect(jsonPath("$.data.pageNumbers[1]").value(3))
-                .andExpect(jsonPath("$.data.pageNumbers[2]").value(6));
-
-        mockMvc.perform(get("/api/books/" + bookId + "/pages/6/passages").header("Authorization", bearerToken(readerId)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.passages[0].passageId").value(page6.getId()))
-                .andExpect(jsonPath("$.data.passages[0].quotedText").value("6페이지 문장"));
-    }
-
-    @Test
     @DisplayName("겹치지 않는 꾸밈 중 좋아요 많은 순으로 최대 3개까지만 병합되어 노출된다")
     void mergedDecorationsShowTopThreeNonOverlapping() throws Exception {
         Opinion popular = opinion(page3, readerId, "인기 흔적", 10);
@@ -150,13 +120,7 @@ class PassageReadFlowIntegrationTest {
         Opinion another = opinion(page3, readerId, "또 다른 흔적", 5);
         decoration(another, 10, 15);
 
-        mockMvc.perform(put("/api/users/me/book-status")
-                        .header("Authorization", bearerToken(readerId))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"bookId\": " + bookId + ", \"status\": \"READING\", \"currentPage\": 6}"))
-                .andExpect(status().isOk());
-
-        mockMvc.perform(get("/api/books/" + bookId + "/pages/3/passages").header("Authorization", bearerToken(readerId)))
+        mockMvc.perform(get("/api/books/" + bookId + "/pages/3/passages"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.passages[0].decorations.length()").value(2))
                 .andExpect(jsonPath("$.data.passages[0].decorations[0].startOffset").value(3))

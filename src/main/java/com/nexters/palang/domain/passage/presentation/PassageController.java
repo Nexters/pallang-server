@@ -66,8 +66,7 @@ public class PassageController implements PassageControllerDocs {
             @PathVariable Long bookId,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
-        Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
-        Page<Integer> pageNumbers = passageService.getVisiblePageNumbers(bookId, currentUserId, pageable(page, size));
+        Page<Integer> pageNumbers = passageService.getPageNumbers(bookId, pageable(page, size));
         return DataResponse.from(PassageResponse.PageNumbers.from(pageNumbers));
     }
 
@@ -76,8 +75,7 @@ public class PassageController implements PassageControllerDocs {
     public DataResponse<PassageResponse.PassagesByPage> getPassagesByPage(
             @PathVariable Long bookId,
             @PathVariable("page") int pageNumber) {
-        Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
-        List<Passage> passages = passageService.getVisiblePassagesByPage(bookId, pageNumber, currentUserId);
+        List<Passage> passages = passageService.getPassagesByPage(bookId, pageNumber);
         Map<Long, List<DecorationMergeCandidate>> merged = passageService.getMergedDecorationsByPassageId(passages);
         return DataResponse.from(PassageResponse.PassagesByPage.from(passages, merged));
     }
