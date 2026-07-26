@@ -136,4 +136,15 @@ class UserServiceTest {
 
         assertThatThrownBy(() -> userService.withdraw(1L)).isInstanceOf(UserException.class);
     }
+
+    @Test
+    @DisplayName("온보딩 완료를 요청하면 반영된다")
+    void completeOnboardingMarksUserCompleted() {
+        User user = user(1L);
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+        userService.completeOnboarding(1L);
+
+        assertThat(user.isHasCompletedOnboarding()).isTrue();
+    }
 }

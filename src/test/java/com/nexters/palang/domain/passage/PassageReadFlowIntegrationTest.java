@@ -17,6 +17,7 @@ import com.nexters.palang.domain.passage.infrastructure.PassageRepository;
 import com.nexters.palang.domain.user.domain.SnsProvider;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
+import com.nexters.palang.global.security.jwt.JwtTokenProvider;
 import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -51,6 +52,9 @@ class PassageReadFlowIntegrationTest {
     @Autowired
     private OpinionRepository opinionRepository;
 
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
+
     private Long bookId;
     private Long writerId;
     private Long readerId;
@@ -79,6 +83,10 @@ class PassageReadFlowIntegrationTest {
         page6 = passageRepository.save(Passage.builder()
                 .book(book).creator(writer).pageNumber(6).quotedText("6페이지 문장").isSpoiler(false)
                 .normalizedHash("hash-6").build());
+    }
+
+    private String bearerToken(Long userId) {
+        return "Bearer " + jwtTokenProvider.createAccessToken(userId);
     }
 
     private Opinion opinion(Passage passage, Long userId, String content, int likeCount) {
@@ -115,18 +123,18 @@ class PassageReadFlowIntegrationTest {
     @DisplayName("읽는 중(READING) 상태의 로그인 사용자는 현재 페이지까지의 대목을 볼 수 있다 (스포일러 포함)")
     void readingUserSeesUpToCurrentPage() throws Exception {
         mockMvc.perform(put("/api/users/me/book-status")
-                        .header("X-Debug-User-Id", readerId)
+                        .header("Authorization", bearerToken(readerId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"bookId\": " + bookId + ", \"status\": \"READING\", \"currentPage\": 6}"))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/books/" + bookId + "/passages").header("X-Debug-User-Id", readerId))
+        mockMvc.perform(get("/api/books/" + bookId + "/passages").header("Authorization", bearerToken(readerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.pageNumbers[0]").value(1))
                 .andExpect(jsonPath("$.data.pageNumbers[1]").value(3))
                 .andExpect(jsonPath("$.data.pageNumbers[2]").value(6));
 
-        mockMvc.perform(get("/api/books/" + bookId + "/pages/6/passages").header("X-Debug-User-Id", readerId))
+        mockMvc.perform(get("/api/books/" + bookId + "/pages/6/passages").header("Authorization", bearerToken(readerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.passages[0].passageId").value(page6.getId()))
                 .andExpect(jsonPath("$.data.passages[0].quotedText").value("6페이지 문장"));
@@ -143,12 +151,12 @@ class PassageReadFlowIntegrationTest {
         decoration(another, 10, 15);
 
         mockMvc.perform(put("/api/users/me/book-status")
-                        .header("X-Debug-User-Id", readerId)
+                        .header("Authorization", bearerToken(readerId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"bookId\": " + bookId + ", \"status\": \"READING\", \"currentPage\": 6}"))
                 .andExpect(status().isOk());
 
-        mockMvc.perform(get("/api/books/" + bookId + "/pages/3/passages").header("X-Debug-User-Id", readerId))
+        mockMvc.perform(get("/api/books/" + bookId + "/pages/3/passages").header("Authorization", bearerToken(readerId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.passages[0].decorations.length()").value(2))
                 .andExpect(jsonPath("$.data.passages[0].decorations[0].startOffset").value(3))

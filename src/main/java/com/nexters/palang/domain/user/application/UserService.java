@@ -42,6 +42,12 @@ public class UserService {
         user.withdraw();
     }
 
+    @Transactional
+    public void completeOnboarding(Long userId) {
+        User user = getActiveUser(userId);
+        user.completeOnboarding();
+    }
+
     // 탈퇴한 사용자는 더 이상 조작 대상이 아니므로 존재하지 않는 것과 동일하게 취급한다.
     private User getActiveUser(Long userId) {
         User user = userRepository.findById(userId)
