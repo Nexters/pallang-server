@@ -90,8 +90,10 @@ fi
 # 실제 리스닝 포트를 확인해서 허용한다. 안 그러면 ufw enable 직후 SSH 접속이 끊길 수 있다.
 SSH_PORT="22"
 if command -v sshd >/dev/null 2>&1; then
-    DETECTED_PORT="$(sshd -T 2>/dev/null | awk '/^port /{print $2; exit}')"
-    if [[ -n "${DETECTED_PORT}" ]]; then
+    # sshd -T가 실패해도(권한/환경 이슈 등) pipefail 때문에 스크립트 전체가 조용히
+    # 종료되지 않도록 || true로 무시하고 기본값(22)으로 폴백한다.
+    DETECTED_PORT="$(sshd -T 2>/dev/null | awk '/^port /{print $2; exit}')" || true
+    if [[ -n "${DETECTED_PORT:-}" ]]; then
         SSH_PORT="${DETECTED_PORT}"
     fi
 fi
