@@ -1,5 +1,7 @@
 package com.nexters.palang.domain.user.domain;
 
+import com.nexters.palang.domain.user.common.error.UserErrorCode;
+import com.nexters.palang.domain.user.common.error.UserException;
 import com.nexters.palang.global.common.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -8,6 +10,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -29,6 +32,7 @@ import lombok.NoArgsConstructor;
 public class User extends BaseEntity {
 
     public static final int NICKNAME_MAX_LENGTH = 15;
+    public static final int BACKGROUND_COLOR_MAX_LENGTH = 20;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,7 +48,7 @@ public class User extends BaseEntity {
     @Column(name = "profile_image_url", columnDefinition = "TEXT")
     private String profileImageUrl;
 
-    @Column(name = "background_color", length = 20)
+    @Column(name = "background_color", length = BACKGROUND_COLOR_MAX_LENGTH)
     private String backgroundColor;
 
     @Enumerated(EnumType.STRING)
@@ -87,6 +91,20 @@ public class User extends BaseEntity {
 
     public void completeOnboarding() {
         this.hasCompletedOnboarding = true;
+    }
+
+    // 하루 1회 제한(FR-MY-05): 마지막 변경일이 오늘이면 재변경을 막는다. 이 사용자 한 명의 상태만으로
+    // 판단 가능한 생성/수정 시점 불변식이라 서비스 계층이 아닌 엔티티에서 직접 막는다.
+    public void changeNickname(String nickname) {
+        if (nicknameUpdatedAt != null && nicknameUpdatedAt.toLocalDate().isEqual(LocalDate.now())) {
+            throw new UserException(UserErrorCode.NICKNAME_CHANGE_LIMITED);
+        }
+        this.nickname = nickname;
+        this.nicknameUpdatedAt = LocalDateTime.now();
+    }
+
+    public void changeBackgroundColor(String backgroundColor) {
+        this.backgroundColor = backgroundColor;
     }
 
     public void withdraw() {

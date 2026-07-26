@@ -6,6 +6,7 @@ import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.decoration.domain.Decoration;
 import com.nexters.palang.domain.opinion.domain.Opinion;
+import com.nexters.palang.domain.opinion.infrastructure.OpinionQueryRepository;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
 import com.nexters.palang.domain.opinion.presentation.dto.CreateOpinionRequest;
 import com.nexters.palang.domain.passage.application.PassageNormalizer;
@@ -19,6 +20,8 @@ import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class OpinionService {
 
     private final OpinionRepository opinionRepository;
+    private final OpinionQueryRepository opinionQueryRepository;
     private final PassageRepository passageRepository;
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
@@ -61,6 +65,18 @@ public class OpinionService {
             throw new PassageException(PassageErrorCode.PASSAGE_BOOK_MISMATCH);
         }
         return existing;
+    }
+
+    public Page<MyOpinionProjection> getMyOpinions(Long userId, Pageable pageable) {
+        return opinionQueryRepository.findMyOpinions(userId, pageable);
+    }
+
+    public Page<LikedOpinionProjection> getLikedOpinions(Long userId, Pageable pageable) {
+        return opinionQueryRepository.findLikedOpinions(userId, pageable);
+    }
+
+    public long getMyOpinionCount(Long userId) {
+        return opinionRepository.countByUserIdAndDeletedAtIsNull(userId);
     }
 
     private Passage createNewPassage(CreateOpinionRequest request, User creator) {
