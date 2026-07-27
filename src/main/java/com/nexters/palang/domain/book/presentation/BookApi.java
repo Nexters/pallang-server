@@ -21,7 +21,8 @@ import org.springframework.http.ResponseEntity;
 public interface BookApi {
 
     @Operation(summary = "도서 외부 검색",
-            description = "알라딘 Open API로 도서를 검색합니다. 응답 속도를 위해 pageCount는 채우지 않으며 항상 null입니다.")
+            description = "알라딘 Open API로 도서를 검색합니다. 응답 속도를 위해 pageCount는 내려주지 않으며, "
+                    + "등록 시 사용자가 직접 입력합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "검색 성공"),
             @ApiResponse(responseCode = "400", description = "keyword 누락, page/size 형식 오류(COMMON_400_1) "

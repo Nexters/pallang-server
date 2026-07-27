@@ -49,7 +49,7 @@ class AladinBookApiClientTest {
     }
 
     @Test
-    @DisplayName("검색 결과를 반환하며, 응답 속도를 위해 pageCount는 채우지 않고 항상 null이다")
+    @DisplayName("검색 결과를 반환하며, 응답 속도를 위해 pageCount는 포함하지 않는다")
     void searchDoesNotEnrichPageCount() {
         stubSearch("""
                 {
@@ -69,7 +69,7 @@ class AladinBookApiClientTest {
         Page<ExternalBookResult> results = aladinBookApiClient().search("프랑켄슈타인", PageRequest.of(0, 20));
 
         assertThat(results.getContent()).containsExactly(
-                new ExternalBookResult("프랑켄슈타인", "메리 셸리", "문학동네", null, "9788954429721",
+                new ExternalBookResult("프랑켄슈타인", "메리 셸리", "문학동네", "9788954429721",
                         "https://image.aladin.co.kr/cover.jpg"));
         assertThat(results.getTotalElements()).isEqualTo(1);
     }

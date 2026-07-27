@@ -27,8 +27,7 @@ public final class BookMapper {
 
     public static ExternalBookResponse toExternalResponse(ExternalBookResult result) {
         return new ExternalBookResponse(
-                result.title(), result.author(), result.publisher(),
-                result.pageCount(), result.isbn(), result.coverImageUrl());
+                result.title(), result.author(), result.publisher(), result.isbn(), result.coverImageUrl());
     }
 
     public static ExternalBookListResponse toExternalListResponse(Page<ExternalBookResult> results) {
