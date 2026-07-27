@@ -1,5 +1,7 @@
 package com.nexters.palang.global.config;
 
+import com.nexters.palang.domain.book.application.BookService;
+import com.nexters.palang.domain.book.application.ExternalBookResult;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
@@ -15,15 +17,20 @@ import java.security.MessageDigest;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 // 로컬 개발/FE 협업용 초기 데이터. @DataJpaTest/@WebMvcTest 슬라이스 테스트는 이 빈을 로드하지 않고,
 // @SpringBootTest 통합 테스트는 자체 데이터를 직접 만들어 검증하므로 이 시드와 충돌하지 않는다.
 // (data.sql 방식은 컨텍스트가 캐시·공유되는 @DataJpaTest 전반을 오염시켜 채택하지 않음)
+@Slf4j
 @Profile("local")
 @Component
 @RequiredArgsConstructor
@@ -35,6 +42,7 @@ public class LocalDataSeeder implements ApplicationRunner {
     private final PassageRepository passageRepository;
     private final UserRepository userRepository;
     private final PolicyRepository policyRepository;
+    private final BookService bookService;
 
     @Override
     @Transactional
@@ -54,6 +62,26 @@ public class LocalDataSeeder implements ApplicationRunner {
         }
     }
 
+    // Aladin이 pageCount를 제공하지 않고(BookService 참고) 검색이 실패할 수도 있어(TTB 키 미설정 등)
+    // 페이지수·표지는 플레이스홀더를 기본값으로 두고, 검색이 성공하면 실제 저자/출판사/ISBN/표지로 덮어쓴다.
+    private record SeedBookFallback(String title, String author, String publisher, int pageCount, String coverImageUrl) {
+    }
+
+    private static final List<SeedBookFallback> SEED_BOOKS = List.of(
+            new SeedBookFallback("달러구트 꿈 백화점", "이미예", "팩토리나인", 300,
+                    "https://picsum.photos/seed/book1/300/450"),
+            new SeedBookFallback("불편한 편의점", "김호연", "나무옆의자", 320,
+                    "https://picsum.photos/seed/book2/300/450"),
+            new SeedBookFallback("아몬드", "손원평", "창비", 264,
+                    "https://picsum.photos/seed/book3/300/450"),
+            new SeedBookFallback("죽고 싶지만 떡볶이는 먹고 싶어", "백세희", "흔", 260,
+                    "https://picsum.photos/seed/book4/300/450"),
+            new SeedBookFallback("여행의 이유", "김영하", "문학동네", 256,
+                    "https://picsum.photos/seed/book5/300/450"),
+            new SeedBookFallback("미드나잇 라이브러리", "매트 헤이그", "인플루엔셜", 428,
+                    "https://picsum.photos/seed/book6/300/450")
+    );
+
     private void seedBooks() {
         if (bookRepository.count() > 0) {
             return;
@@ -65,35 +93,40 @@ public class LocalDataSeeder implements ApplicationRunner {
                 .snsId(SEED_SNS_ID)
                 .build());
 
-        List<Book> books = bookRepository.saveAll(List.of(
-                book("달러구트 꿈 백화점", "이미예", "팩토리나인", 300,
-                        "https://picsum.photos/seed/book1/300/450"),
-                book("불편한 편의점", "김호연", "나무옆의자", 320,
-                        "https://picsum.photos/seed/book2/300/450"),
-                book("아몬드", "손원평", "창비", 264,
-                        "https://picsum.photos/seed/book3/300/450"),
-                book("죽고 싶지만 떡볶이는 먹고 싶어", "백세희", "흔", 260,
-                        "https://picsum.photos/seed/book4/300/450"),
-                book("여행의 이유", "김영하", "문학동네", 256,
-                        "https://picsum.photos/seed/book5/300/450"),
-                book("미드나잇 라이브러리", "매트 헤이그", "인플루엔셜", 428,
-                        "https://picsum.photos/seed/book6/300/450")
-        ));
+        List<Book> books = bookRepository.saveAll(SEED_BOOKS.stream().map(this::resolveBook).toList());
 
         for (Book book : books) {
             passageRepository.save(passage(book, seedUser));
         }
     }
 
-    private Book book(String title, String author, String publisher, int pageCount, String coverImageUrl) {
+    private Book resolveBook(SeedBookFallback fallback) {
+        ExternalBookResult aladinResult = searchAladin(fallback.title());
+
         return Book.builder()
-                .title(title)
-                .author(author)
-                .publisher(publisher)
-                .pageCount(pageCount)
-                .coverImageUrl(coverImageUrl)
-                .source(BookSource.MANUAL)
+                .title(fallback.title())
+                .author(orElse(aladinResult == null ? null : aladinResult.author(), fallback.author()))
+                .publisher(orElse(aladinResult == null ? null : aladinResult.publisher(), fallback.publisher()))
+                .pageCount(fallback.pageCount())
+                .isbn(aladinResult == null ? null : aladinResult.isbn())
+                .coverImageUrl(orElse(aladinResult == null ? null : aladinResult.coverImageUrl(), fallback.coverImageUrl()))
+                .source(aladinResult != null ? BookSource.API : BookSource.MANUAL)
                 .build();
+    }
+
+    private ExternalBookResult searchAladin(String title) {
+        try {
+            Page<ExternalBookResult> results = bookService.searchExternalBooks(title, PageRequest.of(0, 1));
+            return results.hasContent() ? results.getContent().get(0) : null;
+        } catch (RuntimeException e) {
+            log.warn("알라딘 검색 실패 - '{}' 시드 데이터는 플레이스홀더로 대체합니다 (ALADIN_TTB_KEY 미설정일 수 있음): {}",
+                    title, e.getMessage());
+            return null;
+        }
+    }
+
+    private String orElse(String value, String fallback) {
+        return StringUtils.hasText(value) ? value : fallback;
     }
 
     private Passage passage(Book book, User creator) {
