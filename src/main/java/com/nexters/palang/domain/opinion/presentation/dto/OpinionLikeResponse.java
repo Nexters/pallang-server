@@ -4,9 +4,9 @@ import com.nexters.palang.domain.opinion.application.OpinionLikeResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record OpinionLikeResponse(
-        @Schema(example = "1") Long opinionId,
-        @Schema(example = "true") boolean liked,
-        @Schema(example = "42") int likeCount
+        @Schema(example = "1", requiredMode = Schema.RequiredMode.REQUIRED) Long opinionId,
+        @Schema(example = "true", requiredMode = Schema.RequiredMode.REQUIRED) boolean liked,
+        @Schema(example = "42", requiredMode = Schema.RequiredMode.REQUIRED) int likeCount
 ) {
 
     public static OpinionLikeResponse from(OpinionLikeResult result) {

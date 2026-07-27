@@ -14,7 +14,9 @@ import org.springframework.data.domain.Page;
 
 public class PassageResponse {
 
-    public record SimilarCandidates(List<SimilarCandidate> passages) {
+    public record SimilarCandidates(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<SimilarCandidate> passages
+    ) {
         public static SimilarCandidates from(List<SimilarPassageProjection> projections) {
             List<SimilarCandidate> candidates = projections.stream()
                     .map(SimilarCandidate::from)
@@ -25,8 +27,9 @@ public class PassageResponse {
 
     // 대목/흔적 보기 페이지 네비게이션(FR-VIEW-02): 발췌된 페이지 번호 목록.
     public record PageNumbers(
-            @ArraySchema(schema = @Schema(example = "3")) List<Integer> pageNumbers,
-            PageInfo pageInfo
+            @ArraySchema(schema = @Schema(example = "3"), arraySchema = @Schema(requiredMode = Schema.RequiredMode.REQUIRED))
+            List<Integer> pageNumbers,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) PageInfo pageInfo
     ) {
         public static PageNumbers from(Page<Integer> page) {
             return new PageNumbers(page.getContent(), PageInfo.from(page));
@@ -34,7 +37,9 @@ public class PassageResponse {
     }
 
     // 대목 전환(FR-VIEW-03 2-b) + 꾸밈 병합 결과(FR-VIEW-03 꾸밈 병합 표시).
-    public record PassagesByPage(List<Detail> passages) {
+    public record PassagesByPage(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Detail> passages
+    ) {
         public static PassagesByPage from(List<Passage> passages, Map<Long, List<DecorationMergeCandidate>> mergedByPassageId) {
             List<Detail> details = passages.stream()
                     .map(passage -> Detail.from(passage, mergedByPassageId.getOrDefault(passage.getId(), List.of())))
@@ -46,11 +51,11 @@ public class PassageResponse {
         // 블러 처리 + [버튼] 눌러야 확인 가능한 화면(FR-VIEW-03 스포일러 처리)은 즉시 반응해야 하는 순수 UI 동작이라
         // 프론트가 isSpoiler 플래그만 보고 클라이언트에서 처리한다 (서버 왕복 없이 버튼 클릭 즉시 확인 가능).
         public record Detail(
-                @Schema(example = "1") Long passageId,
-                @Schema(example = "87") int pageNumber,
-                @Schema(example = "우리는 모두 이야기를 찾아 헤맨다.") String quotedText,
-                @Schema(example = "false") boolean isSpoiler,
-                List<DecorationResponse> decorations
+                @Schema(example = "1", requiredMode = Schema.RequiredMode.REQUIRED) Long passageId,
+                @Schema(example = "87", requiredMode = Schema.RequiredMode.REQUIRED) int pageNumber,
+                @Schema(example = "우리는 모두 이야기를 찾아 헤맨다.", requiredMode = Schema.RequiredMode.REQUIRED) String quotedText,
+                @Schema(example = "false", requiredMode = Schema.RequiredMode.REQUIRED) boolean isSpoiler,
+                @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DecorationResponse> decorations
         ) {
             public static Detail from(Passage passage, List<DecorationMergeCandidate> merged) {
                 List<DecorationResponse> decorations = merged.stream()
@@ -65,10 +70,10 @@ public class PassageResponse {
     }
 
     public record SimilarCandidate(
-            @Schema(example = "1") Long passageId,
-            @Schema(example = "우리는 모두 이야기를 찾아 헤맨다.") String quotedText,
-            @Schema(example = "87") int pageNumber,
-            @Schema(example = "4") long opinionCount
+            @Schema(example = "1", requiredMode = Schema.RequiredMode.REQUIRED) Long passageId,
+            @Schema(example = "우리는 모두 이야기를 찾아 헤맨다.", requiredMode = Schema.RequiredMode.REQUIRED) String quotedText,
+            @Schema(example = "87", requiredMode = Schema.RequiredMode.REQUIRED) int pageNumber,
+            @Schema(example = "4", requiredMode = Schema.RequiredMode.REQUIRED) long opinionCount
     ) {
         public static SimilarCandidate from(SimilarPassageProjection projection) {
             return new SimilarCandidate(
@@ -80,7 +85,9 @@ public class PassageResponse {
         }
     }
 
-    public record OcrRecognize(List<TextBlock> blocks) {
+    public record OcrRecognize(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<TextBlock> blocks
+    ) {
         public static OcrRecognize from(List<OcrResultDto> blocks) {
             List<TextBlock> textBlockResponses = blocks.stream()
                     .map(TextBlock::from)
@@ -90,16 +97,18 @@ public class PassageResponse {
     }
 
     public record TextBlock(
-            @Schema(example = "우리는 모두 이야기를 찾아 헤맨다.") String text,
-            BoundingBox boundingBox,
-            @Schema(example = "true") boolean lineBreak
+            @Schema(example = "우리는 모두 이야기를 찾아 헤맨다.", requiredMode = Schema.RequiredMode.REQUIRED) String text,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) BoundingBox boundingBox,
+            @Schema(example = "true", requiredMode = Schema.RequiredMode.REQUIRED) boolean lineBreak
     ) {
         public static TextBlock from(OcrResultDto block) {
             return new TextBlock(block.text(), BoundingBox.from(block.boundingBox()), block.lineBreak());
         }
     }
 
-    public record BoundingBox(List<Point> vertices) {
+    public record BoundingBox(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Point> vertices
+    ) {
         public static BoundingBox from(OcrResultDto.BoundingBox boundingBox) {
             List<Point> vertices = boundingBox.vertices().stream()
                     .map(point -> new Point(point.x(), point.y()))
@@ -108,6 +117,9 @@ public class PassageResponse {
         }
     }
 
-    public record Point(@Schema(example = "120.5") double x, @Schema(example = "48.0") double y) {
+    public record Point(
+            @Schema(example = "120.5", requiredMode = Schema.RequiredMode.REQUIRED) double x,
+            @Schema(example = "48.0", requiredMode = Schema.RequiredMode.REQUIRED) double y
+    ) {
     }
 }
