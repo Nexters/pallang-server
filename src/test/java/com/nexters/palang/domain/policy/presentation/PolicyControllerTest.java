@@ -54,4 +54,12 @@ class PolicyControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("POLICY_404_1"));
     }
+
+    @Test
+    @DisplayName("TERMS/PRIVACY가 아닌 값으로 요청하면 400 에러가 발생한다")
+    void getPolicyFailsWhenTypeIsInvalid() throws Exception {
+        mockMvc.perform(get("/api/policies/FOO"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("COMMON_400_1"));
+    }
 }
