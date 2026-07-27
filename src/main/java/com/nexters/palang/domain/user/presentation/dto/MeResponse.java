@@ -9,6 +9,6 @@ public record MeResponse(
         @Schema(example = "https://pallang-assets.s3.ap-northeast-2.amazonaws.com/profile/7.png", nullable = true) String profileImageUrl,
         @Schema(example = "#FDF6E3", nullable = true) String backgroundColor,
         @Schema(example = "KAKAO", requiredMode = Schema.RequiredMode.REQUIRED) SnsProvider snsProvider,
-        @Schema(example = "23") long opinionCount
+        @Schema(example = "23", requiredMode = Schema.RequiredMode.REQUIRED) long opinionCount
 ) {
 }

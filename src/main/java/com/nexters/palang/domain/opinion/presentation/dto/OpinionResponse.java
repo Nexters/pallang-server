@@ -10,7 +10,7 @@ import java.util.List;
 public record OpinionResponse(
         @Schema(example = "1", requiredMode = Schema.RequiredMode.REQUIRED) Long opinionId,
         @Schema(example = "1", requiredMode = Schema.RequiredMode.REQUIRED) Long passageId,
-        @Schema(example = "false") boolean merged,
+        @Schema(example = "false", requiredMode = Schema.RequiredMode.REQUIRED) boolean merged,
         @Schema(example = "이 문장에서 작가의 의도가 느껴져서 좋았어요.", requiredMode = Schema.RequiredMode.REQUIRED) String content,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DecorationResponse> decorations,
         @Schema(example = "2026-07-20T14:32:00", requiredMode = Schema.RequiredMode.REQUIRED) LocalDateTime createdAt
@@ -32,8 +32,8 @@ public record OpinionResponse(
 
     public record DecorationResponse(
             @Schema(example = "1", requiredMode = Schema.RequiredMode.REQUIRED) Long decorationId,
-            @Schema(example = "3") int startOffset,
-            @Schema(example = "12") int endOffset,
+            @Schema(example = "3", requiredMode = Schema.RequiredMode.REQUIRED) int startOffset,
+            @Schema(example = "12", requiredMode = Schema.RequiredMode.REQUIRED) int endOffset,
             @Schema(example = "HIGHLIGHT", requiredMode = Schema.RequiredMode.REQUIRED) EffectType effectType,
             @Schema(example = "#FFE08A", requiredMode = Schema.RequiredMode.REQUIRED) String color
     ) {
