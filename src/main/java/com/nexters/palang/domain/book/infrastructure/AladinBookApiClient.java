@@ -27,7 +27,7 @@ public class AladinBookApiClient {
     }
 
     // 결과마다 ItemLookUp을 추가 호출해 페이지수를 채우던 방식은 검색 1회당 응답이 수 초씩 걸려 제거했다.
-    // pageCount는 항상 null로 내려가며, 필요하면 도서 상세 조회 시점에 별도로 채우는 것을 후속 과제로 검토한다.
+    // pageCount는 검색 응답에서 아예 제공하지 않으며, 필요하면 도서 상세 조회 시점에 별도로 채우는 것을 후속 과제로 검토한다.
     public Page<ExternalBookResult> search(String keyword, Pageable pageable) {
         // 알라딘 start는 1부터 시작하는 인덱스
         int start = (int) pageable.getOffset() + 1;
@@ -64,6 +64,6 @@ public class AladinBookApiClient {
     }
 
     private ExternalBookResult toExternalBookResult(AladinItem item) {
-        return new ExternalBookResult(item.title(), item.author(), item.publisher(), null, item.isbn13(), item.cover());
+        return new ExternalBookResult(item.title(), item.author(), item.publisher(), item.isbn13(), item.cover());
     }
 }

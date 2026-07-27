@@ -67,13 +67,13 @@ class BookControllerTest {
     @DisplayName("키워드로 도서 외부 검색을 요청하면 결과 목록을 반환한다")
     void searchExternalBooks() throws Exception {
         given(bookService.searchExternalBooks(eq("제목"), any(Pageable.class))).willReturn(
-                new PageImpl<>(List.of(new ExternalBookResult("제목", "작가", "출판사", 300, "isbn", "cover")),
+                new PageImpl<>(List.of(new ExternalBookResult("제목", "작가", "출판사", "isbn", "cover")),
                         DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/search").param("keyword", "제목"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.books[0].title").value("제목"))
-                .andExpect(jsonPath("$.data.books[0].pageCount").value(300))
+                .andExpect(jsonPath("$.data.books[0].pageCount").doesNotExist())
                 .andExpect(jsonPath("$.data.pageInfo.totalElements").value(1));
     }
 
