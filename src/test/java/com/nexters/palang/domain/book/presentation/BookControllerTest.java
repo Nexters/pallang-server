@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexters.palang.domain.book.application.BookActivityProjection;
+import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.application.BookService;
 import com.nexters.palang.domain.book.application.ExternalBookResult;
 import com.nexters.palang.domain.book.domain.Book;
@@ -97,12 +98,16 @@ class BookControllerTest {
     @DisplayName("키워드로 도서 내부 검색을 요청하면 등록된 도서 목록을 반환한다")
     void searchInternalBooks() throws Exception {
         given(bookService.searchInternalBooks(eq("제목"), any(Pageable.class))).willReturn(
-                new PageImpl<>(List.of(book(1L, "제목")), DEFAULT_PAGEABLE, 1));
+                new PageImpl<>(List.of(new BookSearchProjection(
+                        1L, "제목", "작가", "출판사", 300, "isbn", "cover", BookSource.MANUAL, 12, 34)),
+                        DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/internal-search").param("keyword", "제목"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.books[0].bookId").value(1))
-                .andExpect(jsonPath("$.data.books[0].title").value("제목"));
+                .andExpect(jsonPath("$.data.books[0].title").value("제목"))
+                .andExpect(jsonPath("$.data.books[0].passageCount").value(12))
+                .andExpect(jsonPath("$.data.books[0].opinionCount").value(34));
     }
 
     @Test

@@ -33,8 +33,8 @@ public class BookService {
         return aladinBookApiClient.search(keyword, pageable);
     }
 
-    public Page<Book> searchInternalBooks(String keyword, Pageable pageable) {
-        return bookRepository.findByTitleContainingIgnoreCase(keyword, pageable);
+    public Page<BookSearchProjection> searchInternalBooks(String keyword, Pageable pageable) {
+        return bookQueryRepository.searchByTitle(keyword, pageable);
     }
 
     @Transactional
