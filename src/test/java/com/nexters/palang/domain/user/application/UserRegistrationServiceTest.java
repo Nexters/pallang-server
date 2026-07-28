@@ -58,7 +58,7 @@ class UserRegistrationServiceTest {
         given(nicknameGenerator.generateBase()).willReturn("고요한책갈피");
         given(nicknameGenerator.withSuffix("고요한책갈피", 1)).willReturn("고요한책갈피1");
         given(userRepository.saveAndFlush(argThat(u -> u != null && u.getNickname().equals("고요한책갈피"))))
-                .willThrow(new DataIntegrityViolationException("duplicate"));
+                .willThrow(new DataIntegrityViolationException("Duplicate entry for key 'users.uq_users_nickname'"));
         given(userRepository.saveAndFlush(argThat(u -> u != null && u.getNickname().equals("고요한책갈피1"))))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
@@ -74,9 +74,22 @@ class UserRegistrationServiceTest {
         given(nicknameGenerator.withSuffix(eq("고요한책갈피"), anyInt()))
                 .willAnswer(invocation -> "고요한책갈피" + invocation.<Integer>getArgument(1));
         given(userRepository.saveAndFlush(any(User.class)))
-                .willThrow(new DataIntegrityViolationException("duplicate"));
+                .willThrow(new DataIntegrityViolationException("Duplicate entry for key 'users.uq_users_nickname'"));
 
         assertThatThrownBy(() -> userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-3"))
                 .isInstanceOf(UserException.class);
+    }
+
+    @Test
+    @DisplayName("닉네임 충돌이 아닌 다른 무결성 위반은 재시도하지 않고 그대로 던진다")
+    void registerViaSnsRethrowsNonNicknameViolation() {
+        given(nicknameGenerator.generateBase()).willReturn("고요한책갈피");
+        given(userRepository.saveAndFlush(any(User.class)))
+                .willThrow(new DataIntegrityViolationException(
+                        "Column 'terms_agreed_at' cannot be null"));
+
+        assertThatThrownBy(() -> userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-4"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        verify(userRepository, times(1)).saveAndFlush(any());
     }
 }
