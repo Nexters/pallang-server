@@ -3,6 +3,7 @@ package com.nexters.palang.domain.book.presentation;
 import com.nexters.palang.domain.book.presentation.dto.BookActivityListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookResponse;
+import com.nexters.palang.domain.book.presentation.dto.BookSearchListResponse;
 import com.nexters.palang.domain.book.presentation.dto.CreateBookRequest;
 import com.nexters.palang.domain.book.presentation.dto.ExternalBookListResponse;
 import com.nexters.palang.global.common.error.ErrorResponse;
@@ -35,14 +36,16 @@ public interface BookApi {
             @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
     );
 
-    @Operation(summary = "도서 내부 검색", description = "서비스 DB에 이미 등록된 도서를 제목으로 검색합니다.")
+    @Operation(summary = "도서 내부 검색",
+            description = "서비스 DB에 이미 등록된 도서를 제목으로 검색하며, 도서별 대목/흔적 수를 함께 반환합니다. "
+                    + "제목과 검색어의 띄어쓰기 차이는 무시하고 매칭합니다. keyword에 빈 문자열을 넘기면 전체 목록을 반환합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "검색 성공"),
             @ApiResponse(responseCode = "400", description = "keyword 누락 또는 page/size 형식 오류 (COMMON_400_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    ResponseEntity<DataResponse<BookListResponse>> searchInternalBooks(
-            @Parameter(description = "검색 키워드", required = true) String keyword,
+    ResponseEntity<DataResponse<BookSearchListResponse>> searchInternalBooks(
+            @Parameter(description = "검색 키워드 (빈 문자열이면 전체 목록)", required = true) String keyword,
             @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,
             @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
     );

@@ -69,16 +69,18 @@ class BookServiceTest {
     }
 
     @Test
-    @DisplayName("키워드로 내부 도서를 검색하면 제목에 포함된 도서 목록을 반환한다")
+    @DisplayName("키워드로 내부 도서를 검색하면 QueryRepository 결과를 그대로 반환한다")
     void searchInternalBooks() {
         Pageable pageable = PageRequest.of(0, 20);
-        Book book = book(1L, "프랑켄슈타인");
-        given(bookRepository.findByTitleContainingIgnoreCase("프랑", pageable))
-                .willReturn(new PageImpl<>(List.of(book), pageable, 1));
+        Page<BookSearchProjection> expected = new PageImpl<>(
+                List.of(new BookSearchProjection(
+                        1L, "프랑켄슈타인", "작가", "출판사", 300, "isbn", "cover", BookSource.MANUAL, 5, 10)),
+                pageable, 1);
+        given(bookQueryRepository.searchByTitle("프랑", pageable)).willReturn(expected);
 
-        Page<Book> results = bookService.searchInternalBooks("프랑", pageable);
+        Page<BookSearchProjection> results = bookService.searchInternalBooks("프랑", pageable);
 
-        assertThat(results.getContent()).containsExactly(book);
+        assertThat(results).isEqualTo(expected);
     }
 
     @Test

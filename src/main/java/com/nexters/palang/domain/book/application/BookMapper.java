@@ -5,6 +5,8 @@ import com.nexters.palang.domain.book.presentation.dto.BookActivityListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookActivityResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookResponse;
+import com.nexters.palang.domain.book.presentation.dto.BookSearchListResponse;
+import com.nexters.palang.domain.book.presentation.dto.BookSearchResponse;
 import com.nexters.palang.domain.book.presentation.dto.ExternalBookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.ExternalBookResponse;
 import com.nexters.palang.global.common.response.PageInfo;
@@ -23,6 +25,18 @@ public final class BookMapper {
 
     public static BookListResponse toListResponse(Page<Book> books) {
         return new BookListResponse(books.map(BookMapper::toResponse).getContent(), PageInfo.from(books));
+    }
+
+    public static BookSearchResponse toSearchResponse(BookSearchProjection projection) {
+        return new BookSearchResponse(
+                projection.bookId(), projection.title(), projection.author(), projection.publisher(),
+                projection.pageCount(), projection.isbn(), projection.coverImageUrl(), projection.source(),
+                projection.passageCount(), projection.opinionCount());
+    }
+
+    public static BookSearchListResponse toSearchListResponse(Page<BookSearchProjection> projections) {
+        return new BookSearchListResponse(
+                projections.map(BookMapper::toSearchResponse).getContent(), PageInfo.from(projections));
     }
 
     public static ExternalBookResponse toExternalResponse(ExternalBookResult result) {

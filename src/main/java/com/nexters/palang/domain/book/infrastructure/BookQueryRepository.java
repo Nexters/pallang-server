@@ -1,10 +1,13 @@
 package com.nexters.palang.domain.book.infrastructure;
 
 import com.nexters.palang.domain.book.application.BookActivityProjection;
+import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.domain.QBook;
 import com.nexters.palang.domain.opinion.domain.QOpinion;
 import com.nexters.palang.domain.passage.domain.QPassage;
 import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.StringExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +21,40 @@ import org.springframework.stereotype.Repository;
 public class BookQueryRepository {
 
     private final JPAQueryFactory queryFactory;
+
+    // 띄어쓰기 차이를 무시하고 검색할 수 있도록 제목/키워드 모두에서 공백을 제거한 뒤 비교한다.
+    public Page<BookSearchProjection> searchByTitle(String keyword, Pageable pageable) {
+        QBook book = QBook.book;
+        QPassage passage = QPassage.passage;
+        QOpinion opinion = QOpinion.opinion;
+
+        String normalizedKeyword = keyword.replace(" ", "");
+        StringExpression normalizedTitle = Expressions.stringTemplate("replace({0}, ' ', '')", book.title);
+
+        List<BookSearchProjection> content = queryFactory
+                .select(Projections.constructor(BookSearchProjection.class,
+                        book.id, book.title, book.author, book.publisher, book.pageCount,
+                        book.isbn, book.coverImageUrl, book.source,
+                        passage.countDistinct(), opinion.countDistinct()))
+                .from(book)
+                .leftJoin(passage).on(passage.book.eq(book))
+                .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
+                .where(normalizedTitle.containsIgnoreCase(normalizedKeyword))
+                .groupBy(book.id, book.title, book.author, book.publisher, book.pageCount,
+                        book.isbn, book.coverImageUrl, book.source)
+                .orderBy(book.id.asc())
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        Long total = queryFactory
+                .select(book.countDistinct())
+                .from(book)
+                .where(normalizedTitle.containsIgnoreCase(normalizedKeyword))
+                .fetchOne();
+
+        return new PageImpl<>(content, pageable, total != null ? total : 0L);
+    }
 
     public Page<BookActivityProjection> findCarouselBooks(Pageable pageable) {
         QBook book = QBook.book;

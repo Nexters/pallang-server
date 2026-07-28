@@ -3,6 +3,7 @@ package com.nexters.palang.domain.book.infrastructure;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nexters.palang.domain.book.application.BookActivityProjection;
+import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.passage.domain.Passage;
@@ -71,6 +72,39 @@ class BookQueryRepositoryTest {
                 .user(user)
                 .content("흔적 내용")
                 .build());
+    }
+
+    @Test
+    @DisplayName("검색어와 제목의 띄어쓰기가 달라도 도서를 찾는다")
+    void searchByTitleIgnoresWhitespaceDifferences() {
+        Book book = book("두 번째 산책");
+
+        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle("두번째산책", PageRequest.of(0, 20));
+
+        assertThat(results.getContent()).extracting(BookSearchProjection::bookId).containsExactly(book.getId());
+    }
+
+    @Test
+    @DisplayName("대목/흔적이 없는 도서도 검색 결과에 포함되고 수는 0으로 집계된다")
+    void searchByTitleIncludesBooksWithoutPassages() {
+        Book book = book("아직 흔적 없는 책");
+
+        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle("아직", PageRequest.of(0, 20));
+
+        assertThat(results.getContent()).extracting(BookSearchProjection::bookId).containsExactly(book.getId());
+        assertThat(results.getContent().get(0).passageCount()).isEqualTo(0);
+        assertThat(results.getContent().get(0).opinionCount()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("검색어가 빈 문자열이면 전체 도서 목록을 반환한다")
+    void searchByTitleReturnsAllBooksWhenKeywordIsBlank() {
+        book("책1");
+        book("책2");
+
+        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle("", PageRequest.of(0, 20));
+
+        assertThat(results.getTotalElements()).isEqualTo(2);
     }
 
     @Test
