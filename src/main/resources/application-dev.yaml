@@ -54,6 +54,10 @@ aladin:
   base-url: https://www.aladin.co.kr/ttb/api
   ttb-key: ${ALADIN_TTB_KEY:}
 
+# 6. CORS 허용 origin (프론트엔드와 서브도메인이 달라 브라우저 기준 다른 origin으로 취급됨)
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:https://dev.pallang.co.kr,http://localhost:3000}
+
 logging:
   level:
     root: INFO
