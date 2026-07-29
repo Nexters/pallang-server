@@ -56,12 +56,14 @@ public class BookQueryRepository {
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
     }
 
-    public Page<BookActivityProjection> findCarouselBooks(Pageable pageable) {
+    // 홈 캐러셀은 전체 목록 중 임의의 가운데 offset에서 좌우로 조회해야 해서, page*size로 offset이
+    // 고정되는 Pageable 대신 offset/limit을 직접 받는다.
+    public List<BookActivityProjection> findCarouselBooks(long offset, int limit) {
         QBook book = QBook.book;
         QPassage passage = QPassage.passage;
         QOpinion opinion = QOpinion.opinion;
 
-        List<BookActivityProjection> content = queryFactory
+        return queryFactory
                 .select(Projections.constructor(BookActivityProjection.class,
                         book.id, book.title, book.author, book.coverImageUrl,
                         passage.countDistinct(), opinion.countDistinct()))
@@ -70,11 +72,13 @@ public class BookQueryRepository {
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .groupBy(book.id, book.title, book.author, book.coverImageUrl)
                 .orderBy(passage.createdAt.max().desc(), book.id.asc())
-                .offset(pageable.getOffset())
-                .limit(pageable.getPageSize())
+                .offset(offset)
+                .limit(limit)
                 .fetch();
+    }
 
-        return new PageImpl<>(content, pageable, countBooksWithPassages());
+    public long countCarouselBooks() {
+        return countBooksWithPassages();
     }
 
     public Page<BookActivityProjection> findPopularBooks(Pageable pageable) {

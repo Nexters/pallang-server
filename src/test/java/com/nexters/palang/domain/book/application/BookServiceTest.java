@@ -127,4 +127,40 @@ class BookServiceTest {
 
         assertThat(results).isEqualTo(expected);
     }
+
+    @Test
+    @DisplayName("offset을 지정하지 않으면 전체 목록 중 가운데 위치를 offset으로 계산한다")
+    void getHomeCarouselBooksResolvesCenterOffsetWhenOffsetIsNull() {
+        given(bookQueryRepository.countCarouselBooks()).willReturn(100L);
+        given(bookQueryRepository.findCarouselBooks(40L, 20))
+                .willReturn(List.of(new BookActivityProjection(1L, "책1", "작가", "cover", 5, 10)));
+
+        BookCarouselPage result = bookService.getHomeCarouselBooks(null, 20);
+
+        assertThat(result.offset()).isEqualTo(40L);
+        assertThat(result.totalElements()).isEqualTo(100L);
+        assertThat(result.books()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("offset을 직접 지정하면 그 값을 그대로 사용해 조회한다")
+    void getHomeCarouselBooksUsesGivenOffset() {
+        given(bookQueryRepository.countCarouselBooks()).willReturn(100L);
+        given(bookQueryRepository.findCarouselBooks(60L, 20)).willReturn(List.of());
+
+        BookCarouselPage result = bookService.getHomeCarouselBooks(60L, 20);
+
+        assertThat(result.offset()).isEqualTo(60L);
+    }
+
+    @Test
+    @DisplayName("전체 개수가 size보다 작으면 가운데 offset은 0이다")
+    void getHomeCarouselBooksClampsCenterOffsetToZero() {
+        given(bookQueryRepository.countCarouselBooks()).willReturn(5L);
+        given(bookQueryRepository.findCarouselBooks(0L, 20)).willReturn(List.of());
+
+        BookCarouselPage result = bookService.getHomeCarouselBooks(null, 20);
+
+        assertThat(result.offset()).isEqualTo(0L);
+    }
 }
