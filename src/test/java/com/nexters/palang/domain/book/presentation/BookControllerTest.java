@@ -2,7 +2,9 @@ package com.nexters.palang.domain.book.presentation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -12,6 +14,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexters.palang.domain.book.application.BookActivityProjection;
+import com.nexters.palang.domain.book.application.BookCarouselPage;
 import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.application.BookService;
 import com.nexters.palang.domain.book.application.ExternalBookResult;
@@ -138,14 +141,26 @@ class BookControllerTest {
     @Test
     @DisplayName("홈 캐러셀 도서 목록을 요청하면 대목/흔적 수와 함께 반환한다")
     void getHomeCarouselBooks() throws Exception {
-        given(bookService.getHomeCarouselBooks(any(Pageable.class))).willReturn(
-                new PageImpl<>(List.of(new BookActivityProjection(1L, "제목", "작가", "cover", 3, 7)),
-                        DEFAULT_PAGEABLE, 1));
+        given(bookService.getHomeCarouselBooks(isNull(), anyInt())).willReturn(
+                new BookCarouselPage(List.of(new BookActivityProjection(1L, "제목", "작가", "cover", 3, 7)), 0, 20, 1));
 
         mockMvc.perform(get("/api/home/books"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.books[0].passageCount").value(3))
                 .andExpect(jsonPath("$.data.books[0].opinionCount").value(7));
+    }
+
+    @Test
+    @DisplayName("홈 캐러셀 도서 목록 조회 시 offset을 지정하면 그대로 전달하고, 응답에 이전/다음 여부를 함께 내려준다")
+    void getHomeCarouselBooksWithOffset() throws Exception {
+        given(bookService.getHomeCarouselBooks(eq(40L), anyInt())).willReturn(
+                new BookCarouselPage(List.of(new BookActivityProjection(1L, "제목", "작가", "cover", 3, 7)), 40, 20, 100));
+
+        mockMvc.perform(get("/api/home/books").param("offset", "40").param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pageInfo.offset").value(40))
+                .andExpect(jsonPath("$.data.pageInfo.hasPrevious").value(true))
+                .andExpect(jsonPath("$.data.pageInfo.hasNext").value(true));
     }
 
     @Test

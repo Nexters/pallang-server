@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.book.presentation;
 
 import com.nexters.palang.domain.book.presentation.dto.BookActivityListResponse;
+import com.nexters.palang.domain.book.presentation.dto.BookCarouselListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookSearchListResponse;
@@ -60,15 +61,18 @@ public interface BookApi {
             @Valid CreateBookRequest request
     );
 
-    @Operation(summary = "홈 캐러셀 도서 목록", description = "흔적이 남은 도서를 대목/흔적 수와 함께 조회합니다.")
+    @Operation(summary = "홈 캐러셀 도서 목록",
+            description = "흔적이 남은 도서를 대목/흔적 수와 함께 조회합니다. offset을 생략하면 전체 목록 중 "
+                    + "정가운데 책들을 기준으로 조회하며, 좌우 스크롤 시에는 응답으로 받은 pageInfo를 참고해 "
+                    + "offset - size(이전) 또는 offset + size(다음)로 다시 요청하면 됩니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
+            @ApiResponse(responseCode = "400", description = "offset/size 형식 오류 (COMMON_400_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    ResponseEntity<DataResponse<BookActivityListResponse>> getHomeCarouselBooks(
-            @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,
-            @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
+    ResponseEntity<DataResponse<BookCarouselListResponse>> getHomeCarouselBooks(
+            @Parameter(description = "조회 시작 위치 (0부터 시작). 생략하면 전체 목록 중 가운데를 기준으로 조회") Long offset,
+            @Parameter(description = "조회 개수 (기본값 20, 최대 100)") int size
     );
 
     @Operation(summary = "내가 최근에 남긴 도서 목록",

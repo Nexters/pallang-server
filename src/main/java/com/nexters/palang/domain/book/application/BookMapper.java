@@ -3,13 +3,16 @@ package com.nexters.palang.domain.book.application;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.presentation.dto.BookActivityListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookActivityResponse;
+import com.nexters.palang.domain.book.presentation.dto.BookCarouselListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookSearchListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookSearchResponse;
 import com.nexters.palang.domain.book.presentation.dto.ExternalBookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.ExternalBookResponse;
+import com.nexters.palang.global.common.response.CarouselPageInfo;
 import com.nexters.palang.global.common.response.PageInfo;
+import java.util.List;
 import org.springframework.data.domain.Page;
 
 public final class BookMapper {
@@ -58,5 +61,11 @@ public final class BookMapper {
     public static BookActivityListResponse toActivityListResponse(Page<BookActivityProjection> projections) {
         return new BookActivityListResponse(
                 projections.map(BookMapper::toActivityResponse).getContent(), PageInfo.from(projections));
+    }
+
+    public static BookCarouselListResponse toCarouselListResponse(BookCarouselPage page) {
+        List<BookActivityResponse> books = page.books().stream().map(BookMapper::toActivityResponse).toList();
+        CarouselPageInfo pageInfo = CarouselPageInfo.of(page.offset(), page.size(), books.size(), page.totalElements());
+        return new BookCarouselListResponse(books, pageInfo);
     }
 }

@@ -12,6 +12,7 @@ import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.global.config.JpaAuditingConfig;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -118,30 +119,47 @@ class BookQueryRepositoryTest {
         opinion(passage1, writer);
         opinion(passage1, writer);
 
-        Page<BookActivityProjection> results = bookQueryRepository.findCarouselBooks(PageRequest.of(0, 20));
+        List<BookActivityProjection> results = bookQueryRepository.findCarouselBooks(0, 20);
 
-        assertThat(results.getContent()).extracting(BookActivityProjection::bookId)
+        assertThat(results).extracting(BookActivityProjection::bookId)
                 .containsExactly(bookWithPassages.getId());
-        assertThat(results.getContent().get(0).passageCount()).isEqualTo(2);
-        assertThat(results.getContent().get(0).opinionCount()).isEqualTo(2);
+        assertThat(results.get(0).passageCount()).isEqualTo(2);
+        assertThat(results.get(0).opinionCount()).isEqualTo(2);
         assertThat(bookWithoutPassages.getId()).isNotIn(
                 results.stream().map(BookActivityProjection::bookId).toList());
     }
 
     @Test
-    @DisplayName("캐러셀 조회는 요청한 페이지 크기만큼만 반환하고 전체 개수를 함께 알려준다")
-    void findCarouselBooksRespectsPageSize() {
+    @DisplayName("캐러셀 조회는 요청한 개수만큼만 반환하고 전체 개수를 별도로 알려준다")
+    void findCarouselBooksRespectsLimit() {
         User writer = user("writer-page");
         Book book1 = book("책1");
         Book book2 = book("책2");
         passage(book1, writer, 1);
         passage(book2, writer, 1);
 
-        Page<BookActivityProjection> firstPage = bookQueryRepository.findCarouselBooks(PageRequest.of(0, 1));
+        List<BookActivityProjection> firstBook = bookQueryRepository.findCarouselBooks(0, 1);
 
-        assertThat(firstPage.getContent()).hasSize(1);
-        assertThat(firstPage.getTotalElements()).isEqualTo(2);
-        assertThat(firstPage.hasNext()).isTrue();
+        assertThat(firstBook).hasSize(1);
+        assertThat(bookQueryRepository.countCarouselBooks()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("임의의 offset을 지정하면 전체 정렬 순서상 그 위치부터 도서를 반환한다")
+    void findCarouselBooksSupportsArbitraryOffset() {
+        User writer = user("writer-off");
+        Book book1 = book("책1");
+        Book book2 = book("책2");
+        Book book3 = book("책3");
+        passage(book1, writer, 1);
+        passage(book2, writer, 1);
+        passage(book3, writer, 1);
+
+        List<BookActivityProjection> all = bookQueryRepository.findCarouselBooks(0, 3);
+        List<BookActivityProjection> middle = bookQueryRepository.findCarouselBooks(1, 1);
+
+        assertThat(middle).extracting(BookActivityProjection::bookId)
+                .containsExactly(all.get(1).bookId());
     }
 
     @Test

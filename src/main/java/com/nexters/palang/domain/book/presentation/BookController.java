@@ -4,6 +4,7 @@ import com.nexters.palang.domain.book.application.BookMapper;
 import com.nexters.palang.domain.book.application.BookService;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.presentation.dto.BookActivityListResponse;
+import com.nexters.palang.domain.book.presentation.dto.BookCarouselListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookSearchListResponse;
@@ -62,11 +63,12 @@ public class BookController implements BookApi {
 
     @Override
     @GetMapping("/api/home/books")
-    public ResponseEntity<DataResponse<BookActivityListResponse>> getHomeCarouselBooks(
-            @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
+    public ResponseEntity<DataResponse<BookCarouselListResponse>> getHomeCarouselBooks(
+            @RequestParam(required = false) Long offset,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
+        int clampedSize = Math.clamp(size, 1, MAX_SIZE);
         return ResponseEntity.ok(DataResponse.from(
-                BookMapper.toActivityListResponse(bookService.getHomeCarouselBooks(pageable(page, size)))));
+                BookMapper.toCarouselListResponse(bookService.getHomeCarouselBooks(offset, clampedSize))));
     }
 
     @Override

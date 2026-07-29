@@ -51,8 +51,16 @@ public class BookService {
         return bookRepository.save(book);
     }
 
-    public Page<BookActivityProjection> getHomeCarouselBooks(Pageable pageable) {
-        return bookQueryRepository.findCarouselBooks(pageable);
+    // offset을 지정하지 않으면 전체 목록 중 가운데 책들을 반환한다. 좌우 스크롤 시에는 이전/다음 offset을 그대로 넘기면 된다.
+    public BookCarouselPage getHomeCarouselBooks(Long offset, int size) {
+        long total = bookQueryRepository.countCarouselBooks();
+        long resolvedOffset = offset != null ? Math.max(0, offset) : centerOffset(total, size);
+        List<BookActivityProjection> books = bookQueryRepository.findCarouselBooks(resolvedOffset, size);
+        return new BookCarouselPage(books, resolvedOffset, size, total);
+    }
+
+    private long centerOffset(long total, int size) {
+        return Math.max(0, (total - size) / 2);
     }
 
     public Page<Book> getRecentBooks(Long userId, Pageable pageable) {
