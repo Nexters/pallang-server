@@ -11,6 +11,8 @@ import com.nexters.palang.domain.opinion.common.error.OpinionErrorCode;
 import com.nexters.palang.domain.opinion.common.error.OpinionException;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
+import com.nexters.palang.domain.user.common.error.UserErrorCode;
+import com.nexters.palang.domain.user.common.error.UserException;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
 import java.util.List;
@@ -58,7 +60,8 @@ public class CommentService {
     @Transactional
     public Comment createComment(Long opinionId, Long userId, CreateCommentRequest request) {
         Opinion opinion = getExistingOpinion(opinionId);
-        User user = userRepository.getReferenceById(userId);
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
 
         if (request.parentCommentId() == null) {
             return commentRepository.save(Comment.root(opinion, user, request.content()));
@@ -100,7 +103,7 @@ public class CommentService {
     }
 
     private Comment getExistingComment(Long commentId) {
-        return commentRepository.findById(commentId)
+        return commentRepository.findByIdWithUser(commentId)
                 .orElseThrow(() -> new CommentException(CommentErrorCode.COMMENT_NOT_FOUND));
     }
 
