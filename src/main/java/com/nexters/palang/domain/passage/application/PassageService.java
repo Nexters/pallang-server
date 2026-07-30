@@ -2,6 +2,7 @@ package com.nexters.palang.domain.passage.application;
 
 import com.nexters.palang.domain.book.common.error.BookErrorCode;
 import com.nexters.palang.domain.book.common.error.BookException;
+import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.decoration.application.DecorationMergeCandidate;
 import com.nexters.palang.domain.decoration.application.DecorationMergeSelector;
@@ -26,10 +27,12 @@ public class PassageService {
     private final DecorationQueryRepository decorationQueryRepository;
     private final BookRepository bookRepository;
 
-    // 대목/흔적 보기 페이지 네비게이션: 발췌된 페이지 번호 목록 (스포일러 포함).
-    public Page<Integer> getPageNumbers(Long bookId, Pageable pageable) {
-        validateBookExists(bookId);
-        return passageQueryRepository.findPageNumbers(bookId, pageable);
+    // 대목/흔적 보기 페이지 네비게이션: 발췌된 페이지 번호 목록 (스포일러 포함) + 헤더용 책 정보.
+    public PageNumbersResult getPageNumbers(Long bookId, Pageable pageable) {
+        Book book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new BookException(BookErrorCode.BOOK_NOT_FOUND));
+        Page<Integer> pageNumbers = passageQueryRepository.findPageNumbers(bookId, pageable);
+        return new PageNumbersResult(book, pageNumbers);
     }
 
     // 대목 전환: 특정 페이지의 대목들과 각 대목의 꾸밈 병합 결과.

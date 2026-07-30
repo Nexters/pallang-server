@@ -24,6 +24,7 @@ public class CommentQueryRepository {
 
         List<Comment> content = queryFactory
                 .selectFrom(comment)
+                .join(comment.user).fetchJoin()
                 .where(comment.opinion.id.eq(opinionId), comment.parentComment.isNull())
                 .orderBy(comment.createdAt.asc(), comment.id.asc())
                 .offset(pageable.getOffset())
@@ -70,6 +71,7 @@ public class CommentQueryRepository {
         for (Long parentId : parentIds) {
             List<Comment> preview = queryFactory
                     .selectFrom(comment)
+                    .join(comment.user).fetchJoin()
                     .where(comment.parentComment.id.eq(parentId))
                     .orderBy(comment.createdAt.asc(), comment.id.asc())
                     .limit(previewSize)
@@ -84,6 +86,7 @@ public class CommentQueryRepository {
 
         List<Comment> content = queryFactory
                 .selectFrom(comment)
+                .join(comment.user).fetchJoin()
                 .where(comment.parentComment.id.eq(parentCommentId))
                 .orderBy(comment.createdAt.asc(), comment.id.asc())
                 .offset(pageable.getOffset())

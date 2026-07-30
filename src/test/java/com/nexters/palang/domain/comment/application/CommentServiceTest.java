@@ -139,7 +139,7 @@ class CommentServiceTest {
     @Test
     @DisplayName("존재하지 않는 원댓글의 답글을 조회하면 예외가 발생한다")
     void getRepliesFailsWhenParentCommentNotFound() {
-        given(commentRepository.findById(999L)).willReturn(Optional.empty());
+        given(commentRepository.findByIdWithUser(999L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> commentService.getReplies(999L, PageRequest.of(0, 20)))
                 .isInstanceOf(CommentException.class);
@@ -149,7 +149,7 @@ class CommentServiceTest {
     @DisplayName("답글 더보기를 요청하면 해당 원댓글의 답글을 페이지네이션으로 반환한다")
     void getRepliesReturnsPageFromQueryRepository() {
         Comment root = rootComment(1L, opinion, writer);
-        given(commentRepository.findById(1L)).willReturn(Optional.of(root));
+        given(commentRepository.findByIdWithUser(1L)).willReturn(Optional.of(root));
         given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
         Pageable pageable = PageRequest.of(0, 5);
         Page<Comment> expected = new PageImpl<>(List.of(replyComment(11L, root, writer)), pageable, 1);
@@ -164,7 +164,7 @@ class CommentServiceTest {
     @DisplayName("삭제된 흔적의 답글을 조회하면 예외가 발생한다")
     void getRepliesFailsWhenOpinionDeleted() {
         Comment root = rootComment(1L, opinion, writer);
-        given(commentRepository.findById(1L)).willReturn(Optional.of(root));
+        given(commentRepository.findByIdWithUser(1L)).willReturn(Optional.of(root));
         opinion.delete();
         given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
 
@@ -176,7 +176,7 @@ class CommentServiceTest {
     @DisplayName("원댓글을 작성하면 부모 댓글 없이 저장된다")
     void createRootComment() {
         given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
-        given(userRepository.getReferenceById(10L)).willReturn(writer);
+        given(userRepository.findById(10L)).willReturn(Optional.of(writer));
         given(commentRepository.save(any(Comment.class))).willAnswer(invocation -> invocation.getArgument(0));
 
         Comment created = commentService.createComment(1L, 10L, new CreateCommentRequest(null, "내용"));
@@ -200,8 +200,8 @@ class CommentServiceTest {
     void createReplyComment() {
         Comment root = rootComment(1L, opinion, writer);
         given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
-        given(commentRepository.findById(1L)).willReturn(Optional.of(root));
-        given(userRepository.getReferenceById(20L)).willReturn(otherUser);
+        given(commentRepository.findByIdWithUser(1L)).willReturn(Optional.of(root));
+        given(userRepository.findById(20L)).willReturn(Optional.of(otherUser));
         given(commentRepository.save(any(Comment.class))).willAnswer(invocation -> invocation.getArgument(0));
 
         Comment created = commentService.createComment(1L, 20L, new CreateCommentRequest(1L, "답글 내용"));
@@ -214,7 +214,8 @@ class CommentServiceTest {
     @DisplayName("존재하지 않는 부모 댓글에 답글을 작성하면 예외가 발생한다")
     void createReplyFailsWhenParentNotFound() {
         given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
-        given(commentRepository.findById(999L)).willReturn(Optional.empty());
+        given(userRepository.findById(10L)).willReturn(Optional.of(writer));
+        given(commentRepository.findByIdWithUser(999L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> commentService.createComment(1L, 10L, new CreateCommentRequest(999L, "내용")))
                 .isInstanceOf(CommentException.class);
@@ -226,7 +227,8 @@ class CommentServiceTest {
         Opinion otherOpinion = opinion(2L);
         Comment parentOfOtherOpinion = rootComment(1L, otherOpinion, writer);
         given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
-        given(commentRepository.findById(1L)).willReturn(Optional.of(parentOfOtherOpinion));
+        given(userRepository.findById(10L)).willReturn(Optional.of(writer));
+        given(commentRepository.findByIdWithUser(1L)).willReturn(Optional.of(parentOfOtherOpinion));
 
         assertThatThrownBy(() -> commentService.createComment(1L, 10L, new CreateCommentRequest(1L, "내용")))
                 .isInstanceOf(CommentException.class);
@@ -238,7 +240,8 @@ class CommentServiceTest {
         Comment root = rootComment(1L, opinion, writer);
         root.delete();
         given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
-        given(commentRepository.findById(1L)).willReturn(Optional.of(root));
+        given(userRepository.findById(10L)).willReturn(Optional.of(writer));
+        given(commentRepository.findByIdWithUser(1L)).willReturn(Optional.of(root));
 
         assertThatThrownBy(() -> commentService.createComment(1L, 10L, new CreateCommentRequest(1L, "내용")))
                 .isInstanceOf(CommentException.class);
@@ -250,7 +253,8 @@ class CommentServiceTest {
         Comment root = rootComment(1L, opinion, writer);
         Comment reply = replyComment(2L, root, writer);
         given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
-        given(commentRepository.findById(2L)).willReturn(Optional.of(reply));
+        given(userRepository.findById(10L)).willReturn(Optional.of(writer));
+        given(commentRepository.findByIdWithUser(2L)).willReturn(Optional.of(reply));
 
         assertThatThrownBy(() -> commentService.createComment(1L, 10L, new CreateCommentRequest(2L, "내용")))
                 .isInstanceOf(NestedReplyNotAllowedException.class);
@@ -259,7 +263,7 @@ class CommentServiceTest {
     @Test
     @DisplayName("존재하지 않는 댓글을 수정하면 예외가 발생한다")
     void modifyCommentFailsWhenNotFound() {
-        given(commentRepository.findById(999L)).willReturn(Optional.empty());
+        given(commentRepository.findByIdWithUser(999L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> commentService.modifyComment(999L, 10L, new UpdateCommentRequest("수정")))
                 .isInstanceOf(CommentException.class);
@@ -270,7 +274,7 @@ class CommentServiceTest {
     void modifyCommentFailsWhenAlreadyDeleted() {
         Comment comment = rootComment(1L, opinion, writer);
         comment.delete();
-        given(commentRepository.findById(1L)).willReturn(Optional.of(comment));
+        given(commentRepository.findByIdWithUser(1L)).willReturn(Optional.of(comment));
 
         assertThatThrownBy(() -> commentService.modifyComment(1L, 10L, new UpdateCommentRequest("수정")))
                 .isInstanceOf(CommentException.class);
@@ -280,7 +284,7 @@ class CommentServiceTest {
     @DisplayName("본인이 작성하지 않은 댓글을 수정하면 예외가 발생한다")
     void modifyCommentFailsWhenNotOwner() {
         Comment comment = rootComment(1L, opinion, writer);
-        given(commentRepository.findById(1L)).willReturn(Optional.of(comment));
+        given(commentRepository.findByIdWithUser(1L)).willReturn(Optional.of(comment));
 
         assertThatThrownBy(() -> commentService.modifyComment(1L, 20L, new UpdateCommentRequest("수정")))
                 .isInstanceOf(CommentException.class);
@@ -290,7 +294,7 @@ class CommentServiceTest {
     @DisplayName("본인이 작성한 댓글을 수정하면 내용이 변경된다")
     void modifyCommentUpdatesContent() {
         Comment comment = rootComment(1L, opinion, writer);
-        given(commentRepository.findById(1L)).willReturn(Optional.of(comment));
+        given(commentRepository.findByIdWithUser(1L)).willReturn(Optional.of(comment));
 
         Comment modified = commentService.modifyComment(1L, 10L, new UpdateCommentRequest("수정된 내용"));
 
@@ -301,7 +305,7 @@ class CommentServiceTest {
     @DisplayName("본인이 작성하지 않은 댓글을 삭제하면 예외가 발생한다")
     void removeCommentFailsWhenNotOwner() {
         Comment comment = rootComment(1L, opinion, writer);
-        given(commentRepository.findById(1L)).willReturn(Optional.of(comment));
+        given(commentRepository.findByIdWithUser(1L)).willReturn(Optional.of(comment));
 
         assertThatThrownBy(() -> commentService.removeComment(1L, 20L)).isInstanceOf(CommentException.class);
     }
@@ -310,7 +314,7 @@ class CommentServiceTest {
     @DisplayName("본인이 작성한 댓글을 삭제하면 소프트 삭제된다")
     void removeCommentSoftDeletesComment() {
         Comment comment = rootComment(1L, opinion, writer);
-        given(commentRepository.findById(1L)).willReturn(Optional.of(comment));
+        given(commentRepository.findByIdWithUser(1L)).willReturn(Optional.of(comment));
 
         commentService.removeComment(1L, 10L);
 

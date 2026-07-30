@@ -2,6 +2,7 @@ package com.nexters.palang.domain.passage.presentation.response;
 
 import com.nexters.palang.domain.decoration.application.DecorationMergeCandidate;
 import com.nexters.palang.domain.opinion.presentation.dto.OpinionResponse.DecorationResponse;
+import com.nexters.palang.domain.passage.application.PageNumbersResult;
 import com.nexters.palang.domain.passage.application.SimilarPassageProjection;
 import com.nexters.palang.domain.passage.application.dto.OcrResultDto;
 import com.nexters.palang.domain.passage.domain.Passage;
@@ -25,14 +26,20 @@ public class PassageResponse {
         }
     }
 
-    // 대목/흔적 보기 페이지 네비게이션(FR-VIEW-02): 발췌된 페이지 번호 목록.
+    // 대목/흔적 보기 페이지 네비게이션(FR-VIEW-02): 발췌된 페이지 번호 목록 + 헤더용 책 정보.
     public record PageNumbers(
+            @Schema(example = "이방인", requiredMode = Schema.RequiredMode.REQUIRED) String bookTitle,
+            @Schema(example = "https://example.com/cover.jpg") String coverImageUrl,
             @ArraySchema(schema = @Schema(example = "3"), arraySchema = @Schema(requiredMode = Schema.RequiredMode.REQUIRED))
             List<Integer> pageNumbers,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) PageInfo pageInfo
     ) {
-        public static PageNumbers from(Page<Integer> page) {
-            return new PageNumbers(page.getContent(), PageInfo.from(page));
+        public static PageNumbers from(PageNumbersResult result) {
+            return new PageNumbers(
+                    result.book().getTitle(),
+                    result.book().getCoverImageUrl(),
+                    result.pageNumbers().getContent(),
+                    PageInfo.from(result.pageNumbers()));
         }
     }
 

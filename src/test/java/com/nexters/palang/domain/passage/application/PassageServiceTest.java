@@ -14,6 +14,7 @@ import com.nexters.palang.domain.passage.infrastructure.PassageQueryRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,7 +52,7 @@ class PassageServiceTest {
     @Test
     @DisplayName("존재하지 않는 도서로 페이지 번호를 조회하면 예외가 발생한다")
     void getPageNumbersThrowsExceptionWhenBookDoesNotExist() {
-        given(bookRepository.existsById(1L)).willReturn(false);
+        given(bookRepository.findById(1L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> passageService.getPageNumbers(1L, PageRequest.of(0, 20)))
                 .isInstanceOf(BookException.class);

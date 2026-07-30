@@ -3,6 +3,7 @@ package com.nexters.palang.domain.opinion.infrastructure;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nexters.palang.domain.book.domain.Book;
+import com.nexters.palang.domain.comment.domain.Comment;
 import com.nexters.palang.domain.opinion.application.LikedOpinionProjection;
 import com.nexters.palang.domain.opinion.application.MyOpinionProjection;
 import com.nexters.palang.domain.opinion.application.OpinionSummaryProjection;
@@ -91,7 +92,7 @@ class OpinionQueryRepositoryTest {
         Opinion popular = opinion(passage, writer, "많은 좋아요", 10);
 
         Page<OpinionSummaryProjection> result = opinionQueryRepository.findOpinions(
-                passage.getId(), OpinionSortType.LIKES, PageRequest.of(0, 10));
+                passage.getId(), OpinionSortType.LIKES, PageRequest.of(0, 10), null);
 
         assertThat(result.getContent().get(0).opinionId()).isEqualTo(popular.getId());
     }
@@ -105,7 +106,7 @@ class OpinionQueryRepositoryTest {
         Opinion later = opinion(passage, writer, "나중에 작성", 1);
 
         Page<OpinionSummaryProjection> result = opinionQueryRepository.findOpinions(
-                passage.getId(), OpinionSortType.LATEST, PageRequest.of(0, 10));
+                passage.getId(), OpinionSortType.LATEST, PageRequest.of(0, 10), null);
 
         assertThat(result.getContent().get(0).opinionId()).isEqualTo(later.getId());
     }
@@ -121,7 +122,7 @@ class OpinionQueryRepositoryTest {
         entityManager.persistAndFlush(deleted);
 
         Page<OpinionSummaryProjection> result = opinionQueryRepository.findOpinions(
-                passage.getId(), OpinionSortType.LATEST, PageRequest.of(0, 10));
+                passage.getId(), OpinionSortType.LATEST, PageRequest.of(0, 10), null);
 
         assertThat(result.getContent()).extracting(OpinionSummaryProjection::opinionId)
                 .containsExactly(active.getId());
@@ -135,9 +136,47 @@ class OpinionQueryRepositoryTest {
         opinion(passage, writer, "흔적 내용", 0);
 
         Page<OpinionSummaryProjection> result = opinionQueryRepository.findOpinions(
-                passage.getId(), OpinionSortType.LATEST, PageRequest.of(0, 10));
+                passage.getId(), OpinionSortType.LATEST, PageRequest.of(0, 10), null);
 
         assertThat(result.getContent().get(0).nickname()).isEqualTo(writer.getNickname());
+    }
+
+    @Test
+    @DisplayName("currentUserId가 좋아요를 눌렀으면 liked=true, 비로그인(null)이면 liked=false를 반환한다")
+    void findOpinionsReflectsLikedForCurrentUser() {
+        User writer = user("writer-5");
+        Passage passage = passage(writer);
+        Opinion opinion = opinion(passage, writer, "흔적 내용", 0);
+        entityManager.persistAndFlush(OpinionLike.builder().user(me).opinion(opinion).build());
+
+        Page<OpinionSummaryProjection> likedResult = opinionQueryRepository.findOpinions(
+                passage.getId(), OpinionSortType.LATEST, PageRequest.of(0, 10), me.getId());
+        Page<OpinionSummaryProjection> anonymousResult = opinionQueryRepository.findOpinions(
+                passage.getId(), OpinionSortType.LATEST, PageRequest.of(0, 10), null);
+        Page<OpinionSummaryProjection> otherResult = opinionQueryRepository.findOpinions(
+                passage.getId(), OpinionSortType.LATEST, PageRequest.of(0, 10), other.getId());
+
+        assertThat(likedResult.getContent().get(0).liked()).isTrue();
+        assertThat(anonymousResult.getContent().get(0).liked()).isFalse();
+        assertThat(otherResult.getContent().get(0).liked()).isFalse();
+    }
+
+    @Test
+    @DisplayName("commentCount는 답글을 포함하고 삭제된 댓글은 제외한다")
+    void findOpinionsCountsCommentsIncludingRepliesExcludingDeleted() {
+        User writer = user("writer-6");
+        Passage passage = passage(writer);
+        Opinion opinion = opinion(passage, writer, "흔적 내용", 0);
+        Comment root = entityManager.persistAndFlush(Comment.root(opinion, writer, "원댓글"));
+        entityManager.persistAndFlush(Comment.reply(root, writer, "답글"));
+        Comment deletedRoot = entityManager.persistAndFlush(Comment.root(opinion, writer, "삭제될 댓글"));
+        deletedRoot.delete();
+        entityManager.persistAndFlush(deletedRoot);
+
+        Page<OpinionSummaryProjection> result = opinionQueryRepository.findOpinions(
+                passage.getId(), OpinionSortType.LATEST, PageRequest.of(0, 10), null);
+
+        assertThat(result.getContent().get(0).commentCount()).isEqualTo(2L);
     }
 
     @Test

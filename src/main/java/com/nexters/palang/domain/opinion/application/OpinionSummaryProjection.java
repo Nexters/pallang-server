@@ -8,6 +8,8 @@ public record OpinionSummaryProjection(
         String nickname,
         String content,
         int likeCount,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        boolean liked,
+        long commentCount
 ) {
 }

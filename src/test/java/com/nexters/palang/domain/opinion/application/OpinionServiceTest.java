@@ -154,9 +154,9 @@ class OpinionServiceTest {
         given(passageRepository.existsById(100L)).willReturn(true);
         Pageable pageable = PageRequest.of(0, 20);
 
-        opinionService.getOpinions(100L, OpinionSortType.LATEST, pageable);
+        opinionService.getOpinions(100L, OpinionSortType.LATEST, pageable, 1L);
 
-        verify(opinionQueryRepository).findOpinions(100L, OpinionSortType.LATEST, pageable);
+        verify(opinionQueryRepository).findOpinions(100L, OpinionSortType.LATEST, pageable, 1L);
     }
 
     @Test
@@ -164,7 +164,7 @@ class OpinionServiceTest {
     void getOpinionsThrowsExceptionWhenPassageDoesNotExist() {
         given(passageRepository.existsById(100L)).willReturn(false);
 
-        assertThatThrownBy(() -> opinionService.getOpinions(100L, OpinionSortType.LATEST, PageRequest.of(0, 20)))
+        assertThatThrownBy(() -> opinionService.getOpinions(100L, OpinionSortType.LATEST, PageRequest.of(0, 20), 1L))
                 .isInstanceOf(PassageException.class);
     }
 
@@ -172,7 +172,7 @@ class OpinionServiceTest {
     @DisplayName("존재하는 흔적을 조회하면 해당 흔적을 반환한다")
     void getOpinionReturnsExistingOpinion() {
         Opinion opinion = opinionOwnedBy(1L, 1L);
-        given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
+        given(opinionRepository.findDetailById(1L)).willReturn(Optional.of(opinion));
 
         Opinion result = opinionService.getOpinion(1L);
 
@@ -184,7 +184,7 @@ class OpinionServiceTest {
     void getOpinionThrowsExceptionWhenOpinionIsDeleted() {
         Opinion opinion = opinionOwnedBy(1L, 1L);
         opinion.delete();
-        given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
+        given(opinionRepository.findDetailById(1L)).willReturn(Optional.of(opinion));
 
         assertThatThrownBy(() -> opinionService.getOpinion(1L))
                 .isInstanceOf(OpinionException.class);
@@ -194,7 +194,7 @@ class OpinionServiceTest {
     @DisplayName("본인이 작성한 흔적을 수정하면 내용이 변경된다")
     void modifyOpinionUpdatesContentWhenOwner() {
         Opinion opinion = opinionOwnedBy(1L, 10L);
-        given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
+        given(opinionRepository.findDetailById(1L)).willReturn(Optional.of(opinion));
 
         Opinion result = opinionService.modifyOpinion(1L, 10L, new UpdateOpinionRequest("수정된 내용"));
 
@@ -205,7 +205,7 @@ class OpinionServiceTest {
     @DisplayName("본인이 아닌 사용자가 흔적을 수정하려 하면 예외가 발생한다")
     void modifyOpinionThrowsExceptionWhenNotOwner() {
         Opinion opinion = opinionOwnedBy(1L, 10L);
-        given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
+        given(opinionRepository.findDetailById(1L)).willReturn(Optional.of(opinion));
 
         assertThatThrownBy(() -> opinionService.modifyOpinion(1L, 999L, new UpdateOpinionRequest("수정된 내용")))
                 .isInstanceOf(OpinionException.class);
@@ -215,7 +215,7 @@ class OpinionServiceTest {
     @DisplayName("본인이 작성한 흔적을 삭제하면 소프트 삭제된다")
     void removeOpinionDeletesWhenOwner() {
         Opinion opinion = opinionOwnedBy(1L, 10L);
-        given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
+        given(opinionRepository.findDetailById(1L)).willReturn(Optional.of(opinion));
 
         opinionService.removeOpinion(1L, 10L);
 
@@ -226,7 +226,7 @@ class OpinionServiceTest {
     @DisplayName("본인이 아닌 사용자가 흔적을 삭제하려 하면 예외가 발생한다")
     void removeOpinionThrowsExceptionWhenNotOwner() {
         Opinion opinion = opinionOwnedBy(1L, 10L);
-        given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
+        given(opinionRepository.findDetailById(1L)).willReturn(Optional.of(opinion));
 
         assertThatThrownBy(() -> opinionService.removeOpinion(1L, 999L))
                 .isInstanceOf(OpinionException.class);

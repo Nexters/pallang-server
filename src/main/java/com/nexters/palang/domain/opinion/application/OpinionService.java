@@ -40,12 +40,13 @@ public class OpinionService {
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
 
-    // 흔적 목록(FR-OPINION-03): 최신순(기본)/좋아요순.
-    public Page<OpinionSummaryProjection> getOpinions(Long passageId, OpinionSortType sortType, Pageable pageable) {
+    // 흔적 목록(FR-OPINION-03): 최신순(기본)/좋아요순. currentUserId는 비로그인 시 null(liked는 항상 false).
+    public Page<OpinionSummaryProjection> getOpinions(
+            Long passageId, OpinionSortType sortType, Pageable pageable, Long currentUserId) {
         if (!passageRepository.existsById(passageId)) {
             throw new PassageException(PassageErrorCode.PASSAGE_NOT_FOUND);
         }
-        return opinionQueryRepository.findOpinions(passageId, sortType, pageable);
+        return opinionQueryRepository.findOpinions(passageId, sortType, pageable, currentUserId);
     }
 
     // 흔적 상세(FR-OPINION-05): 이 흔적 작성자가 기록한 꾸밈을 그대로 보여준다.
@@ -69,7 +70,7 @@ public class OpinionService {
     }
 
     private Opinion getExistingOpinion(Long opinionId) {
-        Opinion opinion = opinionRepository.findById(opinionId)
+        Opinion opinion = opinionRepository.findDetailById(opinionId)
                 .orElseThrow(() -> new OpinionException(OpinionErrorCode.OPINION_NOT_FOUND));
         if (opinion.isDeleted()) {
             throw new OpinionException(OpinionErrorCode.OPINION_NOT_FOUND);
