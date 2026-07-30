@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.opinion.infrastructure;
 
 import com.nexters.palang.domain.book.domain.QBook;
+import com.nexters.palang.domain.comment.domain.QComment;
 import com.nexters.palang.domain.opinion.application.LikedOpinionProjection;
 import com.nexters.palang.domain.opinion.application.MyOpinionProjection;
 import com.nexters.palang.domain.opinion.application.OpinionSummaryProjection;
@@ -9,8 +10,11 @@ import com.nexters.palang.domain.opinion.domain.QOpinion;
 import com.nexters.palang.domain.opinion.domain.QOpinionLike;
 import com.nexters.palang.domain.passage.domain.QPassage;
 import com.nexters.palang.domain.user.domain.QUser;
+import com.querydsl.core.types.Expression;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -26,13 +30,30 @@ public class OpinionQueryRepository {
     private final JPAQueryFactory queryFactory;
 
     // 흔적 목록(FR-OPINION-03): 최신순(기본)/좋아요순, 삭제된 흔적 제외.
-    public Page<OpinionSummaryProjection> findOpinions(Long passageId, OpinionSortType sortType, Pageable pageable) {
+    // liked: 현재 로그인 사용자 기준(비로그인이면 false), commentCount: 답글 포함/삭제 댓글 제외.
+    public Page<OpinionSummaryProjection> findOpinions(
+            Long passageId, OpinionSortType sortType, Pageable pageable, Long currentUserId) {
         QOpinion opinion = QOpinion.opinion;
         QUser user = QUser.user;
+        QOpinionLike opinionLike = QOpinionLike.opinionLike;
+        QComment comment = QComment.comment;
+
+        Expression<Boolean> likedExpression = currentUserId != null
+                ? JPAExpressions.selectOne()
+                        .from(opinionLike)
+                        .where(opinionLike.opinion.id.eq(opinion.id), opinionLike.user.id.eq(currentUserId))
+                        .exists()
+                : Expressions.FALSE;
+
+        Expression<Long> commentCountExpression = JPAExpressions
+                .select(comment.count())
+                .from(comment)
+                .where(comment.opinion.id.eq(opinion.id), comment.deletedAt.isNull());
 
         List<OpinionSummaryProjection> content = queryFactory
                 .select(Projections.constructor(OpinionSummaryProjection.class,
-                        opinion.id, user.id, user.nickname, opinion.content, opinion.likeCount, opinion.createdAt))
+                        opinion.id, user.id, user.nickname, opinion.content, opinion.likeCount, opinion.createdAt,
+                        likedExpression, commentCountExpression))
                 .from(opinion)
                 .join(opinion.user, user)
                 .where(opinion.passage.id.eq(passageId), opinion.deletedAt.isNull())

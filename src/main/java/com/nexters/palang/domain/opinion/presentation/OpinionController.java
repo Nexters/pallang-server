@@ -55,8 +55,9 @@ public class OpinionController implements OpinionApi {
             @RequestParam(defaultValue = "LATEST") OpinionSortType sortType,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
-        return ResponseEntity.ok(DataResponse.from(
-                OpinionListResponse.from(opinionService.getOpinions(passageId, sortType, pageable(page, size)))));
+        Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
+        return ResponseEntity.ok(DataResponse.from(OpinionListResponse.from(
+                opinionService.getOpinions(passageId, sortType, pageable(page, size), currentUserId))));
     }
 
     @Override

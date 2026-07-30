@@ -130,8 +130,9 @@ class OpinionControllerTest {
     @Test
     @DisplayName("흔적 목록을 조회하면 정렬된 목록을 반환한다")
     void getOpinions() throws Exception {
-        OpinionSummaryProjection projection = new OpinionSummaryProjection(1L, 2L, "닉네임", "흔적 내용", 3, LocalDateTime.now());
-        given(opinionService.getOpinions(any(), any(), any()))
+        OpinionSummaryProjection projection =
+                new OpinionSummaryProjection(1L, 2L, "닉네임", "흔적 내용", 3, LocalDateTime.now(), false, 0L);
+        given(opinionService.getOpinions(any(), any(), any(), any()))
                 .willReturn(new PageImpl<>(List.of(projection), PageRequest.of(0, 20), 1));
 
         mockMvc.perform(get("/api/passages/100/opinions"))
