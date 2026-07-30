@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.passage.presentation;
 
 import com.nexters.palang.domain.decoration.application.DecorationMergeCandidate;
+import com.nexters.palang.domain.passage.application.PageNumbersResult;
 import com.nexters.palang.domain.passage.application.PassageOcrService;
 import com.nexters.palang.domain.passage.application.PassageService;
 import com.nexters.palang.domain.passage.application.SimilarPassageFinder;
@@ -16,7 +17,6 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
@@ -66,8 +66,8 @@ public class PassageController implements PassageControllerDocs {
             @PathVariable Long bookId,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
-        Page<Integer> pageNumbers = passageService.getPageNumbers(bookId, pageable(page, size));
-        return DataResponse.from(PassageResponse.PageNumbers.from(pageNumbers));
+        PageNumbersResult result = passageService.getPageNumbers(bookId, pageable(page, size));
+        return DataResponse.from(PassageResponse.PageNumbers.from(result));
     }
 
     @Override

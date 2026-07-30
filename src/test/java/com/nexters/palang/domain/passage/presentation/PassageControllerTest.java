@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexters.palang.domain.book.domain.Book;
+import com.nexters.palang.domain.passage.application.PageNumbersResult;
 import com.nexters.palang.domain.passage.application.PassageOcrService;
 import com.nexters.palang.domain.passage.application.PassageService;
 import com.nexters.palang.domain.passage.application.SimilarPassageFinder;
@@ -117,14 +119,22 @@ class PassageControllerTest {
                 .andExpect(jsonPath("$.title").value("COMMON_400_1"));
     }
 
+    private Book book() {
+        return Book.builder()
+                .title("제목").author("작가").publisher("출판사").pageCount(300)
+                .coverImageUrl("https://example.com/cover.jpg").build();
+    }
+
     @Test
-    @DisplayName("페이지 번호 목록을 조회하면 오름차순으로 반환한다")
+    @DisplayName("페이지 번호 목록을 조회하면 오름차순으로, 책 정보와 함께 반환한다")
     void getPageNumbers() throws Exception {
-        given(passageService.getPageNumbers(any(), any()))
-                .willReturn(new PageImpl<>(List.of(2, 5), PageRequest.of(0, 20), 2));
+        given(passageService.getPageNumbers(any(), any())).willReturn(new PageNumbersResult(
+                book(), new PageImpl<>(List.of(2, 5), PageRequest.of(0, 20), 2)));
 
         mockMvc.perform(get("/api/books/1/passages"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.bookTitle").value("제목"))
+                .andExpect(jsonPath("$.data.coverImageUrl").value("https://example.com/cover.jpg"))
                 .andExpect(jsonPath("$.data.pageNumbers[0]").value(2))
                 .andExpect(jsonPath("$.data.pageNumbers[1]").value(5));
     }
@@ -132,8 +142,8 @@ class PassageControllerTest {
     @Test
     @DisplayName("비로그인 사용자로 페이지 번호를 조회해도 401 없이 조회된다 (soft auth)")
     void getPageNumbersDoesNotRequireAuthentication() throws Exception {
-        given(passageService.getPageNumbers(any(), any()))
-                .willReturn(new PageImpl<>(List.of(), PageRequest.of(0, 20), 0));
+        given(passageService.getPageNumbers(any(), any())).willReturn(new PageNumbersResult(
+                book(), new PageImpl<>(List.of(), PageRequest.of(0, 20), 0)));
 
         mockMvc.perform(get("/api/books/1/passages"))
                 .andExpect(status().isOk());
