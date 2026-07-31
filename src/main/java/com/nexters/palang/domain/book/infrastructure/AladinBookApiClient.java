@@ -44,6 +44,7 @@ public class AladinBookApiClient {
                             .queryParam("MaxResults", maxResults)
                             .queryParam("start", start)
                             .queryParam("SearchTarget", "Book")
+                            .queryParam("Cover", "Big")
                             .queryParam("output", "js")
                             .queryParam("Version", VERSION)
                             .build())

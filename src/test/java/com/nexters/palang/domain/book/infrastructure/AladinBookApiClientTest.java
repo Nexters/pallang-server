@@ -107,4 +107,16 @@ class AladinBookApiClientTest {
         String query = requestCaptor.getValue().url().getQuery();
         assertThat(query).contains("start=6").contains("MaxResults=5");
     }
+
+    @Test
+    @DisplayName("고화질 커버 이미지를 받기 위해 Cover=Big 파라미터를 함께 요청한다")
+    void searchRequestsBigCoverImage() {
+        ArgumentCaptor<ClientRequest> requestCaptor = ArgumentCaptor.forClass(ClientRequest.class);
+        given(exchangeFunction.exchange(requestCaptor.capture())).willReturn(Mono.just(jsonResponse("{}")));
+
+        aladinBookApiClient().search("프랑켄슈타인", PageRequest.of(0, 20));
+
+        String query = requestCaptor.getValue().url().getQuery();
+        assertThat(query).contains("Cover=Big");
+    }
 }
