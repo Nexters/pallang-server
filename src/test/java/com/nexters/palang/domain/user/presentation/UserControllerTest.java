@@ -65,6 +65,7 @@ class UserControllerTest {
     private User user(Long id) {
         User user = User.builder()
                 .nickname("닉네임")
+                .email("user@example.com")
                 .profileImageUrl("cover")
                 .backgroundColor("#FFFFFF")
                 .snsProvider(SnsProvider.KAKAO)
@@ -84,6 +85,7 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.userId").value(1))
                 .andExpect(jsonPath("$.data.nickname").value("닉네임"))
+                .andExpect(jsonPath("$.data.email").value("user@example.com"))
                 .andExpect(jsonPath("$.data.opinionCount").value(5));
     }
 

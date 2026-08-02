@@ -67,10 +67,12 @@ class AuthServiceTest {
     @Test
     @DisplayName("처음 로그인하는 카카오 사용자는 신규 가입되고 isNewUser가 true다")
     void loginWithKakaoSignsUpNewUser() {
-        given(kakaoOAuthClient.getSnsId("kakao-token")).willReturn("sns-100");
+        given(kakaoOAuthClient.getUserInfo("kakao-token"))
+                .willReturn(new KakaoOAuthClient.KakaoUserInfo("sns-100", "user100@example.com"));
         given(userRepository.findBySnsProviderAndSnsId(SnsProvider.KAKAO, "sns-100")).willReturn(Optional.empty());
         User newUser = user(100L);
-        given(userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-100")).willReturn(newUser);
+        given(userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-100", "user100@example.com"))
+                .willReturn(newUser);
         given(jwtTokenProvider.createAccessToken(100L)).willReturn("access-token");
         given(jwtTokenProvider.createRefreshToken(100L)).willReturn("refresh-token");
         given(jwtTokenProvider.refreshTokenExpiryFromNow()).willReturn(LocalDateTime.now().plusDays(14));
@@ -86,9 +88,10 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("이미 가입된 카카오 사용자가 로그인하면 isNewUser가 false다")
+    @DisplayName("이미 가입된 카카오 사용자가 로그인하면 isNewUser가 false이고 이메일이 갱신된다")
     void loginWithKakaoSignsInExistingUser() {
-        given(kakaoOAuthClient.getSnsId("kakao-token")).willReturn("sns-200");
+        given(kakaoOAuthClient.getUserInfo("kakao-token"))
+                .willReturn(new KakaoOAuthClient.KakaoUserInfo("sns-200", "user200@example.com"));
         User existingUser = user(200L);
         given(userRepository.findBySnsProviderAndSnsId(SnsProvider.KAKAO, "sns-200"))
                 .willReturn(Optional.of(existingUser));
@@ -99,13 +102,15 @@ class AuthServiceTest {
         AuthResult result = authService.loginWithKakao("kakao-token");
 
         assertThat(result.isNewUser()).isFalse();
-        verify(userRegistrationService, never()).registerViaSns(any(), anyString());
+        assertThat(existingUser.getEmail()).isEqualTo("user200@example.com");
+        verify(userRegistrationService, never()).registerViaSns(any(), anyString(), any());
     }
 
     @Test
     @DisplayName("탈퇴한 계정으로 로그인을 시도하면 예외가 발생한다")
     void loginWithKakaoFailsWhenAccountWithdrawn() {
-        given(kakaoOAuthClient.getSnsId("kakao-token")).willReturn("sns-300");
+        given(kakaoOAuthClient.getUserInfo("kakao-token"))
+                .willReturn(new KakaoOAuthClient.KakaoUserInfo("sns-300", null));
         User withdrawnUser = user(300L);
         withdrawnUser.withdraw();
         given(userRepository.findBySnsProviderAndSnsId(SnsProvider.KAKAO, "sns-300"))
@@ -118,7 +123,7 @@ class AuthServiceTest {
     @DisplayName("[개발용] userId 없이 devLogin을 호출하면 새 테스트 유저를 만들어 로그인 처리한다")
     void devLoginCreatesNewUserWhenUserIdOmitted() {
         User newUser = user(400L);
-        given(userRegistrationService.registerViaSns(eq(SnsProvider.KAKAO), anyString())).willReturn(newUser);
+        given(userRegistrationService.registerViaSns(eq(SnsProvider.KAKAO), anyString(), any())).willReturn(newUser);
         given(jwtTokenProvider.createAccessToken(400L)).willReturn("access-token");
         given(jwtTokenProvider.createRefreshToken(400L)).willReturn("refresh-token");
         given(jwtTokenProvider.refreshTokenExpiryFromNow()).willReturn(LocalDateTime.now().plusDays(14));
@@ -141,7 +146,7 @@ class AuthServiceTest {
         AuthResult result = authService.devLogin(500L);
 
         assertThat(result.isNewUser()).isFalse();
-        verify(userRegistrationService, never()).registerViaSns(any(), anyString());
+        verify(userRegistrationService, never()).registerViaSns(any(), anyString(), any());
     }
 
     @Test

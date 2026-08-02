@@ -44,11 +44,12 @@ class UserRegistrationServiceTest {
         given(nicknameGenerator.generateBase()).willReturn("고요한책갈피");
         given(userRepository.saveAndFlush(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
 
-        User user = userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-1");
+        User user = userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-1", "user1@example.com");
 
         assertThat(user.getNickname()).isEqualTo("고요한책갈피");
         assertThat(user.getSnsProvider()).isEqualTo(SnsProvider.KAKAO);
         assertThat(user.getSnsId()).isEqualTo("sns-1");
+        assertThat(user.getEmail()).isEqualTo("user1@example.com");
         verify(userRepository, times(1)).saveAndFlush(any());
     }
 
@@ -62,7 +63,7 @@ class UserRegistrationServiceTest {
         given(userRepository.saveAndFlush(argThat(u -> u != null && u.getNickname().equals("고요한책갈피1"))))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
-        User user = userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-2");
+        User user = userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-2", null);
 
         assertThat(user.getNickname()).isEqualTo("고요한책갈피1");
     }
@@ -76,7 +77,7 @@ class UserRegistrationServiceTest {
         given(userRepository.saveAndFlush(any(User.class)))
                 .willThrow(new DataIntegrityViolationException("Duplicate entry for key 'users.uq_users_nickname'"));
 
-        assertThatThrownBy(() -> userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-3"))
+        assertThatThrownBy(() -> userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-3", null))
                 .isInstanceOf(UserException.class);
     }
 
@@ -88,7 +89,7 @@ class UserRegistrationServiceTest {
                 .willThrow(new DataIntegrityViolationException(
                         "Column 'terms_agreed_at' cannot be null"));
 
-        assertThatThrownBy(() -> userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-4"))
+        assertThatThrownBy(() -> userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-4", null))
                 .isInstanceOf(DataIntegrityViolationException.class);
         verify(userRepository, times(1)).saveAndFlush(any());
     }

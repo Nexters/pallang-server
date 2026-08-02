@@ -48,6 +48,10 @@ public class User extends BaseEntity {
     @Column(name = "profile_image_url", columnDefinition = "TEXT")
     private String profileImageUrl;
 
+    // 카카오계정(이메일) 동의항목을 거부했거나 미인증 상태면 null일 수 있어 nullable이다.
+    @Column(name = "email")
+    private String email;
+
     @Column(name = "background_color", length = BACKGROUND_COLOR_MAX_LENGTH)
     private String backgroundColor;
 
@@ -79,6 +83,7 @@ public class User extends BaseEntity {
             String backgroundColor,
             SnsProvider snsProvider,
             String snsId,
+            String email,
             LocalDateTime termsAgreedAt
     ) {
         this.nickname = nickname;
@@ -86,6 +91,7 @@ public class User extends BaseEntity {
         this.backgroundColor = backgroundColor;
         this.snsProvider = snsProvider;
         this.snsId = snsId;
+        this.email = email;
         this.termsAgreedAt = termsAgreedAt;
         this.hasCompletedOnboarding = false;
         this.isWithdrawn = false;
@@ -116,6 +122,11 @@ public class User extends BaseEntity {
 
     public void changeProfileImage(String profileImageUrl) {
         this.profileImageUrl = profileImageUrl;
+    }
+
+    // 이메일 동의를 나중에 하는 경우가 있어, 로그인 시점마다 카카오가 내려준 값으로 갱신한다(멱등).
+    public void changeEmail(String email) {
+        this.email = email;
     }
 
     public void withdraw() {
