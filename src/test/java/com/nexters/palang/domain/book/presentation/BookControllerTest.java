@@ -8,7 +8,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -33,7 +33,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -116,12 +116,27 @@ class BookControllerTest {
     @Test
     @DisplayName("필수 항목을 채워 도서를 직접 등록하면 등록된 도서를 반환한다")
     void createBook() throws Exception {
-        CreateBookRequest request = new CreateBookRequest("제목", "작가", "출판사", 300, "isbn", "cover");
-        given(bookService.createBook(any())).willReturn(book(1L, "제목"));
+        CreateBookRequest request = new CreateBookRequest("제목", "작가", "출판사", 300, "isbn");
+        MockMultipartFile bookPart = new MockMultipartFile(
+                "book", "book", "application/json", objectMapper.writeValueAsString(request).getBytes());
+        given(bookService.createBook(any(), any())).willReturn(book(1L, "제목"));
 
-        mockMvc.perform(post("/api/books")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+        mockMvc.perform(multipart("/api/books").file(bookPart))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.bookId").value(1));
+    }
+
+    @Test
+    @DisplayName("표지 이미지와 함께 도서를 직접 등록하면 등록된 도서를 반환한다")
+    void createBookWithCoverImage() throws Exception {
+        CreateBookRequest request = new CreateBookRequest("제목", "작가", "출판사", 300, "isbn");
+        MockMultipartFile bookPart = new MockMultipartFile(
+                "book", "book", "application/json", objectMapper.writeValueAsString(request).getBytes());
+        MockMultipartFile coverImagePart = new MockMultipartFile(
+                "coverImage", "cover.jpg", "image/jpeg", "image-bytes".getBytes());
+        given(bookService.createBook(any(), any())).willReturn(book(1L, "제목"));
+
+        mockMvc.perform(multipart("/api/books").file(bookPart).file(coverImagePart))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.bookId").value(1));
     }
@@ -129,11 +144,11 @@ class BookControllerTest {
     @Test
     @DisplayName("필수 항목이 비어 있는 상태로 도서 등록을 요청하면 400 에러가 발생한다")
     void createBookFailsWhenRequiredFieldIsBlank() throws Exception {
-        CreateBookRequest request = new CreateBookRequest("", "작가", "출판사", 300, null, null);
+        CreateBookRequest request = new CreateBookRequest("", "작가", "출판사", 300, null);
+        MockMultipartFile bookPart = new MockMultipartFile(
+                "book", "book", "application/json", objectMapper.writeValueAsString(request).getBytes());
 
-        mockMvc.perform(post("/api/books")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+        mockMvc.perform(multipart("/api/books").file(bookPart))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("COMMON_400_1"));
     }

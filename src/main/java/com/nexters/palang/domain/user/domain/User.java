@@ -114,6 +114,10 @@ public class User extends BaseEntity {
         this.backgroundColor = backgroundColor;
     }
 
+    public void changeProfileImage(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
+    }
+
     public void withdraw() {
         this.isWithdrawn = true;
         this.withdrawnAt = LocalDateTime.now();

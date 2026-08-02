@@ -9,7 +9,6 @@ public record CreateBookRequest(
         @NotBlank(message = "지은이는 필수입니다.") @Schema(example = "한강") String author,
         @NotBlank(message = "출판사는 필수입니다.") @Schema(example = "창비") String publisher,
         @Positive(message = "페이지수는 1 이상이어야 합니다.") @Schema(example = "268") int pageCount,
-        @Schema(example = "9788936434120") String isbn,
-        @Schema(example = "https://image.aladin.co.kr/product/123/45/cover/8936434120_1.jpg") String coverImageUrl
+        @Schema(example = "9788936434120") String isbn
 ) {
 }

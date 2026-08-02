@@ -19,7 +19,9 @@ WORKDIR /app
 
 RUN addgroup --system pallang && adduser --system --ingroup pallang pallang
 COPY --from=builder /workspace/build/libs/*.jar app.jar
-RUN chown pallang:pallang app.jar
+# uploads-data 볼륨이 마운트될 경로. 이미지에 먼저 만들어 소유권을 넘겨둬야
+# named volume이 최초 생성될 때 이 소유권/권한을 그대로 물려받아 pallang 사용자가 쓸 수 있다.
+RUN mkdir -p uploads && chown -R pallang:pallang app.jar uploads
 USER pallang
 
 ENV SPRING_PROFILES_ACTIVE=prod

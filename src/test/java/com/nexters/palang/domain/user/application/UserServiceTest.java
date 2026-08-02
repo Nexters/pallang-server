@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.given;
 import com.nexters.palang.domain.user.common.error.UserException;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
+import com.nexters.palang.global.storage.FileStorageService;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -22,11 +24,14 @@ class UserServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private FileStorageService fileStorageService;
+
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository);
+        userService = new UserService(userRepository, fileStorageService);
     }
 
     private User user(Long id) {
@@ -114,6 +119,28 @@ class UserServiceTest {
         User result = userService.modifyBackgroundColor(1L, "#000000");
 
         assertThat(result.getBackgroundColor()).isEqualTo("#000000");
+    }
+
+    @Test
+    @DisplayName("프로필 이미지를 업로드하면 저장소 URL로 반영된다")
+    void modifyProfileImageSucceeds() {
+        User user = user(1L);
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        MockMultipartFile image = new MockMultipartFile("image", "profile.png", "image/png", "data".getBytes());
+        given(fileStorageService.store(image, "profile-images"))
+                .willReturn("https://storage.example.com/profile-images/uuid.png");
+
+        User result = userService.modifyProfileImage(1L, image);
+
+        assertThat(result.getProfileImageUrl()).isEqualTo("https://storage.example.com/profile-images/uuid.png");
+    }
+
+    @Test
+    @DisplayName("이미지가 아닌 파일로 프로필 이미지를 변경하려 하면 예외가 발생한다")
+    void modifyProfileImageFailsWhenNotImage() {
+        MockMultipartFile file = new MockMultipartFile("image", "profile.txt", "text/plain", "data".getBytes());
+
+        assertThatThrownBy(() -> userService.modifyProfileImage(1L, file)).isInstanceOf(UserException.class);
     }
 
     @Test

@@ -4,16 +4,22 @@ import com.nexters.palang.domain.user.common.error.UserErrorCode;
 import com.nexters.palang.domain.user.common.error.UserException;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
+import com.nexters.palang.global.storage.FileStorageService;
+import com.nexters.palang.global.storage.ImageMimeType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class UserService {
 
+    private static final String PROFILE_IMAGE_SUB_DIRECTORY = "profile-images";
+
     private final UserRepository userRepository;
+    private final FileStorageService fileStorageService;
 
     public User getMe(Long userId) {
         return getActiveUser(userId);
@@ -33,6 +39,17 @@ public class UserService {
     public User modifyBackgroundColor(Long userId, String backgroundColor) {
         User user = getActiveUser(userId);
         user.changeBackgroundColor(backgroundColor);
+        return user;
+    }
+
+    @Transactional
+    public User modifyProfileImage(Long userId, MultipartFile image) {
+        if (ImageMimeType.from(image.getContentType()).isEmpty()) {
+            throw new UserException(UserErrorCode.INVALID_IMAGE_FILE);
+        }
+        User user = getActiveUser(userId);
+        String profileImageUrl = fileStorageService.store(image, PROFILE_IMAGE_SUB_DIRECTORY);
+        user.changeProfileImage(profileImageUrl);
         return user;
     }
 
