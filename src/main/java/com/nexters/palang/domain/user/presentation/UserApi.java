@@ -23,8 +23,9 @@ import org.springframework.web.multipart.MultipartFile;
 @Tag(name = "User", description = "마이페이지 API")
 public interface UserApi {
 
-    @Operation(summary = "내 프로필 조회", description = "닉네임, 프로필 이미지, 배경색, 가입 경로(SNS), "
-            + "지금까지 남긴 흔적 수를 조회합니다. Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @Operation(summary = "내 프로필 조회", description = "닉네임, 이메일, 프로필 이미지, 배경색, 가입 경로(SNS), "
+            + "지금까지 남긴 흔적 수를 조회합니다. 이메일은 SNS 이메일 동의 여부에 따라 없을 수 있습니다(null). "
+            + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",

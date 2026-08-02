@@ -18,7 +18,7 @@ public final class UserMapper {
 
     public static MeResponse toMeResponse(User user, long opinionCount) {
         return new MeResponse(
-                user.getId(), user.getNickname(), user.getProfileImageUrl(),
+                user.getId(), user.getNickname(), user.getEmail(), user.getProfileImageUrl(),
                 user.getBackgroundColor(), user.getSnsProvider(), opinionCount);
     }
 

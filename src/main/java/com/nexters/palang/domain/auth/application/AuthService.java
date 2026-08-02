@@ -35,14 +35,17 @@ public class AuthService {
 
     @Transactional
     public AuthResult loginWithKakao(String kakaoAccessToken) {
-        String snsId = kakaoOAuthClient.getSnsId(kakaoAccessToken);
-        User user = userRepository.findBySnsProviderAndSnsId(SnsProvider.KAKAO, snsId).orElse(null);
+        KakaoOAuthClient.KakaoUserInfo kakaoUserInfo = kakaoOAuthClient.getUserInfo(kakaoAccessToken);
+        User user = userRepository.findBySnsProviderAndSnsId(SnsProvider.KAKAO, kakaoUserInfo.snsId()).orElse(null);
 
         boolean isNewUser = user == null;
         if (isNewUser) {
-            user = userRegistrationService.registerViaSns(SnsProvider.KAKAO, snsId);
+            user = userRegistrationService.registerViaSns(SnsProvider.KAKAO, kakaoUserInfo.snsId(), kakaoUserInfo.email());
         } else if (user.isWithdrawn()) {
             throw new AuthException(AuthErrorCode.WITHDRAWN_ACCOUNT);
+        } else if (kakaoUserInfo.email() != null) {
+            // 최초 로그인 시 이메일 동의를 거부했다가 나중에 동의하는 경우를 위해 갱신한다.
+            user.changeEmail(kakaoUserInfo.email());
         }
 
         return issueTokens(user, isNewUser);
@@ -59,7 +62,7 @@ public class AuthService {
     public AuthResult devLogin(Long userId) {
         boolean isNewUser = userId == null;
         User user = isNewUser
-                ? userRegistrationService.registerViaSns(SnsProvider.KAKAO, "dev-" + System.nanoTime())
+                ? userRegistrationService.registerViaSns(SnsProvider.KAKAO, "dev-" + System.nanoTime(), null)
                 : getActiveUser(userId);
         return issueTokens(user, isNewUser);
     }

@@ -27,12 +27,12 @@ public class UserRegistrationService {
     // FR-AUTH-04: 닉네임 유니크 제약 충돌은 사전 조회 대신 저장 시도 -> 실패 시 접미사를 붙여 재시도하는
     // 낙관적 방식으로 처리한다(사전 조회는 동시성에 취약). 각 시도를 REQUIRES_NEW로 독립된 트랜잭션에서
     // 실행해, 제약 위반 예외가 영속성 컨텍스트를 오염시켜 다음 시도까지 실패시키는 것을 막는다.
-    public User registerViaSns(SnsProvider snsProvider, String snsId) {
+    public User registerViaSns(SnsProvider snsProvider, String snsId, String email) {
         String base = nicknameGenerator.generateBase();
         for (int suffix = 0; suffix <= NicknameGenerator.MAX_SUFFIX_ATTEMPTS; suffix++) {
             String nickname = suffix == 0 ? base : nicknameGenerator.withSuffix(base, suffix);
             try {
-                return createUser(nickname, snsProvider, snsId);
+                return createUser(nickname, snsProvider, snsId, email);
             } catch (DataIntegrityViolationException e) {
                 if (!isNicknameConflict(e)) {
                     // 닉네임 충돌이 아닌 다른 무결성 위반을 닉네임 생성 실패로 오인해 삼키지 않는다 —
@@ -51,11 +51,12 @@ public class UserRegistrationService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public User createUser(String nickname, SnsProvider snsProvider, String snsId) {
+    public User createUser(String nickname, SnsProvider snsProvider, String snsId, String email) {
         User user = User.builder()
                 .nickname(nickname)
                 .snsProvider(snsProvider)
                 .snsId(snsId)
+                .email(email)
                 .build();
         return userRepository.saveAndFlush(user);
     }
