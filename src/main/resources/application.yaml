@@ -18,3 +18,9 @@ jwt:
   secret: ${JWT_SECRET:local-dev-jwt-secret-key-please-change-this-01234567890123456789}
   access-token-expiration-seconds: ${JWT_ACCESS_EXPIRATION_SECONDS:3600}
   refresh-token-expiration-seconds: ${JWT_REFRESH_EXPIRATION_SECONDS:1209600}
+
+# 이미지 업로드 저장 경로. 가비아 상용 클라우드에는 오브젝트 스토리지 상품이 없어
+# 서버(Docker volume)에 직접 저장하고 /images/** 경로로 서빙한다.
+storage:
+  upload-dir: ${IMAGE_UPLOAD_DIR:./uploads}
+  base-url: /images

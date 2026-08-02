@@ -13,6 +13,7 @@ public enum UserErrorCode implements BaseErrorCode {
     NICKNAME_CHANGE_LIMITED(HttpStatus.BAD_REQUEST, "USER_400_1", "닉네임은 하루에 한 번만 변경할 수 있습니다."),
     NICKNAME_ALREADY_IN_USE(HttpStatus.CONFLICT, "USER_409_1", "이미 사용 중인 닉네임입니다."),
     NICKNAME_GENERATION_FAILED(HttpStatus.CONFLICT, "USER_409_2", "닉네임 자동 생성에 실패했습니다. 잠시 후 다시 시도해주세요."),
+    INVALID_IMAGE_FILE(HttpStatus.BAD_REQUEST, "USER_400_2", "이미지 파일만 업로드할 수 있습니다."),
     ;
 
     private final HttpStatus httpStatus;

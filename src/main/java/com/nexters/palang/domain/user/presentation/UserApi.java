@@ -18,6 +18,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "User", description = "마이페이지 API")
 public interface UserApi {
@@ -84,6 +85,27 @@ public interface UserApi {
                                     + "\"status\":404,\"detail\":\"해당 사용자를 찾을 수 없습니다.\"}")))
     })
     ResponseEntity<DataResponse<MeResponse>> modifyBackgroundColor(@Valid UpdateBackgroundColorRequest request);
+
+    @Operation(summary = "프로필 이미지 변경", description = "프로필 이미지를 업로드하여 변경합니다(jpeg/png). "
+            + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "변경 성공"),
+            @ApiResponse(responseCode = "400", description = "이미지 파일이 아님 (USER_400_2)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/users/me/profile-image\",\"title\":\"USER_400_2\","
+                                    + "\"status\":400,\"detail\":\"이미지 파일만 업로드할 수 있습니다.\"}"))),
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/users/me/profile-image\",\"title\":\"AUTH_401_1\","
+                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "해당 사용자를 찾을 수 없음 (USER_404_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/users/me/profile-image\",\"title\":\"USER_404_1\","
+                                    + "\"status\":404,\"detail\":\"해당 사용자를 찾을 수 없습니다.\"}")))
+    })
+    ResponseEntity<DataResponse<MeResponse>> modifyProfileImage(
+            @Parameter(description = "프로필 이미지 파일 (jpeg/png)", required = true) MultipartFile image
+    );
 
     @Operation(summary = "회원 탈퇴", description = "소프트 삭제 처리하고 닉네임을 익명화합니다(다른 이용자의 대화 맥락 유지를 위해 "
             + "공개된 발췌·의견·댓글은 남습니다). Authorization: Bearer {accessToken} 헤더로 인증합니다.")

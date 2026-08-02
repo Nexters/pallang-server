@@ -12,12 +12,15 @@ import com.nexters.palang.global.common.response.DataResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Encoding;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.multipart.MultipartFile;
 
 @Tag(name = "Book", description = "도서 API")
 public interface BookApi {
@@ -51,14 +54,25 @@ public interface BookApi {
             @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
     );
 
-    @Operation(summary = "도서 직접 등록", description = "검색 결과에 없는 도서를 직접 등록합니다. 인증 불필요.")
+    @Operation(summary = "도서 직접 등록", description = "검색 결과에 없는 도서를 직접 등록합니다. 인증 불필요. "
+            + "multipart/form-data로 요청하며, coverImage는 선택 항목입니다.")
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            content = @Content(
+                    mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+                    // book 파트는 JSON 객체다. springdoc이 encoding을 자동으로 채워주지 않아
+                    // 명시하지 않으면 Swagger UI가 application/octet-stream으로 보내 400/415가 난다.
+                    encoding = @Encoding(name = "book", contentType = MediaType.APPLICATION_JSON_VALUE)
+            )
+    )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "등록 성공"),
-            @ApiResponse(responseCode = "400", description = "필수값 누락 또는 페이지수가 1 미만 (COMMON_400_1)",
+            @ApiResponse(responseCode = "400", description = "필수값 누락, 페이지수가 1 미만 (COMMON_400_1) "
+                    + "또는 이미지 파일이 아님 (BOOK_400_3)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     ResponseEntity<DataResponse<BookResponse>> createBook(
-            @Valid CreateBookRequest request
+            @Valid CreateBookRequest request,
+            @Parameter(description = "책 표지 이미지 파일 (jpeg/png, 선택)") MultipartFile coverImage
     );
 
     @Operation(summary = "홈 캐러셀 도서 목록",

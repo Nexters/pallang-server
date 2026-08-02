@@ -7,6 +7,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -34,7 +35,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -183,6 +186,32 @@ class UserControllerTest {
                         .content(objectMapper.writeValueAsString(new UpdateBackgroundColorRequest(""))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("COMMON_400_1"));
+    }
+
+    @Test
+    @DisplayName("프로필 이미지를 변경하면 변경된 프로필을 반환한다")
+    void modifyProfileImage() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(userService.modifyProfileImage(eq(1L), any())).willReturn(user(1L));
+        given(opinionService.getMyOpinionCount(1L)).willReturn(0L);
+        MockMultipartFile image = new MockMultipartFile("image", "profile.png", "image/png", "data".getBytes());
+
+        mockMvc.perform(multipart(HttpMethod.PATCH, "/api/users/me/profile-image").file(image))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.userId").value(1));
+    }
+
+    @Test
+    @DisplayName("이미지가 아닌 파일로 프로필 이미지를 변경하려 하면 400 에러가 발생한다")
+    void modifyProfileImageFailsWhenNotImage() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(userService.modifyProfileImage(eq(1L), any()))
+                .willThrow(new UserException(UserErrorCode.INVALID_IMAGE_FILE));
+        MockMultipartFile file = new MockMultipartFile("image", "profile.txt", "text/plain", "data".getBytes());
+
+        mockMvc.perform(multipart(HttpMethod.PATCH, "/api/users/me/profile-image").file(file))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("USER_400_2"));
     }
 
     @Test

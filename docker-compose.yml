@@ -27,10 +27,14 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
+      IMAGE_UPLOAD_DIR: ${IMAGE_UPLOAD_DIR:-/app/uploads}
     # deploy/nginx/pallang.conf.template의 upstream이 127.0.0.1:8080을 하드코딩하고 있으므로
     # 호스트 포트를 가변으로 두지 않는다 (바꾸려면 이 파일과 nginx 템플릿을 함께 수정할 것).
     ports:
       - "127.0.0.1:8080:8080"
+    volumes:
+      # 업로드된 이미지(책 표지, 프로필)를 컨테이너 재배포 후에도 유지한다.
+      - uploads-data:/app/uploads
     depends_on:
       mysql:
         condition: service_healthy
@@ -81,6 +85,7 @@ services:
 volumes:
   mysql-data:
   redis-data:
+  uploads-data:
 
 networks:
   pallang-net:

@@ -10,7 +10,9 @@ import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.book.infrastructure.AladinBookApiClient;
 import com.nexters.palang.domain.book.infrastructure.BookQueryRepository;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
+import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.presentation.dto.CreateBookRequest;
+import com.nexters.palang.global.storage.FileStorageService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +25,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,11 +40,14 @@ class BookServiceTest {
     @Mock
     private AladinBookApiClient aladinBookApiClient;
 
+    @Mock
+    private FileStorageService fileStorageService;
+
     private BookService bookService;
 
     @BeforeEach
     void setUp() {
-        bookService = new BookService(bookRepository, bookQueryRepository, aladinBookApiClient);
+        bookService = new BookService(bookRepository, bookQueryRepository, aladinBookApiClient, fileStorageService);
     }
 
     private Book book(Long id, String title) {
@@ -84,17 +90,41 @@ class BookServiceTest {
     }
 
     @Test
-    @DisplayName("도서를 직접 등록하면 출처가 MANUAL인 도서로 저장된다")
+    @DisplayName("표지 이미지 없이 도서를 직접 등록하면 출처가 MANUAL이고 coverImageUrl은 null이다")
     void createBook() {
-        CreateBookRequest request = new CreateBookRequest("제목", "작가", "출판사", 300, "isbn", "cover");
+        CreateBookRequest request = new CreateBookRequest("제목", "작가", "출판사", 300, "isbn");
         given(bookRepository.save(any(Book.class))).willAnswer(invocation -> invocation.getArgument(0));
 
-        Book created = bookService.createBook(request);
+        Book created = bookService.createBook(request, null);
 
         ArgumentCaptor<Book> captor = ArgumentCaptor.forClass(Book.class);
         verify(bookRepository).save(captor.capture());
         assertThat(captor.getValue().getSource()).isEqualTo(BookSource.MANUAL);
         assertThat(created.getTitle()).isEqualTo("제목");
+        assertThat(created.getCoverImageUrl()).isNull();
+    }
+
+    @Test
+    @DisplayName("표지 이미지를 함께 등록하면 저장소에 업로드하고 반환된 URL을 coverImageUrl로 저장한다")
+    void createBookWithCoverImage() {
+        CreateBookRequest request = new CreateBookRequest("제목", "작가", "출판사", 300, "isbn");
+        MockMultipartFile coverImage = new MockMultipartFile("coverImage", "cover.jpg", "image/jpeg", "data".getBytes());
+        given(fileStorageService.store(coverImage, "book-covers")).willReturn("https://storage.example.com/book-covers/uuid.jpg");
+        given(bookRepository.save(any(Book.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        Book created = bookService.createBook(request, coverImage);
+
+        assertThat(created.getCoverImageUrl()).isEqualTo("https://storage.example.com/book-covers/uuid.jpg");
+    }
+
+    @Test
+    @DisplayName("이미지가 아닌 파일을 표지로 올리면 예외가 발생한다")
+    void createBookWithInvalidImageFileThrows() {
+        CreateBookRequest request = new CreateBookRequest("제목", "작가", "출판사", 300, "isbn");
+        MockMultipartFile invalidFile = new MockMultipartFile("coverImage", "cover.txt", "text/plain", "data".getBytes());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> bookService.createBook(request, invalidFile))
+                .isInstanceOf(BookException.class);
     }
 
     @Test
