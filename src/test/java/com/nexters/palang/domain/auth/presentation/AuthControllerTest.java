@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexters.palang.domain.auth.application.AuthResult;
 import com.nexters.palang.domain.auth.application.AuthService;
+import com.nexters.palang.domain.auth.presentation.dto.AppleLoginRequest;
 import com.nexters.palang.domain.auth.presentation.dto.KakaoLoginRequest;
 import com.nexters.palang.domain.auth.presentation.dto.RefreshTokenRequest;
 import com.nexters.palang.global.security.AuthErrorCode;
@@ -76,6 +77,46 @@ class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(new KakaoLoginRequest("invalid-token"))))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.title").value("AUTH_401_4"));
+    }
+
+    @Test
+    @DisplayName("애플 identity token으로 로그인하면 서비스 자체 JWT를 발급받는다")
+    void loginWithApple() throws Exception {
+        given(authService.loginWithApple("apple-token", "auth-code", "길동", "홍"))
+                .willReturn(new AuthResult("access", "refresh", true, false, false));
+
+        mockMvc.perform(post("/api/auth/apple")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new AppleLoginRequest("apple-token", "auth-code", "길동", "홍"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.accessToken").value("access"))
+                .andExpect(jsonPath("$.data.refreshToken").value("refresh"))
+                .andExpect(jsonPath("$.data.isNewUser").value(true));
+    }
+
+    @Test
+    @DisplayName("애플 identity token 없이 로그인을 요청하면 400 에러가 발생한다")
+    void loginWithAppleFailsWhenTokenBlank() throws Exception {
+        mockMvc.perform(post("/api/auth/apple")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new AppleLoginRequest("", null, null, null))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("COMMON_400_1"));
+    }
+
+    @Test
+    @DisplayName("애플 인증에 실패하면 401 에러가 발생한다")
+    void loginWithAppleFailsWhenAppleAuthFails() throws Exception {
+        given(authService.loginWithApple("invalid-token", null, null, null))
+                .willThrow(new AuthException(AuthErrorCode.APPLE_AUTH_FAILED));
+
+        mockMvc.perform(post("/api/auth/apple")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(
+                                new AppleLoginRequest("invalid-token", null, null, null))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("AUTH_401_6"));
     }
 
     @Test

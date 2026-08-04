@@ -44,7 +44,7 @@ class UserRegistrationServiceTest {
         given(nicknameGenerator.generateBase()).willReturn("고요한책갈피");
         given(userRepository.saveAndFlush(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
 
-        User user = userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-1", "user1@example.com");
+        User user = userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-1", "user1@example.com", null);
 
         assertThat(user.getNickname()).isEqualTo("고요한책갈피");
         assertThat(user.getSnsProvider()).isEqualTo(SnsProvider.KAKAO);
@@ -63,7 +63,7 @@ class UserRegistrationServiceTest {
         given(userRepository.saveAndFlush(argThat(u -> u != null && u.getNickname().equals("고요한책갈피1"))))
                 .willAnswer(invocation -> invocation.getArgument(0));
 
-        User user = userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-2", null);
+        User user = userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-2", null, null);
 
         assertThat(user.getNickname()).isEqualTo("고요한책갈피1");
     }
@@ -77,7 +77,7 @@ class UserRegistrationServiceTest {
         given(userRepository.saveAndFlush(any(User.class)))
                 .willThrow(new DataIntegrityViolationException("Duplicate entry for key 'users.uq_users_nickname'"));
 
-        assertThatThrownBy(() -> userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-3", null))
+        assertThatThrownBy(() -> userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-3", null, null))
                 .isInstanceOf(UserException.class);
     }
 
@@ -89,7 +89,7 @@ class UserRegistrationServiceTest {
                 .willThrow(new DataIntegrityViolationException(
                         "Column 'terms_agreed_at' cannot be null"));
 
-        assertThatThrownBy(() -> userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-4", null))
+        assertThatThrownBy(() -> userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-4", null, null))
                 .isInstanceOf(DataIntegrityViolationException.class);
         verify(userRepository, times(1)).saveAndFlush(any());
     }
