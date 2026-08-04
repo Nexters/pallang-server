@@ -1,6 +1,8 @@
 package com.nexters.palang.domain.auth.application;
 
 import com.nexters.palang.domain.auth.domain.RefreshToken;
+import com.nexters.palang.domain.auth.infrastructure.AppleAuthClient;
+import com.nexters.palang.domain.auth.infrastructure.AppleOAuthClient;
 import com.nexters.palang.domain.auth.infrastructure.KakaoOAuthClient;
 import com.nexters.palang.domain.auth.infrastructure.RefreshTokenRepository;
 import com.nexters.palang.domain.user.application.UserRegistrationService;
@@ -18,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +34,8 @@ public class AuthService {
     private final UserRegistrationService userRegistrationService;
     private final RefreshTokenRepository refreshTokenRepository;
     private final KakaoOAuthClient kakaoOAuthClient;
+    private final AppleOAuthClient appleOAuthClient;
+    private final AppleAuthClient appleAuthClient;
     private final JwtTokenProvider jwtTokenProvider;
 
     @Transactional
@@ -40,7 +45,8 @@ public class AuthService {
 
         boolean isNewUser = user == null;
         if (isNewUser) {
-            user = userRegistrationService.registerViaSns(SnsProvider.KAKAO, kakaoUserInfo.snsId(), kakaoUserInfo.email());
+            user = userRegistrationService.registerViaSns(
+                    SnsProvider.KAKAO, kakaoUserInfo.snsId(), kakaoUserInfo.email(), null);
         } else if (user.isWithdrawn()) {
             throw new AuthException(AuthErrorCode.WITHDRAWN_ACCOUNT);
         } else if (kakaoUserInfo.email() != null) {
@@ -49,6 +55,42 @@ public class AuthService {
         }
 
         return issueTokens(user, isNewUser);
+    }
+
+    // authorizationCode는 최초 로그인뿐 아니라 매 로그인마다 전달되지만(프론트 계약), 발급 후 수 분 내에만
+    // Apple에 교환 가능해 매번 즉시 교환을 시도한다 — 실패해도 로그인 자체는 계속 진행한다(best-effort).
+    @Transactional
+    public AuthResult loginWithApple(String identityToken, String authorizationCode, String givenName, String familyName) {
+        AppleOAuthClient.AppleUserInfo appleUserInfo = appleOAuthClient.getUserInfo(identityToken);
+        User user = userRepository.findBySnsProviderAndSnsId(SnsProvider.APPLE, appleUserInfo.snsId()).orElse(null);
+
+        boolean isNewUser = user == null;
+        if (isNewUser) {
+            user = userRegistrationService.registerViaSns(
+                    SnsProvider.APPLE, appleUserInfo.snsId(), appleUserInfo.email(), combineName(familyName, givenName));
+        } else if (user.isWithdrawn()) {
+            throw new AuthException(AuthErrorCode.WITHDRAWN_ACCOUNT);
+        } else if (appleUserInfo.email() != null) {
+            user.changeEmail(appleUserInfo.email());
+        }
+
+        if (authorizationCode != null) {
+            Optional<String> appleRefreshToken =
+                    appleAuthClient.exchangeForRefreshToken(authorizationCode, appleUserInfo.audience());
+            if (appleRefreshToken.isPresent()) {
+                user.updateAppleRefreshToken(appleRefreshToken.get());
+            }
+        }
+
+        return issueTokens(user, isNewUser);
+    }
+
+    // 애플은 성/이름을 따로 내려주고 최초 로그인에만 값이 있다. 한국어 서비스라 성+이름 순서로 붙인다.
+    private String combineName(String familyName, String givenName) {
+        if (familyName == null && givenName == null) {
+            return null;
+        }
+        return (familyName == null ? "" : familyName) + (givenName == null ? "" : givenName);
     }
 
     @Transactional
@@ -62,7 +104,7 @@ public class AuthService {
     public AuthResult devLogin(Long userId) {
         boolean isNewUser = userId == null;
         User user = isNewUser
-                ? userRegistrationService.registerViaSns(SnsProvider.KAKAO, "dev-" + System.nanoTime(), null)
+                ? userRegistrationService.registerViaSns(SnsProvider.KAKAO, "dev-" + System.nanoTime(), null, null)
                 : getActiveUser(userId);
         return issueTokens(user, isNewUser);
     }

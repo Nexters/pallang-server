@@ -11,6 +11,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.nexters.palang.domain.auth.domain.RefreshToken;
+import com.nexters.palang.domain.auth.infrastructure.AppleAuthClient;
+import com.nexters.palang.domain.auth.infrastructure.AppleOAuthClient;
 import com.nexters.palang.domain.auth.infrastructure.KakaoOAuthClient;
 import com.nexters.palang.domain.auth.infrastructure.RefreshTokenRepository;
 import com.nexters.palang.domain.user.application.UserRegistrationService;
@@ -48,18 +50,28 @@ class AuthServiceTest {
     private KakaoOAuthClient kakaoOAuthClient;
 
     @Mock
+    private AppleOAuthClient appleOAuthClient;
+
+    @Mock
+    private AppleAuthClient appleAuthClient;
+
+    @Mock
     private JwtTokenProvider jwtTokenProvider;
 
     private AuthService authService;
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(
-                userRepository, userRegistrationService, refreshTokenRepository, kakaoOAuthClient, jwtTokenProvider);
+        authService = new AuthService(userRepository, userRegistrationService, refreshTokenRepository,
+                kakaoOAuthClient, appleOAuthClient, appleAuthClient, jwtTokenProvider);
     }
 
     private User user(Long id) {
-        User user = User.builder().nickname("닉네임" + id).snsProvider(SnsProvider.KAKAO).snsId("sns-" + id).build();
+        return user(id, SnsProvider.KAKAO);
+    }
+
+    private User user(Long id, SnsProvider snsProvider) {
+        User user = User.builder().nickname("닉네임" + id).snsProvider(snsProvider).snsId("sns-" + id).build();
         ReflectionTestUtils.setField(user, "id", id);
         return user;
     }
@@ -71,7 +83,7 @@ class AuthServiceTest {
                 .willReturn(new KakaoOAuthClient.KakaoUserInfo("sns-100", "user100@example.com"));
         given(userRepository.findBySnsProviderAndSnsId(SnsProvider.KAKAO, "sns-100")).willReturn(Optional.empty());
         User newUser = user(100L);
-        given(userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-100", "user100@example.com"))
+        given(userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-100", "user100@example.com", null))
                 .willReturn(newUser);
         given(jwtTokenProvider.createAccessToken(100L)).willReturn("access-token");
         given(jwtTokenProvider.createRefreshToken(100L)).willReturn("refresh-token");
@@ -103,7 +115,7 @@ class AuthServiceTest {
 
         assertThat(result.isNewUser()).isFalse();
         assertThat(existingUser.getEmail()).isEqualTo("user200@example.com");
-        verify(userRegistrationService, never()).registerViaSns(any(), anyString(), any());
+        verify(userRegistrationService, never()).registerViaSns(any(), anyString(), any(), any());
     }
 
     @Test
@@ -120,10 +132,120 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("처음 로그인하는 애플 사용자는 신규 가입되고 isNewUser가 true다")
+    void loginWithAppleSignsUpNewUser() {
+        given(appleOAuthClient.getUserInfo("apple-token"))
+                .willReturn(new AppleOAuthClient.AppleUserInfo("apple-sns-100", "apple100@example.com", "com.palang.app"));
+        given(userRepository.findBySnsProviderAndSnsId(SnsProvider.APPLE, "apple-sns-100")).willReturn(Optional.empty());
+        User newUser = user(100L, SnsProvider.APPLE);
+        given(userRegistrationService.registerViaSns(SnsProvider.APPLE, "apple-sns-100", "apple100@example.com", null))
+                .willReturn(newUser);
+        given(jwtTokenProvider.createAccessToken(100L)).willReturn("access-token");
+        given(jwtTokenProvider.createRefreshToken(100L)).willReturn("refresh-token");
+        given(jwtTokenProvider.refreshTokenExpiryFromNow()).willReturn(LocalDateTime.now().plusDays(14));
+
+        AuthResult result = authService.loginWithApple("apple-token", null, null, null);
+
+        assertThat(result.isNewUser()).isTrue();
+        assertThat(result.accessToken()).isEqualTo("access-token");
+        assertThat(result.refreshToken()).isEqualTo("refresh-token");
+        verify(refreshTokenRepository).save(any(RefreshToken.class));
+    }
+
+    @Test
+    @DisplayName("최초 로그인 시 애플이 이름을 내려주면 성+이름 순서로 합쳐 저장한다")
+    void loginWithAppleCombinesGivenAndFamilyNameOnSignUp() {
+        given(appleOAuthClient.getUserInfo("apple-token"))
+                .willReturn(new AppleOAuthClient.AppleUserInfo("apple-sns-101", null, "com.palang.app"));
+        given(userRepository.findBySnsProviderAndSnsId(SnsProvider.APPLE, "apple-sns-101")).willReturn(Optional.empty());
+        User newUser = user(101L, SnsProvider.APPLE);
+        given(userRegistrationService.registerViaSns(SnsProvider.APPLE, "apple-sns-101", null, "홍길동"))
+                .willReturn(newUser);
+        given(jwtTokenProvider.createAccessToken(101L)).willReturn("access-token");
+        given(jwtTokenProvider.createRefreshToken(101L)).willReturn("refresh-token");
+        given(jwtTokenProvider.refreshTokenExpiryFromNow()).willReturn(LocalDateTime.now().plusDays(14));
+
+        authService.loginWithApple("apple-token", null, "길동", "홍");
+
+        verify(userRegistrationService).registerViaSns(SnsProvider.APPLE, "apple-sns-101", null, "홍길동");
+    }
+
+    @Test
+    @DisplayName("authorizationCode가 있으면 애플에 교환해 refresh token을 저장한다")
+    void loginWithAppleStoresAppleRefreshTokenWhenAuthorizationCodeGiven() {
+        given(appleOAuthClient.getUserInfo("apple-token"))
+                .willReturn(new AppleOAuthClient.AppleUserInfo("apple-sns-102", null, "com.palang.app"));
+        User existingUser = user(102L, SnsProvider.APPLE);
+        given(userRepository.findBySnsProviderAndSnsId(SnsProvider.APPLE, "apple-sns-102"))
+                .willReturn(Optional.of(existingUser));
+        given(appleAuthClient.exchangeForRefreshToken("auth-code", "com.palang.app"))
+                .willReturn(Optional.of("apple-refresh-token"));
+        given(jwtTokenProvider.createAccessToken(102L)).willReturn("access-token");
+        given(jwtTokenProvider.createRefreshToken(102L)).willReturn("refresh-token");
+        given(jwtTokenProvider.refreshTokenExpiryFromNow()).willReturn(LocalDateTime.now().plusDays(14));
+
+        authService.loginWithApple("apple-token", "auth-code", null, null);
+
+        assertThat(existingUser.getAppleRefreshToken()).isEqualTo("apple-refresh-token");
+    }
+
+    @Test
+    @DisplayName("authorizationCode 교환에 실패해도 로그인은 계속 진행된다")
+    void loginWithAppleSucceedsEvenWhenAuthorizationCodeExchangeFails() {
+        given(appleOAuthClient.getUserInfo("apple-token"))
+                .willReturn(new AppleOAuthClient.AppleUserInfo("apple-sns-103", null, "com.palang.app"));
+        User existingUser = user(103L, SnsProvider.APPLE);
+        given(userRepository.findBySnsProviderAndSnsId(SnsProvider.APPLE, "apple-sns-103"))
+                .willReturn(Optional.of(existingUser));
+        given(appleAuthClient.exchangeForRefreshToken("auth-code", "com.palang.app")).willReturn(Optional.empty());
+        given(jwtTokenProvider.createAccessToken(103L)).willReturn("access-token");
+        given(jwtTokenProvider.createRefreshToken(103L)).willReturn("refresh-token");
+        given(jwtTokenProvider.refreshTokenExpiryFromNow()).willReturn(LocalDateTime.now().plusDays(14));
+
+        AuthResult result = authService.loginWithApple("apple-token", "auth-code", null, null);
+
+        assertThat(result.accessToken()).isEqualTo("access-token");
+        assertThat(existingUser.getAppleRefreshToken()).isNull();
+    }
+
+    @Test
+    @DisplayName("이미 가입된 애플 사용자가 로그인하면 isNewUser가 false이고 이메일이 갱신된다")
+    void loginWithAppleSignsInExistingUser() {
+        given(appleOAuthClient.getUserInfo("apple-token"))
+                .willReturn(new AppleOAuthClient.AppleUserInfo("apple-sns-200", "apple200@example.com", "com.palang.app"));
+        User existingUser = user(200L, SnsProvider.APPLE);
+        given(userRepository.findBySnsProviderAndSnsId(SnsProvider.APPLE, "apple-sns-200"))
+                .willReturn(Optional.of(existingUser));
+        given(jwtTokenProvider.createAccessToken(200L)).willReturn("access-token");
+        given(jwtTokenProvider.createRefreshToken(200L)).willReturn("refresh-token");
+        given(jwtTokenProvider.refreshTokenExpiryFromNow()).willReturn(LocalDateTime.now().plusDays(14));
+
+        AuthResult result = authService.loginWithApple("apple-token", null, null, null);
+
+        assertThat(result.isNewUser()).isFalse();
+        assertThat(existingUser.getEmail()).isEqualTo("apple200@example.com");
+        verify(userRegistrationService, never()).registerViaSns(any(), anyString(), any(), any());
+    }
+
+    @Test
+    @DisplayName("탈퇴한 계정으로 애플 로그인을 시도하면 예외가 발생한다")
+    void loginWithAppleFailsWhenAccountWithdrawn() {
+        given(appleOAuthClient.getUserInfo("apple-token"))
+                .willReturn(new AppleOAuthClient.AppleUserInfo("apple-sns-300", null, "com.palang.app"));
+        User withdrawnUser = user(300L, SnsProvider.APPLE);
+        withdrawnUser.withdraw();
+        given(userRepository.findBySnsProviderAndSnsId(SnsProvider.APPLE, "apple-sns-300"))
+                .willReturn(Optional.of(withdrawnUser));
+
+        assertThatThrownBy(() -> authService.loginWithApple("apple-token", null, null, null))
+                .isInstanceOf(AuthException.class);
+    }
+
+    @Test
     @DisplayName("[개발용] userId 없이 devLogin을 호출하면 새 테스트 유저를 만들어 로그인 처리한다")
     void devLoginCreatesNewUserWhenUserIdOmitted() {
         User newUser = user(400L);
-        given(userRegistrationService.registerViaSns(eq(SnsProvider.KAKAO), anyString(), any())).willReturn(newUser);
+        given(userRegistrationService.registerViaSns(eq(SnsProvider.KAKAO), anyString(), any(), any())).willReturn(newUser);
         given(jwtTokenProvider.createAccessToken(400L)).willReturn("access-token");
         given(jwtTokenProvider.createRefreshToken(400L)).willReturn("refresh-token");
         given(jwtTokenProvider.refreshTokenExpiryFromNow()).willReturn(LocalDateTime.now().plusDays(14));
@@ -146,7 +268,7 @@ class AuthServiceTest {
         AuthResult result = authService.devLogin(500L);
 
         assertThat(result.isNewUser()).isFalse();
-        verify(userRegistrationService, never()).registerViaSns(any(), anyString(), any());
+        verify(userRegistrationService, never()).registerViaSns(any(), anyString(), any(), any());
     }
 
     @Test

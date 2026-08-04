@@ -27,6 +27,11 @@ public class WebClientConfig {
         return webClient(builder, baseUrl);
     }
 
+    @Bean
+    public WebClient appleWebClient(WebClient.Builder builder, @Value("${apple.base-url}") String baseUrl) {
+        return webClient(builder, baseUrl);
+    }
+
     private WebClient webClient(WebClient.Builder builder, String baseUrl) {
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, CONNECT_TIMEOUT_MILLIS)

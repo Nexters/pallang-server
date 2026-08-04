@@ -14,6 +14,7 @@ public enum AuthErrorCode implements BaseErrorCode {
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_401_3", "유효하지 않은 토큰입니다."),
     KAKAO_AUTH_FAILED(HttpStatus.UNAUTHORIZED, "AUTH_401_4", "카카오 인증에 실패했습니다."),
     INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_401_5", "유효하지 않은 리프레시 토큰입니다."),
+    APPLE_AUTH_FAILED(HttpStatus.UNAUTHORIZED, "AUTH_401_6", "애플 인증에 실패했습니다."),
     WITHDRAWN_ACCOUNT(HttpStatus.FORBIDDEN, "AUTH_403_1", "탈퇴한 계정입니다."),
     ;
 
