@@ -42,6 +42,11 @@ public class User extends BaseEntity {
     @Column(name = "nickname", length = NICKNAME_MAX_LENGTH, nullable = false)
     private String nickname;
 
+    // 실명. 카카오는 제공하지 않고, 애플은 최초 로그인 시에만 내려줘서 null일 수 있다. 익명 서비스 특성상
+    // 어디에도 노출하지 않고 보관만 한다(FR-AUTH-04 랜덤 닉네임과는 별개).
+    @Column(name = "name", length = 50)
+    private String name;
+
     @Column(name = "nickname_updated_at")
     private LocalDateTime nicknameUpdatedAt;
 
@@ -76,9 +81,15 @@ public class User extends BaseEntity {
     @Column(name = "withdrawn_at")
     private LocalDateTime withdrawnAt;
 
+    // 회원탈퇴 시 애플 연동 해제(revoke)에 쓴다. authorizationCode는 발급 후 수 분 내에만 교환 가능해
+    // 탈퇴 시점이 아니라 로그인 시점에 미리 교환해 저장해둔다.
+    @Column(name = "apple_refresh_token", columnDefinition = "TEXT")
+    private String appleRefreshToken;
+
     @Builder
     private User(
             String nickname,
+            String name,
             String profileImageUrl,
             String backgroundColor,
             SnsProvider snsProvider,
@@ -87,6 +98,7 @@ public class User extends BaseEntity {
             LocalDateTime termsAgreedAt
     ) {
         this.nickname = nickname;
+        this.name = name;
         this.profileImageUrl = profileImageUrl;
         this.backgroundColor = backgroundColor;
         this.snsProvider = snsProvider;
@@ -127,6 +139,10 @@ public class User extends BaseEntity {
     // 이메일 동의를 나중에 하는 경우가 있어, 로그인 시점마다 카카오가 내려준 값으로 갱신한다(멱등).
     public void changeEmail(String email) {
         this.email = email;
+    }
+
+    public void updateAppleRefreshToken(String appleRefreshToken) {
+        this.appleRefreshToken = appleRefreshToken;
     }
 
     public void withdraw() {

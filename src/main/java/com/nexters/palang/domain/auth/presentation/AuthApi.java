@@ -1,5 +1,6 @@
 package com.nexters.palang.domain.auth.presentation;
 
+import com.nexters.palang.domain.auth.presentation.dto.AppleLoginRequest;
 import com.nexters.palang.domain.auth.presentation.dto.KakaoLoginRequest;
 import com.nexters.palang.domain.auth.presentation.dto.LoginResponse;
 import com.nexters.palang.domain.auth.presentation.dto.RefreshTokenRequest;
@@ -17,7 +18,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 
-@Tag(name = "Auth", description = "카카오 로그인/인증 API")
+@Tag(name = "Auth", description = "카카오/애플 로그인 및 인증 API")
 public interface AuthApi {
 
     @Operation(summary = "카카오 로그인", description = "모바일 앱이 카카오 SDK로 로그인해 받은 카카오 액세스 토큰을 전달하면, "
@@ -39,6 +40,30 @@ public interface AuthApi {
                                     + "\"status\":403,\"detail\":\"탈퇴한 계정입니다.\"}")))
     })
     ResponseEntity<DataResponse<LoginResponse>> loginWithKakao(@Valid KakaoLoginRequest request);
+
+    @Operation(summary = "애플 로그인", description = "웹(Apple JS SDK) 또는 iOS 앱(네이티브 Sign in with Apple)에서 발급받은 "
+            + "identity token(JWT)을 전달하면, Apple 공개키(JWKS)로 서명을 직접 검증한 뒤 가입/로그인을 처리하고 "
+            + "서비스 자체 JWT를 발급합니다. aud 클레임은 설정된 웹 Service ID 또는 앱 Bundle ID 중 하나와 일치해야 합니다. "
+            + "authorizationCode를 함께 전달하면 회원탈퇴 시 애플 연동 해제(revoke)에 쓸 refresh token을 미리 "
+            + "확보해둡니다(실패해도 로그인은 계속 진행됩니다). givenName/familyName은 애플이 최초 로그인 시에만 "
+            + "내려주는 값으로, 이후 로그인엔 null이어도 됩니다. "
+            + "처음 로그인하는 사용자는 닉네임이 자동 생성되며(isNewUser=true), 약관 동의는 별도로 POST /api/auth/terms를 호출해야 합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "로그인/가입 성공"),
+            @ApiResponse(responseCode = "400", description = "애플 identity token 누락 (COMMON_400_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/auth/apple\",\"title\":\"COMMON_400_1\","
+                                    + "\"status\":400,\"detail\":\"애플 identity token은 필수입니다.\"}"))),
+            @ApiResponse(responseCode = "401", description = "애플 인증 실패, 서명/발급자/대상/만료 검증 실패 (AUTH_401_6)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/auth/apple\",\"title\":\"AUTH_401_6\","
+                                    + "\"status\":401,\"detail\":\"애플 인증에 실패했습니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "탈퇴한 계정으로 재로그인 시도 (AUTH_403_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/auth/apple\",\"title\":\"AUTH_403_1\","
+                                    + "\"status\":403,\"detail\":\"탈퇴한 계정입니다.\"}")))
+    })
+    ResponseEntity<DataResponse<LoginResponse>> loginWithApple(@Valid AppleLoginRequest request);
 
     @Operation(summary = "약관 동의", description = "이용약관 + 개인정보 수집·이용 동의를 1회 처리로 기록합니다(FR-AUTH-03). "
             + "이미 동의한 사용자가 다시 호출해도 동의 시각만 갱신되며 에러는 발생하지 않습니다.")

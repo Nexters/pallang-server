@@ -3,6 +3,7 @@ package com.nexters.palang.domain.auth.presentation;
 import com.nexters.palang.domain.auth.application.AuthMapper;
 import com.nexters.palang.domain.auth.application.AuthResult;
 import com.nexters.palang.domain.auth.application.AuthService;
+import com.nexters.palang.domain.auth.presentation.dto.AppleLoginRequest;
 import com.nexters.palang.domain.auth.presentation.dto.KakaoLoginRequest;
 import com.nexters.palang.domain.auth.presentation.dto.LoginResponse;
 import com.nexters.palang.domain.auth.presentation.dto.RefreshTokenRequest;
@@ -28,6 +29,14 @@ public class AuthController implements AuthApi {
     @PostMapping("/api/auth/kakao")
     public ResponseEntity<DataResponse<LoginResponse>> loginWithKakao(@RequestBody @Valid KakaoLoginRequest request) {
         AuthResult result = authService.loginWithKakao(request.kakaoAccessToken());
+        return ResponseEntity.ok(DataResponse.from(AuthMapper.toLoginResponse(result)));
+    }
+
+    @Override
+    @PostMapping("/api/auth/apple")
+    public ResponseEntity<DataResponse<LoginResponse>> loginWithApple(@RequestBody @Valid AppleLoginRequest request) {
+        AuthResult result = authService.loginWithApple(
+                request.identityToken(), request.authorizationCode(), request.givenName(), request.familyName());
         return ResponseEntity.ok(DataResponse.from(AuthMapper.toLoginResponse(result)));
     }
 
