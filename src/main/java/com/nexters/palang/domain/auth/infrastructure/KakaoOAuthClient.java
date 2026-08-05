@@ -26,6 +26,11 @@ public class KakaoOAuthClient {
     public KakaoOAuthClient(WebClient kakaoWebClient, @Value("${kakao.admin-key}") String adminKey) {
         this.kakaoWebClient = kakaoWebClient;
         this.adminKey = adminKey;
+        // 배포 환경에서 설정을 빠뜨리면 회원탈퇴가 카카오 연동은 풀지 않은 채 조용히 성공해버릴 수 있어,
+        // 매 요청 로그(debug)와 별개로 기동 시점에 한 번 눈에 띄게 남긴다.
+        if (adminKey == null || adminKey.isBlank()) {
+            log.warn("kakao.admin-key가 설정되지 않았습니다. 회원탈퇴 시 카카오 연동 해제(unlink)가 동작하지 않습니다.");
+        }
     }
 
     // 모바일 앱이 카카오 SDK로 로그인 후 전달한 액세스 토큰을 카카오 서버에 직접 검증한다.

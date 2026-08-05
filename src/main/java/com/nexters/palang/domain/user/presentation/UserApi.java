@@ -109,7 +109,8 @@ public interface UserApi {
     );
 
     @Operation(summary = "회원 탈퇴", description = "소프트 삭제 처리하고 닉네임을 익명화합니다(다른 이용자의 대화 맥락 유지를 위해 "
-            + "공개된 발췌·의견·댓글은 남습니다). 카카오 계정은 서버가 연동을 함께 해제하며, 발급된 모든 리프레시 토큰도 즉시 무효화됩니다. "
+            + "공개된 발췌·의견·댓글은 남습니다). 카카오 연동 해제를 함께 시도하나 실패해도 탈퇴 자체는 계속 진행되며(best-effort), "
+            + "발급된 모든 리프레시 토큰은 즉시 무효화됩니다. "
             + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "탈퇴 성공"),
