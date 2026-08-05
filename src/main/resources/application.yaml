@@ -10,6 +10,7 @@ aladin:
 
 kakao:
   base-url: https://kapi.kakao.com
+  admin-key: ${KAKAO_ADMIN_KEY:}
 
 apple:
   base-url: https://appleid.apple.com

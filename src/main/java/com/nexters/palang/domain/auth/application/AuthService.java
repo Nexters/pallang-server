@@ -6,6 +6,7 @@ import com.nexters.palang.domain.auth.infrastructure.AppleOAuthClient;
 import com.nexters.palang.domain.auth.infrastructure.KakaoOAuthClient;
 import com.nexters.palang.domain.auth.infrastructure.RefreshTokenRepository;
 import com.nexters.palang.domain.user.application.UserRegistrationService;
+import com.nexters.palang.domain.user.application.UserService;
 import com.nexters.palang.domain.user.common.error.UserErrorCode;
 import com.nexters.palang.domain.user.common.error.UserException;
 import com.nexters.palang.domain.user.domain.SnsProvider;
@@ -22,15 +23,18 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final UserService userService;
     private final UserRegistrationService userRegistrationService;
     private final RefreshTokenRepository refreshTokenRepository;
     private final KakaoOAuthClient kakaoOAuthClient;
@@ -127,6 +131,27 @@ public class AuthService {
     public void logout(Long userId, String refreshToken) {
         refreshTokenRepository.findByUserIdAndTokenHash(userId, hash(refreshToken))
                 .ifPresent(RefreshToken::revoke);
+    }
+
+    // 카카오 연동 해제와 세션 무효화는 회원탈퇴의 도메인 규칙(소프트 삭제)이 아니라 auth 인프라(외부 API,
+    // 토큰 저장소)에 걸친 부수효과라 여기서 오케스트레이션하고, 실제 탈퇴 상태 변경은 UserService에 위임한다.
+    @Transactional
+    public void withdraw(Long userId) {
+        User user = getActiveUser(userId);
+        if (user.getSnsProvider() == SnsProvider.KAKAO) {
+            unlinkKakao(user.getSnsId());
+        }
+        refreshTokenRepository.revokeAllByUserId(userId);
+        userService.withdraw(userId);
+    }
+
+    // 카카오 unlink가 실패해도(네트워크 오류, Admin Key 미설정 등) 탈퇴 자체를 막지는 않는다.
+    private void unlinkKakao(String snsId) {
+        try {
+            kakaoOAuthClient.unlink(snsId);
+        } catch (AuthException e) {
+            log.warn("카카오 연동 해제에 실패했습니다. snsId={}", snsId, e);
+        }
     }
 
     private AuthResult issueTokens(User user, boolean isNewUser) {
