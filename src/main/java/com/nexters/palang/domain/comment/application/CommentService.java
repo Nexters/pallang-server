@@ -36,14 +36,14 @@ public class CommentService {
     private final OpinionRepository opinionRepository;
     private final UserRepository userRepository;
 
-    public Page<RootCommentGroup> getRootComments(Long opinionId, Pageable pageable) {
+    public Page<RootCommentGroup> getRootComments(Long opinionId, Pageable pageable, Long currentUserId) {
         validateOpinionExists(opinionId);
 
-        Page<Comment> roots = commentQueryRepository.findRootComments(opinionId, pageable);
+        Page<Comment> roots = commentQueryRepository.findRootComments(opinionId, pageable, currentUserId);
         List<Long> rootIds = roots.getContent().stream().map(Comment::getId).toList();
-        Map<Long, Long> replyCounts = commentQueryRepository.countRepliesByParentIds(rootIds);
+        Map<Long, Long> replyCounts = commentQueryRepository.countRepliesByParentIds(rootIds, currentUserId);
         Map<Long, List<Comment>> replyPreviews =
-                commentQueryRepository.findReplyPreviewsByParentIds(rootIds, REPLY_PREVIEW_SIZE);
+                commentQueryRepository.findReplyPreviewsByParentIds(rootIds, REPLY_PREVIEW_SIZE, currentUserId);
 
         return roots.map(root -> new RootCommentGroup(
                 root,
@@ -51,10 +51,10 @@ public class CommentService {
                 replyCounts.getOrDefault(root.getId(), 0L)));
     }
 
-    public Page<Comment> getReplies(Long parentCommentId, Pageable pageable) {
+    public Page<Comment> getReplies(Long parentCommentId, Pageable pageable, Long currentUserId) {
         Comment parent = getExistingComment(parentCommentId);
         getExistingOpinion(parent.getOpinion().getId());
-        return commentQueryRepository.findReplies(parentCommentId, pageable);
+        return commentQueryRepository.findReplies(parentCommentId, pageable, currentUserId);
     }
 
     @Transactional

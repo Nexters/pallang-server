@@ -90,7 +90,7 @@ class CommentServiceTest {
     void getRootCommentsFailsWhenOpinionNotFound() {
         given(opinionRepository.findById(999L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> commentService.getRootComments(999L, PageRequest.of(0, 20)))
+        assertThatThrownBy(() -> commentService.getRootComments(999L, PageRequest.of(0, 20), null))
                 .isInstanceOf(OpinionException.class);
     }
 
@@ -100,7 +100,7 @@ class CommentServiceTest {
         opinion.delete();
         given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
 
-        assertThatThrownBy(() -> commentService.getRootComments(1L, PageRequest.of(0, 20)))
+        assertThatThrownBy(() -> commentService.getRootComments(1L, PageRequest.of(0, 20), null))
                 .isInstanceOf(OpinionException.class);
     }
 
@@ -111,19 +111,19 @@ class CommentServiceTest {
         Comment root1 = rootComment(1L, opinion, writer);
         Comment root2 = rootComment(2L, opinion, writer);
         Pageable pageable = PageRequest.of(0, 20);
-        given(commentQueryRepository.findRootComments(1L, pageable))
+        given(commentQueryRepository.findRootComments(1L, pageable, null))
                 .willReturn(new PageImpl<>(List.of(root1, root2), pageable, 2));
 
         List<Comment> root1Preview = List.of(
                 replyComment(11L, root1, writer), replyComment(12L, root1, writer),
                 replyComment(13L, root1, writer), replyComment(14L, root1, writer),
                 replyComment(15L, root1, writer));
-        given(commentQueryRepository.countRepliesByParentIds(List.of(1L, 2L)))
+        given(commentQueryRepository.countRepliesByParentIds(List.of(1L, 2L), null))
                 .willReturn(Map.of(1L, 6L));
-        given(commentQueryRepository.findReplyPreviewsByParentIds(List.of(1L, 2L), 5))
+        given(commentQueryRepository.findReplyPreviewsByParentIds(List.of(1L, 2L), 5, null))
                 .willReturn(Map.of(1L, root1Preview));
 
-        Page<RootCommentGroup> results = commentService.getRootComments(1L, pageable);
+        Page<RootCommentGroup> results = commentService.getRootComments(1L, pageable, null);
 
         RootCommentGroup group1 = results.getContent().get(0);
         assertThat(group1.replyPreview()).hasSize(5);
@@ -137,11 +137,26 @@ class CommentServiceTest {
     }
 
     @Test
+    @DisplayName("로그인 사용자가 조회하면 차단 필터링을 위해 currentUserId를 조회 리포지토리에 그대로 전달한다")
+    void getRootCommentsPassesCurrentUserIdForBlockFiltering() {
+        given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
+        Pageable pageable = PageRequest.of(0, 20);
+        given(commentQueryRepository.findRootComments(1L, pageable, 30L))
+                .willReturn(new PageImpl<>(List.of(), pageable, 0));
+        given(commentQueryRepository.countRepliesByParentIds(List.of(), 30L)).willReturn(Map.of());
+        given(commentQueryRepository.findReplyPreviewsByParentIds(List.of(), 5, 30L)).willReturn(Map.of());
+
+        commentService.getRootComments(1L, pageable, 30L);
+
+        org.mockito.Mockito.verify(commentQueryRepository).findRootComments(1L, pageable, 30L);
+    }
+
+    @Test
     @DisplayName("존재하지 않는 원댓글의 답글을 조회하면 예외가 발생한다")
     void getRepliesFailsWhenParentCommentNotFound() {
         given(commentRepository.findByIdWithUser(999L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> commentService.getReplies(999L, PageRequest.of(0, 20)))
+        assertThatThrownBy(() -> commentService.getReplies(999L, PageRequest.of(0, 20), null))
                 .isInstanceOf(CommentException.class);
     }
 
@@ -153,9 +168,9 @@ class CommentServiceTest {
         given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
         Pageable pageable = PageRequest.of(0, 5);
         Page<Comment> expected = new PageImpl<>(List.of(replyComment(11L, root, writer)), pageable, 1);
-        given(commentQueryRepository.findReplies(1L, pageable)).willReturn(expected);
+        given(commentQueryRepository.findReplies(1L, pageable, null)).willReturn(expected);
 
-        Page<Comment> results = commentService.getReplies(1L, pageable);
+        Page<Comment> results = commentService.getReplies(1L, pageable, null);
 
         assertThat(results).isEqualTo(expected);
     }
@@ -168,7 +183,7 @@ class CommentServiceTest {
         opinion.delete();
         given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
 
-        assertThatThrownBy(() -> commentService.getReplies(1L, PageRequest.of(0, 20)))
+        assertThatThrownBy(() -> commentService.getReplies(1L, PageRequest.of(0, 20), null))
                 .isInstanceOf(OpinionException.class);
     }
 
