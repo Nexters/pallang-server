@@ -41,8 +41,9 @@ public class CommentController implements CommentApi {
             @PathVariable Long opinionId,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
-        return ResponseEntity.ok(DataResponse.from(
-                CommentMapper.toRootListResponse(commentService.getRootComments(opinionId, pageable(page, size)))));
+        Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
+        return ResponseEntity.ok(DataResponse.from(CommentMapper.toRootListResponse(
+                commentService.getRootComments(opinionId, pageable(page, size), currentUserId))));
     }
 
     @Override
@@ -51,8 +52,9 @@ public class CommentController implements CommentApi {
             @PathVariable Long commentId,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
+        Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
         return ResponseEntity.ok(DataResponse.from(
-                CommentMapper.toListResponse(commentService.getReplies(commentId, pageable(page, size)))));
+                CommentMapper.toListResponse(commentService.getReplies(commentId, pageable(page, size), currentUserId))));
     }
 
     @Override

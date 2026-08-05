@@ -2,6 +2,7 @@ package com.nexters.palang.domain.comment.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.nexters.palang.domain.block.domain.UserBlock;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.comment.domain.Comment;
 import com.nexters.palang.domain.opinion.domain.Opinion;
@@ -85,7 +86,7 @@ class CommentQueryRepositoryTest {
         Comment root2 = root("둘째 댓글");
         reply(root1, "답글");
 
-        Page<Comment> results = commentQueryRepository.findRootComments(opinion.getId(), PageRequest.of(0, 20));
+        Page<Comment> results = commentQueryRepository.findRootComments(opinion.getId(), PageRequest.of(0, 20), null);
 
         assertThat(results.getContent()).extracting(Comment::getId).containsExactly(root1.getId(), root2.getId());
         assertThat(results.getTotalElements()).isEqualTo(2);
@@ -104,9 +105,26 @@ class CommentQueryRepositoryTest {
         entityManager.persistAndFlush(Comment.root(otherOpinion, writer, "다른 흔적의 댓글"));
         Comment myRoot = root("내 흔적의 댓글");
 
-        Page<Comment> results = commentQueryRepository.findRootComments(opinion.getId(), PageRequest.of(0, 20));
+        Page<Comment> results = commentQueryRepository.findRootComments(opinion.getId(), PageRequest.of(0, 20), null);
 
         assertThat(results.getContent()).extracting(Comment::getId).containsExactly(myRoot.getId());
+    }
+
+    @Test
+    @DisplayName("차단한 작성자의 원댓글은 목록에서 제외되고, 차단하지 않은 사용자에게는 그대로 보인다")
+    void findRootCommentsExcludesCommentsFromBlockedWriter() {
+        User me = user("me");
+        User blockedWriter = user("blocked-w");
+        Comment myRoot = root("내 댓글");
+        Comment blockedRoot = entityManager.persistAndFlush(Comment.root(opinion, blockedWriter, "차단한 사람의 댓글"));
+        entityManager.persistAndFlush(UserBlock.of(me, blockedWriter));
+
+        Page<Comment> resultForMe = commentQueryRepository.findRootComments(opinion.getId(), PageRequest.of(0, 20), me.getId());
+        Page<Comment> resultForAnonymous = commentQueryRepository.findRootComments(opinion.getId(), PageRequest.of(0, 20), null);
+
+        assertThat(resultForMe.getContent()).extracting(Comment::getId).containsExactly(myRoot.getId());
+        assertThat(resultForAnonymous.getContent()).extracting(Comment::getId)
+                .containsExactlyInAnyOrder(myRoot.getId(), blockedRoot.getId());
     }
 
     @Test
@@ -118,7 +136,7 @@ class CommentQueryRepositoryTest {
         reply(root1, "첫 댓글의 답글2");
         reply(root2, "둘째 댓글의 답글");
 
-        Map<Long, Long> counts = commentQueryRepository.countRepliesByParentIds(List.of(root1.getId(), root2.getId()));
+        Map<Long, Long> counts = commentQueryRepository.countRepliesByParentIds(List.of(root1.getId(), root2.getId()), null);
 
         assertThat(counts).containsEntry(root1.getId(), 2L).containsEntry(root2.getId(), 1L);
     }
@@ -126,9 +144,26 @@ class CommentQueryRepositoryTest {
     @Test
     @DisplayName("부모 ID 목록이 비어 있으면 빈 개수 맵을 반환한다")
     void countRepliesByParentIdsReturnsEmptyForEmptyInput() {
-        Map<Long, Long> counts = commentQueryRepository.countRepliesByParentIds(List.of());
+        Map<Long, Long> counts = commentQueryRepository.countRepliesByParentIds(List.of(), null);
 
         assertThat(counts).isEmpty();
+    }
+
+    @Test
+    @DisplayName("차단한 작성자의 답글은 개수 집계에서 제외된다")
+    void countRepliesByParentIdsExcludesRepliesFromBlockedWriter() {
+        User me = user("me");
+        User blockedWriter = user("blocked-w");
+        Comment root1 = root("첫 댓글");
+        reply(root1, "내 답글");
+        entityManager.persistAndFlush(Comment.reply(root1, blockedWriter, "차단한 사람의 답글"));
+        entityManager.persistAndFlush(UserBlock.of(me, blockedWriter));
+
+        Map<Long, Long> countsForMe = commentQueryRepository.countRepliesByParentIds(List.of(root1.getId()), me.getId());
+        Map<Long, Long> countsForAnonymous = commentQueryRepository.countRepliesByParentIds(List.of(root1.getId()), null);
+
+        assertThat(countsForMe).containsEntry(root1.getId(), 1L);
+        assertThat(countsForAnonymous).containsEntry(root1.getId(), 2L);
     }
 
     @Test
@@ -144,7 +179,7 @@ class CommentQueryRepositoryTest {
         Comment root2Reply = reply(root2, "둘째 댓글의 답글");
 
         Map<Long, List<Comment>> previews = commentQueryRepository.findReplyPreviewsByParentIds(
-                List.of(root1.getId(), root2.getId()), 2);
+                List.of(root1.getId(), root2.getId()), 2, null);
 
         assertThat(previews.get(root1.getId())).extracting(Comment::getId)
                 .containsExactly(root1Reply1.getId(), root1Reply2.getId());
@@ -154,7 +189,7 @@ class CommentQueryRepositoryTest {
     @Test
     @DisplayName("부모 ID 목록이 비어 있으면 빈 미리보기 맵을 반환한다")
     void findReplyPreviewsByParentIdsReturnsEmptyForEmptyInput() {
-        Map<Long, List<Comment>> previews = commentQueryRepository.findReplyPreviewsByParentIds(List.of(), 5);
+        Map<Long, List<Comment>> previews = commentQueryRepository.findReplyPreviewsByParentIds(List.of(), 5, null);
 
         assertThat(previews).isEmpty();
     }
@@ -167,10 +202,25 @@ class CommentQueryRepositoryTest {
             reply(rootComment, "답글 " + i);
         }
 
-        Page<Comment> firstPage = commentQueryRepository.findReplies(rootComment.getId(), PageRequest.of(0, 5));
+        Page<Comment> firstPage = commentQueryRepository.findReplies(rootComment.getId(), PageRequest.of(0, 5), null);
 
         assertThat(firstPage.getContent()).hasSize(5);
         assertThat(firstPage.getTotalElements()).isEqualTo(6);
         assertThat(firstPage.hasNext()).isTrue();
+    }
+
+    @Test
+    @DisplayName("차단한 작성자의 답글은 답글 더보기 목록에서 제외된다")
+    void findRepliesExcludesRepliesFromBlockedWriter() {
+        User me = user("me");
+        User blockedWriter = user("blocked-w");
+        Comment rootComment = root("원댓글");
+        Comment myReply = reply(rootComment, "내 답글");
+        entityManager.persistAndFlush(Comment.reply(rootComment, blockedWriter, "차단한 사람의 답글"));
+        entityManager.persistAndFlush(UserBlock.of(me, blockedWriter));
+
+        Page<Comment> resultForMe = commentQueryRepository.findReplies(rootComment.getId(), PageRequest.of(0, 20), me.getId());
+
+        assertThat(resultForMe.getContent()).extracting(Comment::getId).containsExactly(myReply.getId());
     }
 }

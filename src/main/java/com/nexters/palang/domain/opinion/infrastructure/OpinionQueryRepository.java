@@ -1,5 +1,6 @@
 package com.nexters.palang.domain.opinion.infrastructure;
 
+import com.nexters.palang.domain.block.domain.QUserBlock;
 import com.nexters.palang.domain.book.domain.QBook;
 import com.nexters.palang.domain.comment.domain.QComment;
 import com.nexters.palang.domain.opinion.application.LikedOpinionProjection;
@@ -13,6 +14,7 @@ import com.nexters.palang.domain.user.domain.QUser;
 import com.querydsl.core.types.Expression;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -37,6 +39,7 @@ public class OpinionQueryRepository {
         QUser user = QUser.user;
         QOpinionLike opinionLike = QOpinionLike.opinionLike;
         QComment comment = QComment.comment;
+        QUserBlock userBlock = QUserBlock.userBlock;
 
         Expression<Boolean> likedExpression = currentUserId != null
                 ? JPAExpressions.selectOne()
@@ -50,13 +53,21 @@ public class OpinionQueryRepository {
                 .from(comment)
                 .where(comment.opinion.id.eq(opinion.id), comment.deletedAt.isNull());
 
+        // 차단(신고·차단 기능): 로그인 사용자가 차단한 작성자의 흔적은 피드에서 제외한다.
+        BooleanExpression notBlockedByCurrentUser = currentUserId != null
+                ? opinion.user.id.notIn(JPAExpressions
+                        .select(userBlock.blocked.id)
+                        .from(userBlock)
+                        .where(userBlock.blocker.id.eq(currentUserId)))
+                : null;
+
         List<OpinionSummaryProjection> content = queryFactory
                 .select(Projections.constructor(OpinionSummaryProjection.class,
                         opinion.id, user.id, user.nickname, opinion.content, opinion.likeCount, opinion.createdAt,
                         likedExpression, commentCountExpression))
                 .from(opinion)
                 .join(opinion.user, user)
-                .where(opinion.passage.id.eq(passageId), opinion.deletedAt.isNull())
+                .where(opinion.passage.id.eq(passageId), opinion.deletedAt.isNull(), notBlockedByCurrentUser)
                 .orderBy(orderSpecifiers(sortType, opinion))
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
@@ -65,7 +76,7 @@ public class OpinionQueryRepository {
         Long total = queryFactory
                 .select(opinion.count())
                 .from(opinion)
-                .where(opinion.passage.id.eq(passageId), opinion.deletedAt.isNull())
+                .where(opinion.passage.id.eq(passageId), opinion.deletedAt.isNull(), notBlockedByCurrentUser)
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);

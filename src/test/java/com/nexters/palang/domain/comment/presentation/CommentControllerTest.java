@@ -89,7 +89,7 @@ class CommentControllerTest {
         Comment root = rootComment(1L, writer);
         Comment reply = replyComment(2L, root, writer);
         RootCommentGroup group = new RootCommentGroup(root, List.of(reply), 1);
-        given(commentService.getRootComments(eq(1L), any())).willReturn(
+        given(commentService.getRootComments(eq(1L), any(), any())).willReturn(
                 new PageImpl<>(List.of(group), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/opinions/1/comments"))
@@ -103,7 +103,7 @@ class CommentControllerTest {
     @Test
     @DisplayName("존재하지 않는 흔적의 댓글 목록을 조회하면 404 에러가 발생한다")
     void getCommentsFailsWhenOpinionNotFound() throws Exception {
-        given(commentService.getRootComments(eq(999L), any()))
+        given(commentService.getRootComments(eq(999L), any(), any()))
                 .willThrow(new OpinionException(OpinionErrorCode.OPINION_NOT_FOUND));
 
         mockMvc.perform(get("/api/opinions/999/comments"))
@@ -112,12 +112,25 @@ class CommentControllerTest {
     }
 
     @Test
+    @DisplayName("로그인 상태로 댓글 목록을 조회하면 차단 필터링을 위해 currentUserId를 서비스에 전달한다")
+    void getCommentsPassesCurrentUserIdWhenAuthenticated() throws Exception {
+        given(currentUserProvider.findCurrentUserId()).willReturn(java.util.Optional.of(1L));
+        given(commentService.getRootComments(eq(1L), any(), eq(1L))).willReturn(
+                new PageImpl<>(List.of(), DEFAULT_PAGEABLE, 0));
+
+        mockMvc.perform(get("/api/opinions/1/comments"))
+                .andExpect(status().isOk());
+
+        verify(commentService).getRootComments(eq(1L), any(), eq(1L));
+    }
+
+    @Test
     @DisplayName("답글 더보기를 요청하면 답글 목록을 반환한다")
     void getReplies() throws Exception {
         User writer = user(1L);
         Comment root = rootComment(1L, writer);
         Comment reply = replyComment(2L, root, writer);
-        given(commentService.getReplies(eq(1L), any())).willReturn(
+        given(commentService.getReplies(eq(1L), any(), any())).willReturn(
                 new PageImpl<>(List.of(reply), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/comments/1/replies"))
@@ -128,7 +141,7 @@ class CommentControllerTest {
     @Test
     @DisplayName("존재하지 않는 원댓글의 답글을 조회하면 404 에러가 발생한다")
     void getRepliesFailsWhenParentNotFound() throws Exception {
-        given(commentService.getReplies(eq(999L), any()))
+        given(commentService.getReplies(eq(999L), any(), any()))
                 .willThrow(new CommentException(CommentErrorCode.COMMENT_NOT_FOUND));
 
         mockMvc.perform(get("/api/comments/999/replies"))

@@ -2,6 +2,7 @@ package com.nexters.palang.domain.opinion.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.nexters.palang.domain.block.domain.UserBlock;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.comment.domain.Comment;
 import com.nexters.palang.domain.opinion.application.LikedOpinionProjection;
@@ -177,6 +178,28 @@ class OpinionQueryRepositoryTest {
                 passage.getId(), OpinionSortType.LATEST, PageRequest.of(0, 10), null);
 
         assertThat(result.getContent().get(0).commentCount()).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("차단한 작성자의 흔적은 피드에서 제외되고, 차단하지 않은 사용자에게는 그대로 보인다")
+    void findOpinionsExcludesOpinionsFromBlockedWriter() {
+        User blockedWriter = user("blocked-w");
+        Passage passage = passage(blockedWriter);
+        Opinion opinionByBlockedWriter = opinion(passage, blockedWriter, "차단한 사람의 흔적", 0);
+        entityManager.persistAndFlush(UserBlock.of(me, blockedWriter));
+
+        Page<OpinionSummaryProjection> resultForMe = opinionQueryRepository.findOpinions(
+                passage.getId(), OpinionSortType.LATEST, PageRequest.of(0, 10), me.getId());
+        Page<OpinionSummaryProjection> resultForOther = opinionQueryRepository.findOpinions(
+                passage.getId(), OpinionSortType.LATEST, PageRequest.of(0, 10), other.getId());
+        Page<OpinionSummaryProjection> resultForAnonymous = opinionQueryRepository.findOpinions(
+                passage.getId(), OpinionSortType.LATEST, PageRequest.of(0, 10), null);
+
+        assertThat(resultForMe.getContent()).isEmpty();
+        assertThat(resultForOther.getContent()).extracting(OpinionSummaryProjection::opinionId)
+                .containsExactly(opinionByBlockedWriter.getId());
+        assertThat(resultForAnonymous.getContent()).extracting(OpinionSummaryProjection::opinionId)
+                .containsExactly(opinionByBlockedWriter.getId());
     }
 
     @Test
