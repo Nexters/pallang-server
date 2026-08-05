@@ -1,5 +1,6 @@
 package com.nexters.palang.domain.user.presentation;
 
+import com.nexters.palang.domain.auth.application.AuthService;
 import com.nexters.palang.domain.opinion.application.OpinionService;
 import com.nexters.palang.domain.user.application.UserMapper;
 import com.nexters.palang.domain.user.application.UserService;
@@ -36,6 +37,7 @@ public class UserController implements UserApi {
     private static final int MAX_SIZE = 100;
 
     private final UserService userService;
+    private final AuthService authService;
     private final OpinionService opinionService;
     private final CurrentUserProvider currentUserProvider;
 
@@ -77,7 +79,7 @@ public class UserController implements UserApi {
     @DeleteMapping("/api/users/me")
     public ResponseEntity<DataResponse<Void>> withdraw() {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        userService.withdraw(currentUserId);
+        authService.withdraw(currentUserId);
         return ResponseEntity.ok(DataResponse.from(null));
     }
 

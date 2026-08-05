@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -16,10 +17,12 @@ import com.nexters.palang.domain.auth.infrastructure.AppleOAuthClient;
 import com.nexters.palang.domain.auth.infrastructure.KakaoOAuthClient;
 import com.nexters.palang.domain.auth.infrastructure.RefreshTokenRepository;
 import com.nexters.palang.domain.user.application.UserRegistrationService;
+import com.nexters.palang.domain.user.application.UserService;
 import com.nexters.palang.domain.user.common.error.UserException;
 import com.nexters.palang.domain.user.domain.SnsProvider;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
+import com.nexters.palang.global.security.AuthErrorCode;
 import com.nexters.palang.global.security.AuthException;
 import com.nexters.palang.global.security.jwt.JwtTokenProvider;
 import io.jsonwebtoken.ExpiredJwtException;
@@ -39,6 +42,9 @@ class AuthServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private UserService userService;
 
     @Mock
     private UserRegistrationService userRegistrationService;
@@ -62,7 +68,7 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(userRepository, userRegistrationService, refreshTokenRepository,
+        authService = new AuthService(userRepository, userService, userRegistrationService, refreshTokenRepository,
                 kakaoOAuthClient, appleOAuthClient, appleAuthClient, jwtTokenProvider);
     }
 
@@ -374,6 +380,53 @@ class AuthServiceTest {
         given(refreshTokenRepository.findByUserIdAndTokenHash(1L, sha256("refresh"))).willReturn(Optional.empty());
 
         authService.logout(1L, "refresh");
+    }
+
+    @Test
+    @DisplayName("카카오 사용자가 탈퇴하면 카카오 연동 해제와 리프레시 토큰 일괄 폐기, 소프트 삭제가 모두 이뤄진다")
+    void withdrawUnlinksKakaoAndRevokesTokens() {
+        User user = user(1L, SnsProvider.KAKAO);
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+        authService.withdraw(1L);
+
+        verify(kakaoOAuthClient).unlink("sns-1");
+        verify(refreshTokenRepository).revokeAllByUserId(1L);
+        verify(userService).withdraw(1L);
+    }
+
+    @Test
+    @DisplayName("애플 사용자가 탈퇴하면 카카오 연동 해제는 호출되지 않는다")
+    void withdrawDoesNotUnlinkKakaoForAppleUser() {
+        User user = user(1L, SnsProvider.APPLE);
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+        authService.withdraw(1L);
+
+        verify(kakaoOAuthClient, never()).unlink(anyString());
+        verify(refreshTokenRepository).revokeAllByUserId(1L);
+        verify(userService).withdraw(1L);
+    }
+
+    @Test
+    @DisplayName("카카오 연동 해제가 실패해도 탈퇴 자체는 계속 진행된다")
+    void withdrawContinuesEvenWhenKakaoUnlinkFails() {
+        User user = user(1L, SnsProvider.KAKAO);
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        doThrow(new AuthException(AuthErrorCode.KAKAO_UNLINK_FAILED)).when(kakaoOAuthClient).unlink("sns-1");
+
+        authService.withdraw(1L);
+
+        verify(refreshTokenRepository).revokeAllByUserId(1L);
+        verify(userService).withdraw(1L);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 사용자가 탈퇴하려 하면 예외가 발생한다")
+    void withdrawFailsWhenUserNotFound() {
+        given(userRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.withdraw(999L)).isInstanceOf(UserException.class);
     }
 
     private String sha256(String value) {

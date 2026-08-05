@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nexters.palang.domain.auth.application.AuthService;
 import com.nexters.palang.domain.opinion.application.LikedOpinionProjection;
 import com.nexters.palang.domain.opinion.application.MyOpinionProjection;
 import com.nexters.palang.domain.opinion.application.OpinionService;
@@ -53,6 +54,9 @@ class UserControllerTest {
 
     @MockitoBean
     private UserService userService;
+
+    @MockitoBean
+    private AuthService authService;
 
     @MockitoBean
     private OpinionService opinionService;
@@ -224,14 +228,14 @@ class UserControllerTest {
         mockMvc.perform(delete("/api/users/me"))
                 .andExpect(status().isOk());
 
-        verify(userService).withdraw(1L);
+        verify(authService).withdraw(1L);
     }
 
     @Test
     @DisplayName("존재하지 않는 사용자가 탈퇴를 요청하면 404 에러가 발생한다")
     void withdrawFailsWhenNotFound() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        doThrow(new UserException(UserErrorCode.USER_NOT_FOUND)).when(userService).withdraw(1L);
+        doThrow(new UserException(UserErrorCode.USER_NOT_FOUND)).when(authService).withdraw(1L);
 
         mockMvc.perform(delete("/api/users/me"))
                 .andExpect(status().isNotFound())
