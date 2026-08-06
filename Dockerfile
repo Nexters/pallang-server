@@ -30,4 +30,6 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
     CMD bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080' || exit 1
 
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+# docker-compose의 TZ=Asia/Seoul과 별개로, LocalDateTime.now()가 쓰는 JVM 기본 시간대를
+# 컨테이너 tzdata/TZ 환경변수 설정 여부와 무관하게 명시적으로 고정한다.
+ENTRYPOINT ["java", "-Duser.timezone=Asia/Seoul", "-jar", "/app/app.jar"]

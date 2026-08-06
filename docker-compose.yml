@@ -28,6 +28,10 @@ services:
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       IMAGE_UPLOAD_DIR: ${IMAGE_UPLOAD_DIR:-/app/uploads}
+      # mysql 서비스와 동일하게 컨테이너 시간대를 KST로 맞춘다. LocalDateTime.now()(BaseEntity의
+      # @CreatedDate/@LastModifiedDate 등)는 JVM 기본 시간대를 따르는데, 이게 없으면 컨테이너 OS
+      # 기본값인 UTC로 떠서 생성/수정 시각이 9시간 느리게 기록된다.
+      TZ: Asia/Seoul
     # deploy/nginx/pallang.conf.template의 upstream이 127.0.0.1:8080을 하드코딩하고 있으므로
     # 호스트 포트를 가변으로 두지 않는다 (바꾸려면 이 파일과 nginx 템플릿을 함께 수정할 것).
     ports:
