@@ -151,4 +151,22 @@ public class User extends BaseEntity {
         // unique 제약(nickname) 해제를 위해 탈퇴 시점에 닉네임을 익명화한다.
         this.nickname = "탈퇴한 사용자" + this.id;
     }
+
+    // 탈퇴한 계정으로 같은 SNS 식별자(sns_provider+sns_id)로 다시 로그인하면, 유니크 제약 때문에 새
+    // 로우를 만들 수 없어 기존 로우를 초기화해 재가입시킨다. 온보딩/약관 동의도 다시 받아야 하는 완전히
+    // 새로운 가입처럼 취급한다 — 탈퇴 후 영구히 재가입이 막히면 애플 심사(같은 테스트 계정으로 탈퇴/재가입
+    // 반복 테스트)에서 문제가 될 수 있다.
+    public void reactivate(String nickname, String email, String name) {
+        this.isWithdrawn = false;
+        this.withdrawnAt = null;
+        this.nickname = nickname;
+        this.nicknameUpdatedAt = null;
+        this.email = email;
+        this.name = name;
+        this.profileImageUrl = null;
+        this.backgroundColor = null;
+        this.termsAgreedAt = null;
+        this.hasCompletedOnboarding = false;
+        this.appleRefreshToken = null;
+    }
 }

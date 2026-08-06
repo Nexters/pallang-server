@@ -52,7 +52,9 @@ public class AuthService {
             user = userRegistrationService.registerViaSns(
                     SnsProvider.KAKAO, kakaoUserInfo.snsId(), kakaoUserInfo.email(), null);
         } else if (user.isWithdrawn()) {
-            throw new AuthException(AuthErrorCode.WITHDRAWN_ACCOUNT);
+            // 탈퇴한 계정으로 같은 카카오 계정으로 재로그인 시도 — 영구 차단하지 않고 재가입으로 처리한다.
+            user = userRegistrationService.reactivate(user, kakaoUserInfo.email(), null);
+            isNewUser = true;
         } else if (kakaoUserInfo.email() != null) {
             // 최초 로그인 시 이메일 동의를 거부했다가 나중에 동의하는 경우를 위해 갱신한다.
             user.changeEmail(kakaoUserInfo.email());
@@ -73,7 +75,10 @@ public class AuthService {
             user = userRegistrationService.registerViaSns(
                     SnsProvider.APPLE, appleUserInfo.snsId(), appleUserInfo.email(), combineName(familyName, givenName));
         } else if (user.isWithdrawn()) {
-            throw new AuthException(AuthErrorCode.WITHDRAWN_ACCOUNT);
+            // 탈퇴한 계정으로 같은 애플 계정으로 재로그인 시도 — 영구 차단하지 않고 재가입으로 처리한다.
+            // (애플 심사에서 같은 테스트 계정으로 탈퇴/재가입을 반복 테스트할 수 있어야 한다.)
+            user = userRegistrationService.reactivate(user, appleUserInfo.email(), combineName(familyName, givenName));
+            isNewUser = true;
         } else if (appleUserInfo.email() != null) {
             user.changeEmail(appleUserInfo.email());
         }
