@@ -125,24 +125,17 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("탈퇴한 계정으로 같은 카카오 계정으로 재로그인하면 차단되지 않고 재가입 처리된다")
-    void loginWithKakaoReactivatesWithdrawnAccount() {
+    @DisplayName("탈퇴한 계정으로 로그인을 시도하면 예외가 발생한다 (레거시 데이터 방어용 — 정상 흐름에선 " +
+            "탈퇴 시 sns_id가 익명화돼 애초에 이 분기를 안 탄다)")
+    void loginWithKakaoFailsWhenAccountWithdrawn() {
         given(kakaoOAuthClient.getUserInfo("kakao-token"))
-                .willReturn(new KakaoOAuthClient.KakaoUserInfo("sns-300", "user300@example.com"));
+                .willReturn(new KakaoOAuthClient.KakaoUserInfo("sns-300", null));
         User withdrawnUser = user(300L);
         withdrawnUser.withdraw();
         given(userRepository.findBySnsProviderAndSnsId(SnsProvider.KAKAO, "sns-300"))
                 .willReturn(Optional.of(withdrawnUser));
-        given(userRegistrationService.reactivate(withdrawnUser, "user300@example.com", null))
-                .willReturn(withdrawnUser);
-        given(jwtTokenProvider.createAccessToken(300L)).willReturn("access-token");
-        given(jwtTokenProvider.createRefreshToken(300L)).willReturn("refresh-token");
-        given(jwtTokenProvider.refreshTokenExpiryFromNow()).willReturn(LocalDateTime.now().plusDays(14));
 
-        AuthResult result = authService.loginWithKakao("kakao-token");
-
-        assertThat(result.isNewUser()).isTrue();
-        verify(userRegistrationService).reactivate(withdrawnUser, "user300@example.com", null);
+        assertThatThrownBy(() -> authService.loginWithKakao("kakao-token")).isInstanceOf(AuthException.class);
     }
 
     @Test
@@ -242,23 +235,17 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("탈퇴한 계정으로 같은 애플 계정으로 재로그인하면 차단되지 않고 재가입 처리된다")
-    void loginWithAppleReactivatesWithdrawnAccount() {
+    @DisplayName("탈퇴한 계정으로 애플 로그인을 시도하면 예외가 발생한다 (레거시 데이터 방어용)")
+    void loginWithAppleFailsWhenAccountWithdrawn() {
         given(appleOAuthClient.getUserInfo("apple-token"))
                 .willReturn(new AppleOAuthClient.AppleUserInfo("apple-sns-300", null, "com.palang.app"));
         User withdrawnUser = user(300L, SnsProvider.APPLE);
         withdrawnUser.withdraw();
         given(userRepository.findBySnsProviderAndSnsId(SnsProvider.APPLE, "apple-sns-300"))
                 .willReturn(Optional.of(withdrawnUser));
-        given(userRegistrationService.reactivate(withdrawnUser, null, null)).willReturn(withdrawnUser);
-        given(jwtTokenProvider.createAccessToken(300L)).willReturn("access-token");
-        given(jwtTokenProvider.createRefreshToken(300L)).willReturn("refresh-token");
-        given(jwtTokenProvider.refreshTokenExpiryFromNow()).willReturn(LocalDateTime.now().plusDays(14));
 
-        AuthResult result = authService.loginWithApple("apple-token", null, null, null);
-
-        assertThat(result.isNewUser()).isTrue();
-        verify(userRegistrationService).reactivate(withdrawnUser, null, null);
+        assertThatThrownBy(() -> authService.loginWithApple("apple-token", null, null, null))
+                .isInstanceOf(AuthException.class);
     }
 
     @Test
