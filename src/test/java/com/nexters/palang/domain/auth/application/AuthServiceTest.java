@@ -409,6 +409,48 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("애플 사용자가 탈퇴하면 저장된 refresh token으로 애플 연동을 해제한다")
+    void withdrawRevokesAppleWithStoredRefreshToken() {
+        User user = user(1L, SnsProvider.APPLE);
+        user.updateAppleRefreshToken("apple-refresh-token");
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+        authService.withdraw(1L);
+
+        verify(appleAuthClient).revoke("apple-refresh-token");
+        verify(refreshTokenRepository).revokeAllByUserId(1L);
+        verify(userService).withdraw(1L);
+    }
+
+    @Test
+    @DisplayName("애플 refresh token이 없으면 연동 해제를 시도하지 않고도 탈퇴는 진행된다")
+    void withdrawSkipsAppleRevokeWhenRefreshTokenMissing() {
+        User user = user(1L, SnsProvider.APPLE);
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+
+        authService.withdraw(1L);
+
+        verify(appleAuthClient, never()).revoke(anyString());
+        verify(refreshTokenRepository).revokeAllByUserId(1L);
+        verify(userService).withdraw(1L);
+    }
+
+    @Test
+    @DisplayName("애플 연동 해제가 실패해도 탈퇴 자체는 계속 진행된다")
+    void withdrawContinuesEvenWhenAppleRevokeFails() {
+        User user = user(1L, SnsProvider.APPLE);
+        user.updateAppleRefreshToken("apple-refresh-token");
+        given(userRepository.findById(1L)).willReturn(Optional.of(user));
+        doThrow(new AuthException(AuthErrorCode.APPLE_REVOKE_FAILED))
+                .when(appleAuthClient).revoke("apple-refresh-token");
+
+        authService.withdraw(1L);
+
+        verify(refreshTokenRepository).revokeAllByUserId(1L);
+        verify(userService).withdraw(1L);
+    }
+
+    @Test
     @DisplayName("카카오 연동 해제가 실패해도 탈퇴 자체는 계속 진행된다")
     void withdrawContinuesEvenWhenKakaoUnlinkFails() {
         User user = user(1L, SnsProvider.KAKAO);
