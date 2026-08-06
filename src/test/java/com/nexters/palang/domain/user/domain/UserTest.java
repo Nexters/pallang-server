@@ -95,4 +95,33 @@ class UserTest {
 
         assertThat(user.isHasCompletedOnboarding()).isTrue();
     }
+
+    @Test
+    @DisplayName("탈퇴하면 닉네임과 snsId가 익명화되어 같은 SNS 계정으로 재가입할 수 있게 된다")
+    void withdrawAnonymizesNicknameAndSnsId() {
+        User user = User.builder().nickname("기존닉네임").snsProvider(SnsProvider.KAKAO).snsId("kakao-123").build();
+        ReflectionTestUtils.setField(user, "id", 42L);
+
+        user.withdraw();
+
+        assertThat(user.isWithdrawn()).isTrue();
+        assertThat(user.getWithdrawnAt()).isNotNull();
+        assertThat(user.getNickname()).isEqualTo("탈퇴한 사용자42");
+        assertThat(user.getSnsId())
+                .startsWith("withdrawn:")
+                .hasSize(74)
+                .doesNotContain("kakao-123");
+    }
+
+    @Test
+    @DisplayName("애플 sub처럼 snsId가 최대 길이(255자)여도 익명화된 값은 sns_id 컬럼 길이를 넘지 않는다")
+    void withdrawAnonymizedSnsIdFitsWithinColumnLengthEvenForMaxLengthAppleSub() {
+        String maxLengthAppleSub = "a".repeat(255);
+        User user = User.builder().nickname("기존닉네임").snsProvider(SnsProvider.APPLE).snsId(maxLengthAppleSub).build();
+        ReflectionTestUtils.setField(user, "id", 999_999_999_999L);
+
+        user.withdraw();
+
+        assertThat(user.getSnsId()).hasSizeLessThanOrEqualTo(255);
+    }
 }
