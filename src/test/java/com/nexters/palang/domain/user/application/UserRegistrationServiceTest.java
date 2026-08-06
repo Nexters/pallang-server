@@ -93,4 +93,37 @@ class UserRegistrationServiceTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
         verify(userRepository, times(1)).saveAndFlush(any());
     }
+
+    @Test
+    @DisplayName("탈퇴한 계정을 재가입 처리하면 새 닉네임으로 초기화되어 저장된다")
+    void reactivateSucceedsOnFirstAttempt() {
+        User withdrawnUser = User.builder().nickname("탈퇴한 사용자1").snsProvider(SnsProvider.APPLE).snsId("sns-5").build();
+        withdrawnUser.withdraw();
+        given(nicknameGenerator.generateBase()).willReturn("고요한책갈피");
+        given(userRepository.saveAndFlush(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        User user = userRegistrationService.reactivate(withdrawnUser, "user5@example.com", "새이름");
+
+        assertThat(user.isWithdrawn()).isFalse();
+        assertThat(user.getNickname()).isEqualTo("고요한책갈피");
+        assertThat(user.getEmail()).isEqualTo("user5@example.com");
+        assertThat(user.getName()).isEqualTo("새이름");
+    }
+
+    @Test
+    @DisplayName("재가입 시 닉네임이 충돌하면 숫자 접미사를 붙여 재시도한다")
+    void reactivateRetriesWithSuffixOnConflict() {
+        User withdrawnUser = User.builder().nickname("탈퇴한 사용자6").snsProvider(SnsProvider.APPLE).snsId("sns-6").build();
+        withdrawnUser.withdraw();
+        given(nicknameGenerator.generateBase()).willReturn("고요한책갈피");
+        given(nicknameGenerator.withSuffix("고요한책갈피", 1)).willReturn("고요한책갈피1");
+        given(userRepository.saveAndFlush(argThat(u -> u != null && u.getNickname().equals("고요한책갈피"))))
+                .willThrow(new DataIntegrityViolationException("Duplicate entry for key 'users.uq_users_nickname'"));
+        given(userRepository.saveAndFlush(argThat(u -> u != null && u.getNickname().equals("고요한책갈피1"))))
+                .willAnswer(invocation -> invocation.getArgument(0));
+
+        User user = userRegistrationService.reactivate(withdrawnUser, null, null);
+
+        assertThat(user.getNickname()).isEqualTo("고요한책갈피1");
+    }
 }

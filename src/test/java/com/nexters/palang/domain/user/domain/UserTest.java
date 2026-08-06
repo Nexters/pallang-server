@@ -95,4 +95,23 @@ class UserTest {
 
         assertThat(user.isHasCompletedOnboarding()).isTrue();
     }
+
+    @Test
+    @DisplayName("탈퇴한 계정을 재가입 처리하면 탈퇴 상태와 온보딩/약관 동의가 초기화된다")
+    void reactivateResetsWithdrawnAndOnboardingState() {
+        User user = user();
+        user.withdraw();
+        user.agreeToTerms();
+        user.completeOnboarding();
+
+        user.reactivate("새닉네임", "new@example.com", "새이름");
+
+        assertThat(user.isWithdrawn()).isFalse();
+        assertThat(user.getWithdrawnAt()).isNull();
+        assertThat(user.getNickname()).isEqualTo("새닉네임");
+        assertThat(user.getEmail()).isEqualTo("new@example.com");
+        assertThat(user.getName()).isEqualTo("새이름");
+        assertThat(user.getTermsAgreedAt()).isNull();
+        assertThat(user.isHasCompletedOnboarding()).isFalse();
+    }
 }
