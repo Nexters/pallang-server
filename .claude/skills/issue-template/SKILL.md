@@ -49,6 +49,7 @@ description: Use whenever creating or editing a GitHub issue (gh issue create, g
 - `💡 참고 사항`에는 관련 문서(예: `backend_plan.md` 섹션 번호), 선행/후속 이슈 번호, 미확정 사항을 적는다.
 - 기존에 이 형식을 따르지 않는 이슈 본문(예: `## 배경` / `## 작업 내용` / `## 참고` 형태)을 발견하면, 원래 내용을 보존하면서 유형에 맞는 섹션 구조로 재배치한다 (내용을 새로 지어내지 않는다).
 - 라벨이 없거나 제목 접두사와 라벨이 어긋나면, 저장소 라벨 목록(`gh label list`)에서 맞는 라벨을 찾아 붙인다.
+- `gh issue create` 실행 시 사용자가 다른 담당자를 명시하지 않는 한 항상 `--assignee @me` 옵션을 포함해 작성자 본인에게 할당한다. (`gh issue create`는 기본적으로 담당자를 지정하지 않으므로 빠뜨리면 미할당으로 생성된다.) 이미 생성된 이슈에 할당자를 추가/변경할 때는 `gh issue edit <번호> --add-assignee @me`를 사용한다.
 
 ## 참고
 
