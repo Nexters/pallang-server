@@ -107,6 +107,21 @@ class UserTest {
         assertThat(user.isWithdrawn()).isTrue();
         assertThat(user.getWithdrawnAt()).isNotNull();
         assertThat(user.getNickname()).isEqualTo("탈퇴한 사용자42");
-        assertThat(user.getSnsId()).isEqualTo("withdrawn:42:kakao-123");
+        assertThat(user.getSnsId())
+                .startsWith("withdrawn:")
+                .hasSize(74)
+                .doesNotContain("kakao-123");
+    }
+
+    @Test
+    @DisplayName("애플 sub처럼 snsId가 최대 길이(255자)여도 익명화된 값은 sns_id 컬럼 길이를 넘지 않는다")
+    void withdrawAnonymizedSnsIdFitsWithinColumnLengthEvenForMaxLengthAppleSub() {
+        String maxLengthAppleSub = "a".repeat(255);
+        User user = User.builder().nickname("기존닉네임").snsProvider(SnsProvider.APPLE).snsId(maxLengthAppleSub).build();
+        ReflectionTestUtils.setField(user, "id", 999_999_999_999L);
+
+        user.withdraw();
+
+        assertThat(user.getSnsId()).hasSizeLessThanOrEqualTo(255);
     }
 }
