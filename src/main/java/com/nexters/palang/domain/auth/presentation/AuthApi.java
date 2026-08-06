@@ -24,9 +24,10 @@ public interface AuthApi {
     @Operation(summary = "카카오 로그인", description = "모바일 앱이 카카오 SDK로 로그인해 받은 카카오 액세스 토큰을 전달하면, "
             + "카카오 사용자 정보 API로 직접 검증한 뒤 가입/로그인을 처리하고 서비스 자체 JWT를 발급합니다. "
             + "처음 로그인하는 사용자는 닉네임이 자동 생성되며(isNewUser=true), 약관 동의는 별도로 POST /api/auth/terms를 호출해야 합니다. "
-            + "탈퇴했던 계정으로 다시 로그인하면 영구 차단되지 않고 완전히 새로운 가입처럼 재가입 처리됩니다(isNewUser=true).")
+            + "탈퇴했던 계정으로 다시 로그인하면 예전 계정이 되살아나지 않고 완전히 새로운 계정으로 가입됩니다(isNewUser=true) "
+            + "— 예전 계정과 거기 남긴 콘텐츠는 탈퇴 상태로 그대로 남습니다.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "로그인/가입/재가입 성공"),
+            @ApiResponse(responseCode = "200", description = "로그인/가입 성공"),
             @ApiResponse(responseCode = "400", description = "카카오 액세스 토큰 누락 (COMMON_400_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/auth/kakao\",\"title\":\"COMMON_400_1\","
@@ -34,7 +35,12 @@ public interface AuthApi {
             @ApiResponse(responseCode = "401", description = "카카오 인증 실패, 만료/유효하지 않은 토큰 (AUTH_401_4)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/auth/kakao\",\"title\":\"AUTH_401_4\","
-                                    + "\"status\":401,\"detail\":\"카카오 인증에 실패했습니다.\"}")))
+                                    + "\"status\":401,\"detail\":\"카카오 인증에 실패했습니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "탈퇴한 계정으로 재로그인 시도 (AUTH_403_1, 정상 흐름에서는 "
+                    + "발생하지 않고 레거시 데이터에 대한 방어용)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/auth/kakao\",\"title\":\"AUTH_403_1\","
+                                    + "\"status\":403,\"detail\":\"탈퇴한 계정입니다.\"}")))
     })
     ResponseEntity<DataResponse<LoginResponse>> loginWithKakao(@Valid KakaoLoginRequest request);
 
@@ -45,9 +51,10 @@ public interface AuthApi {
             + "확보해둡니다(실패해도 로그인은 계속 진행됩니다). givenName/familyName은 애플이 최초 로그인 시에만 "
             + "내려주는 값으로, 이후 로그인엔 null이어도 됩니다. "
             + "처음 로그인하는 사용자는 닉네임이 자동 생성되며(isNewUser=true), 약관 동의는 별도로 POST /api/auth/terms를 호출해야 합니다. "
-            + "탈퇴했던 계정으로 다시 로그인하면 영구 차단되지 않고 완전히 새로운 가입처럼 재가입 처리됩니다(isNewUser=true).")
+            + "탈퇴했던 계정으로 다시 로그인하면 예전 계정이 되살아나지 않고 완전히 새로운 계정으로 가입됩니다(isNewUser=true) "
+            + "— 예전 계정과 거기 남긴 콘텐츠는 탈퇴 상태로 그대로 남습니다.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "로그인/가입/재가입 성공"),
+            @ApiResponse(responseCode = "200", description = "로그인/가입 성공"),
             @ApiResponse(responseCode = "400", description = "애플 identity token 누락 (COMMON_400_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/auth/apple\",\"title\":\"COMMON_400_1\","
@@ -55,7 +62,12 @@ public interface AuthApi {
             @ApiResponse(responseCode = "401", description = "애플 인증 실패, 서명/발급자/대상/만료 검증 실패 (AUTH_401_6)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/auth/apple\",\"title\":\"AUTH_401_6\","
-                                    + "\"status\":401,\"detail\":\"애플 인증에 실패했습니다.\"}")))
+                                    + "\"status\":401,\"detail\":\"애플 인증에 실패했습니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "탈퇴한 계정으로 재로그인 시도 (AUTH_403_1, 정상 흐름에서는 "
+                    + "발생하지 않고 레거시 데이터에 대한 방어용)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/auth/apple\",\"title\":\"AUTH_403_1\","
+                                    + "\"status\":403,\"detail\":\"탈퇴한 계정입니다.\"}")))
     })
     ResponseEntity<DataResponse<LoginResponse>> loginWithApple(@Valid AppleLoginRequest request);
 

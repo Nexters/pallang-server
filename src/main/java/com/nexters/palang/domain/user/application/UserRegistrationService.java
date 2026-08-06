@@ -45,23 +45,6 @@ public class UserRegistrationService {
         throw new UserException(UserErrorCode.NICKNAME_GENERATION_FAILED);
     }
 
-    // 탈퇴한 계정이 같은 SNS 식별자로 재로그인한 경우: sns_provider+sns_id 유니크 제약 때문에 새 로우를
-    // 만들 수 없어 기존 로우를 초기화해 재가입시킨다. 닉네임 충돌 재시도 로직은 registerViaSns와 동일하다.
-    public User reactivate(User user, String email, String name) {
-        String base = nicknameGenerator.generateBase();
-        for (int suffix = 0; suffix <= NicknameGenerator.MAX_SUFFIX_ATTEMPTS; suffix++) {
-            String nickname = suffix == 0 ? base : nicknameGenerator.withSuffix(base, suffix);
-            try {
-                return saveReactivatedUser(user, nickname, email, name);
-            } catch (DataIntegrityViolationException e) {
-                if (!isNicknameConflict(e)) {
-                    throw e;
-                }
-            }
-        }
-        throw new UserException(UserErrorCode.NICKNAME_GENERATION_FAILED);
-    }
-
     private boolean isNicknameConflict(DataIntegrityViolationException e) {
         String message = String.valueOf(e.getMostSpecificCause().getMessage()).toLowerCase();
         return message.contains(NICKNAME_UNIQUE_CONSTRAINT);
@@ -76,12 +59,6 @@ public class UserRegistrationService {
                 .email(email)
                 .name(name)
                 .build();
-        return userRepository.saveAndFlush(user);
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public User saveReactivatedUser(User user, String nickname, String email, String name) {
-        user.reactivate(nickname, email, name);
         return userRepository.saveAndFlush(user);
     }
 }
