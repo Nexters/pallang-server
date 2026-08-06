@@ -10,8 +10,12 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -64,7 +68,9 @@ public class User extends BaseEntity {
     @Column(name = "sns_provider", nullable = false)
     private SnsProvider snsProvider;
 
-    @Column(name = "sns_id", nullable = false)
+    // Apple sub는 최대 255자까지 가능해 컬럼 길이를 명시적으로 맞춘다. 탈퇴 시 anonymizeSnsId()가
+    // "withdrawn:" + SHA-256(64자) 형태의 고정 길이 값으로 치환하므로 원본 길이와 무관하게 안전하다.
+    @Column(name = "sns_id", nullable = false, length = 255)
     private String snsId;
 
     // SNS 로그인 시점에는 아직 약관에 동의하지 않았을 수 있어(FR-AUTH-03) nullable이다.
@@ -154,6 +160,26 @@ public class User extends BaseEntity {
         this.isWithdrawn = true;
         this.withdrawnAt = LocalDateTime.now();
         this.nickname = "탈퇴한 사용자" + this.id;
-        this.snsId = this.snsId + "#withdrawn#" + this.id;
+        // unique 제약(sns_provider+sns_id) 해제를 위해 이 row(탈퇴한 계정)만의 snsId를 고정 길이 해시로
+        // 되돌릴 수 없게 바꾼다. registerViaSns로 만들어지는 새 계정의 snsId에는 관여하지 않는다.
+        // 같은 SNS 계정으로 재로그인하면 findBySnsProviderAndSnsId가 원본 snsId로는 이 row를 더 이상
+        // 찾지 못해 신규 가입 경로를 타므로, 탈퇴는 되돌릴 수 없는 익명화로 유지되고 재가입은 새 계정으로 시작한다.
+        this.snsId = anonymizeSnsId(this.id, this.snsId);
+    }
+
+    // Apple sub(최대 255자)까지 고려하면 "withdrawn:" + 원본을 그대로 이어붙일 경우 sns_id 컬럼(varchar(255))을
+    // 넘길 수 있어, SHA-256 해시(64자 고정)로 치환해 원본 길이와 무관하게 컬럼 길이 안에 들어오도록 한다.
+    private static String anonymizeSnsId(Long id, String originalSnsId) {
+        return "withdrawn:" + sha256(id + ":" + originalSnsId);
+    }
+
+    private static String sha256(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hashBytes);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 }

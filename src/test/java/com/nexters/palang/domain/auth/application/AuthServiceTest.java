@@ -139,6 +139,26 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("탈퇴 후 같은 카카오 계정으로 재로그인하면 신규 계정으로 가입된다")
+    void loginWithKakaoSignsUpAsNewUserAfterWithdrawal() {
+        // User.withdraw()가 snsId를 익명화해 uq_users_sns 제약을 해제하므로, 탈퇴한 계정은 원본 snsId로 더 이상 조회되지 않는다.
+        given(kakaoOAuthClient.getUserInfo("kakao-token"))
+                .willReturn(new KakaoOAuthClient.KakaoUserInfo("sns-300", "user300@example.com"));
+        given(userRepository.findBySnsProviderAndSnsId(SnsProvider.KAKAO, "sns-300")).willReturn(Optional.empty());
+        User rejoinedUser = user(301L);
+        given(userRegistrationService.registerViaSns(SnsProvider.KAKAO, "sns-300", "user300@example.com", null))
+                .willReturn(rejoinedUser);
+        given(jwtTokenProvider.createAccessToken(301L)).willReturn("access-token");
+        given(jwtTokenProvider.createRefreshToken(301L)).willReturn("refresh-token");
+        given(jwtTokenProvider.refreshTokenExpiryFromNow()).willReturn(LocalDateTime.now().plusDays(14));
+
+        AuthResult result = authService.loginWithKakao("kakao-token");
+
+        assertThat(result.isNewUser()).isTrue();
+        verify(userRegistrationService).registerViaSns(SnsProvider.KAKAO, "sns-300", "user300@example.com", null);
+    }
+
+    @Test
     @DisplayName("처음 로그인하는 애플 사용자는 신규 가입되고 isNewUser가 true다")
     void loginWithAppleSignsUpNewUser() {
         given(appleOAuthClient.getUserInfo("apple-token"))
@@ -246,6 +266,25 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.loginWithApple("apple-token", null, null, null))
                 .isInstanceOf(AuthException.class);
+    }
+
+    @Test
+    @DisplayName("탈퇴 후 같은 애플 계정으로 재로그인하면 신규 계정으로 가입된다")
+    void loginWithAppleSignsUpAsNewUserAfterWithdrawal() {
+        given(appleOAuthClient.getUserInfo("apple-token"))
+                .willReturn(new AppleOAuthClient.AppleUserInfo("apple-sns-300", "apple300@example.com", "com.palang.app"));
+        given(userRepository.findBySnsProviderAndSnsId(SnsProvider.APPLE, "apple-sns-300")).willReturn(Optional.empty());
+        User rejoinedUser = user(301L, SnsProvider.APPLE);
+        given(userRegistrationService.registerViaSns(SnsProvider.APPLE, "apple-sns-300", "apple300@example.com", null))
+                .willReturn(rejoinedUser);
+        given(jwtTokenProvider.createAccessToken(301L)).willReturn("access-token");
+        given(jwtTokenProvider.createRefreshToken(301L)).willReturn("refresh-token");
+        given(jwtTokenProvider.refreshTokenExpiryFromNow()).willReturn(LocalDateTime.now().plusDays(14));
+
+        AuthResult result = authService.loginWithApple("apple-token", null, null, null);
+
+        assertThat(result.isNewUser()).isTrue();
+        verify(userRegistrationService).registerViaSns(SnsProvider.APPLE, "apple-sns-300", "apple300@example.com", null);
     }
 
     @Test

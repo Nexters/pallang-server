@@ -97,16 +97,31 @@ class UserTest {
     }
 
     @Test
-    @DisplayName("탈퇴하면 닉네임과 sns_id가 익명화되어 같은 SNS 계정으로 재가입할 수 있게 된다")
+    @DisplayName("탈퇴하면 닉네임과 snsId가 익명화되어 같은 SNS 계정으로 재가입할 수 있게 된다")
     void withdrawAnonymizesNicknameAndSnsId() {
-        User user = User.builder().nickname("기존닉네임").snsProvider(SnsProvider.APPLE).snsId("apple-sub-1").build();
+        User user = User.builder().nickname("기존닉네임").snsProvider(SnsProvider.KAKAO).snsId("kakao-123").build();
+        ReflectionTestUtils.setField(user, "id", 42L);
 
         user.withdraw();
 
         assertThat(user.isWithdrawn()).isTrue();
         assertThat(user.getWithdrawnAt()).isNotNull();
-        assertThat(user.getNickname()).isNotEqualTo("기존닉네임");
-        // 원래 sns_id로는 더 이상 찾을 수 없어야, 같은 SNS 계정으로 다시 로그인할 때 새 계정을 만들 수 있다.
-        assertThat(user.getSnsId()).isNotEqualTo("apple-sub-1").contains("apple-sub-1");
+        assertThat(user.getNickname()).isEqualTo("탈퇴한 사용자42");
+        assertThat(user.getSnsId())
+                .startsWith("withdrawn:")
+                .hasSize(74)
+                .doesNotContain("kakao-123");
+    }
+
+    @Test
+    @DisplayName("애플 sub처럼 snsId가 최대 길이(255자)여도 익명화된 값은 sns_id 컬럼 길이를 넘지 않는다")
+    void withdrawAnonymizedSnsIdFitsWithinColumnLengthEvenForMaxLengthAppleSub() {
+        String maxLengthAppleSub = "a".repeat(255);
+        User user = User.builder().nickname("기존닉네임").snsProvider(SnsProvider.APPLE).snsId(maxLengthAppleSub).build();
+        ReflectionTestUtils.setField(user, "id", 999_999_999_999L);
+
+        user.withdraw();
+
+        assertThat(user.getSnsId()).hasSizeLessThanOrEqualTo(255);
     }
 }
