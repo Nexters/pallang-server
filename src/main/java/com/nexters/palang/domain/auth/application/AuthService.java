@@ -133,13 +133,15 @@ public class AuthService {
                 .ifPresent(RefreshToken::revoke);
     }
 
-    // 카카오 연동 해제와 세션 무효화는 회원탈퇴의 도메인 규칙(소프트 삭제)이 아니라 auth 인프라(외부 API,
-    // 토큰 저장소)에 걸친 부수효과라 여기서 오케스트레이션하고, 실제 탈퇴 상태 변경은 UserService에 위임한다.
+    // 카카오/애플 연동 해제와 세션 무효화는 회원탈퇴의 도메인 규칙(소프트 삭제)이 아니라 auth 인프라(외부
+    // API, 토큰 저장소)에 걸친 부수효과라 여기서 오케스트레이션하고, 실제 탈퇴 상태 변경은 UserService에 위임한다.
     @Transactional
     public void withdraw(Long userId) {
         User user = getActiveUser(userId);
         if (user.getSnsProvider() == SnsProvider.KAKAO) {
             unlinkKakao(user.getSnsId());
+        } else if (user.getSnsProvider() == SnsProvider.APPLE) {
+            revokeApple(user.getAppleRefreshToken());
         }
         refreshTokenRepository.revokeAllByUserId(userId);
         userService.withdraw(userId);
@@ -151,6 +153,20 @@ public class AuthService {
             kakaoOAuthClient.unlink(snsId);
         } catch (AuthException e) {
             log.warn("카카오 연동 해제에 실패했습니다. snsId={}", snsId, e);
+        }
+    }
+
+    // 로그인 시 authorizationCode 교환이 실패했거나 한 번도 안 됐던 유저는 refresh token이 없어
+    // revoke 자체를 시도할 수 없다 — 이 경우도 탈퇴를 막지 않고 넘어간다.
+    private void revokeApple(String appleRefreshToken) {
+        if (appleRefreshToken == null) {
+            log.warn("애플 refresh token이 없어 연동 해제를 건너뜁니다.");
+            return;
+        }
+        try {
+            appleAuthClient.revoke(appleRefreshToken);
+        } catch (AuthException e) {
+            log.warn("애플 연동 해제에 실패했습니다.", e);
         }
     }
 

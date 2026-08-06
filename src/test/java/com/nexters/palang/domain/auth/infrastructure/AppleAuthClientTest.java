@@ -30,7 +30,7 @@ class AppleAuthClientTest {
                 + Base64.getEncoder().encodeToString(keyPair.getPrivate().getEncoded())
                 + "\n-----END PRIVATE KEY-----";
 
-        AppleAuthClient appleAuthClient = new AppleAuthClient(null, TEAM_ID, KEY_ID, pem);
+        AppleAuthClient appleAuthClient = new AppleAuthClient(null, TEAM_ID, KEY_ID, CLIENT_ID, pem);
 
         String clientSecret = appleAuthClient.buildClientSecret(CLIENT_ID);
 
@@ -43,11 +43,19 @@ class AppleAuthClientTest {
     @Test
     @DisplayName("private key가 설정되지 않으면 authorizationCode 교환을 건너뛰고 빈 값을 반환한다")
     void exchangeForRefreshTokenIsNoOpWhenPrivateKeyMissing() {
-        AppleAuthClient appleAuthClient = new AppleAuthClient(null, TEAM_ID, KEY_ID, "");
+        AppleAuthClient appleAuthClient = new AppleAuthClient(null, TEAM_ID, KEY_ID, CLIENT_ID, "");
 
         Optional<String> result = appleAuthClient.exchangeForRefreshToken("auth-code", CLIENT_ID);
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("private key가 설정되지 않으면 연동 해제(revoke)도 건너뛰고 예외를 던지지 않는다")
+    void revokeIsNoOpWhenPrivateKeyMissing() {
+        AppleAuthClient appleAuthClient = new AppleAuthClient(null, TEAM_ID, KEY_ID, CLIENT_ID, "");
+
+        appleAuthClient.revoke("apple-refresh-token");
     }
 
     private Claims parseWithPublicKey(String jwt, PublicKey publicKey) {

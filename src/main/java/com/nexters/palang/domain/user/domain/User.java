@@ -151,10 +151,14 @@ public class User extends BaseEntity {
         this.appleRefreshToken = appleRefreshToken;
     }
 
+    // 탈퇴해도 이 계정과 이 계정이 남긴 콘텐츠(흔적/댓글 등)는 "탈퇴한 사용자"로 영구히 고정된다 — 되살리지
+    // 않는다. 대신 nickname/snsId를 익명화해 유니크 제약(nickname, sns_provider+sns_id)에서 해제함으로써,
+    // 같은 SNS 계정으로 다시 로그인하면 완전히 새 계정으로 가입되게 한다(FR-AUTH 탈퇴/재가입 정책).
+    // 탈퇴 후 영구히 재가입이 막히면 애플 심사(같은 테스트 계정으로 탈퇴/재가입 반복 테스트)에서 문제가 될
+    // 수 있어, "이 계정을 되살리는" 대신 "이 식별자로 새 계정을 또 만들 수 있게" 하는 방식을 택했다.
     public void withdraw() {
         this.isWithdrawn = true;
         this.withdrawnAt = LocalDateTime.now();
-        // unique 제약(nickname) 해제를 위해 탈퇴 시점에 닉네임을 익명화한다.
         this.nickname = "탈퇴한 사용자" + this.id;
         // unique 제약(sns_provider+sns_id) 해제를 위해 이 row(탈퇴한 계정)만의 snsId를 고정 길이 해시로
         // 되돌릴 수 없게 바꾼다. registerViaSns로 만들어지는 새 계정의 snsId에는 관여하지 않는다.

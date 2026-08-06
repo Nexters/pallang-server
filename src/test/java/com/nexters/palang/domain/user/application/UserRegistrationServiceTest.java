@@ -93,4 +93,16 @@ class UserRegistrationServiceTest {
                 .isInstanceOf(DataIntegrityViolationException.class);
         verify(userRepository, times(1)).saveAndFlush(any());
     }
+
+    @Test
+    @DisplayName("탈퇴 후 같은 SNS 식별자로 재가입하면(탈퇴 시 sns_id가 익명화돼 있어) 완전히 새 계정으로 가입된다")
+    void registerViaSnsSucceedsForPreviouslyWithdrawnSnsId() {
+        given(nicknameGenerator.generateBase()).willReturn("고요한책갈피");
+        given(userRepository.saveAndFlush(any(User.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        User user = userRegistrationService.registerViaSns(SnsProvider.APPLE, "apple-sub-1", null, null);
+
+        assertThat(user.isWithdrawn()).isFalse();
+        assertThat(user.getSnsId()).isEqualTo("apple-sub-1");
+    }
 }
