@@ -150,5 +150,9 @@ public class User extends BaseEntity {
         this.withdrawnAt = LocalDateTime.now();
         // unique 제약(nickname) 해제를 위해 탈퇴 시점에 닉네임을 익명화한다.
         this.nickname = "탈퇴한 사용자" + this.id;
+        // unique 제약(sns_provider+sns_id) 해제를 위해 원본 snsId를 보존한 채 접두사를 붙인다.
+        // 같은 SNS 계정으로 재로그인하면 findBySnsProviderAndSnsId가 이 row를 더 이상 찾지 못해
+        // 신규 가입 경로를 타므로, 탈퇴는 되돌릴 수 없는 익명화로 유지되고 재가입은 새 계정으로 시작한다.
+        this.snsId = "withdrawn:" + this.id + ":" + this.snsId;
     }
 }

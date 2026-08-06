@@ -95,4 +95,18 @@ class UserTest {
 
         assertThat(user.isHasCompletedOnboarding()).isTrue();
     }
+
+    @Test
+    @DisplayName("탈퇴하면 닉네임과 snsId가 익명화되어 같은 SNS 계정으로 재가입할 수 있게 된다")
+    void withdrawAnonymizesNicknameAndSnsId() {
+        User user = User.builder().nickname("기존닉네임").snsProvider(SnsProvider.KAKAO).snsId("kakao-123").build();
+        ReflectionTestUtils.setField(user, "id", 42L);
+
+        user.withdraw();
+
+        assertThat(user.isWithdrawn()).isTrue();
+        assertThat(user.getWithdrawnAt()).isNotNull();
+        assertThat(user.getNickname()).isEqualTo("탈퇴한 사용자42");
+        assertThat(user.getSnsId()).isEqualTo("withdrawn:42:kakao-123");
+    }
 }
