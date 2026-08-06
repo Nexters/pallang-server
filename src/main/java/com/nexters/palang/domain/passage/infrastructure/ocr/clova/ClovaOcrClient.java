@@ -6,7 +6,6 @@ import com.nexters.palang.domain.passage.common.error.PassageErrorCode;
 import com.nexters.palang.domain.passage.infrastructure.ocr.OcrClient;
 import com.nexters.palang.domain.passage.infrastructure.ocr.OcrTextBlock;
 import com.nexters.palang.domain.passage.common.error.PassageException;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.core.io.ByteArrayResource;
@@ -44,18 +43,22 @@ public class ClovaOcrClient implements OcrClient {
 
         ClovaOcrResponse response = requestOcr(bodyBuilder);
 
-        List<OcrTextBlock> blocks = response.images().get(0).fields().stream()
-                .map(this::toTextBlock)
-                // Clova는 필드를 읽기 순서로 보장하지 않으므로, 좌상단 좌표 기준으로 재정렬
-                .sorted(Comparator.comparingDouble((OcrTextBlock block) -> block.boundingBox().topY())
-                        .thenComparingDouble(block -> block.boundingBox().leftX()))
-                .toList();
+        List<OcrTextBlock> blocks = toOrderedTextBlocks(response.images().get(0).fields());
 
         if (blocks.isEmpty()) {
             throw new PassageException(PassageErrorCode.OCR_TEXT_NOT_FOUND);
         }
 
         return blocks;
+    }
+
+    // Clova는 같은 줄의 단어들을 순서대로 반환하고 각 줄의 마지막 단어에 lineBreak=true를 표시한다.
+    // 단어별 바운딩 박스 좌표(특히 topY)는 사진 기울기·글자 높이 차이로 흔들려 좌표 재정렬 시 줄이 뒤섞이므로,
+    // 좌표로 다시 정렬하지 않고 Clova가 준 원본 순서를 그대로 신뢰한다.
+    List<OcrTextBlock> toOrderedTextBlocks(List<ClovaOcrResponse.Field> fields) {
+        return fields.stream()
+                .map(this::toTextBlock)
+                .toList();
     }
 
     // 클로바 OCR API에 HTTP POST 요청 보내기
