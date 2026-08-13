@@ -1,0 +1,35 @@
+# Pallang API 리버스 프록시 설정
+# app 컨테이너는 127.0.0.1:8080 으로만 노출된다 (외부는 반드시 이 Nginx를 거친다).
+# 443 서버 블록과 HTTP->HTTPS 리다이렉트는 certbot이 자동으로 추가한다.
+
+upstream pallang_app {
+    server 127.0.0.1:8080;
+    keepalive 32;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __DOMAIN__;
+
+    # application.yaml의 multipart 최대 크기(10MB)와 맞춤
+    client_max_body_size 10m;
+
+    access_log /var/log/nginx/pallang.access.log;
+    error_log  /var/log/nginx/pallang.error.log;
+
+    location / {
+        proxy_pass http://pallang_app;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+}

@@ -1,0 +1,74 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: palang
+
+  # 1. 데이터베이스 설정
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+
+  # 2. JPA 설정 (Hibernate)
+  jackson:
+    time-zone: Asia/Seoul
+  jpa:
+    database: mysql
+    database-platform: org.hibernate.dialect.MySQLDialect
+    hibernate:
+      # 운영에서는 스키마를 자동 변경하지 않는다. 마이그레이션 도구(Flyway/Liquibase) 도입 전까지는
+      # 스키마를 미리 반영해두고 검증만 수행한다. 스키마가 자주 바뀌는 환경은 application-dev.yaml을 쓸 것.
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          time_zone: Asia/Seoul
+    open-in-view: false
+
+  # 3. 캐시/세션용 Redis 설정
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+  # 4. 파일 업로드 설정 (OCR용 이미지 업로드)
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  # 5. 네이버 클로바 OCR 연동 설정
+  clova:
+    ocr:
+      invoke-url: ${CLOVA_OCR_INVOKE_URL:}
+      secret-key: ${CLOVA_OCR_SECRET_KEY:}
+
+aladin:
+  base-url: https://www.aladin.co.kr/ttb/api
+  ttb-key: ${ALADIN_TTB_KEY:}
+
+kakao:
+  base-url: https://kapi.kakao.com
+  admin-key: ${KAKAO_ADMIN_KEY:}
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration-seconds: ${JWT_ACCESS_EXPIRATION_SECONDS:3600}
+  refresh-token-expiration-seconds: ${JWT_REFRESH_EXPIRATION_SECONDS:1209600}
+
+# CORS 허용 origin (운영 도메인)
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:https://www.pallang.co.kr,https://pallang.co.kr}
+
+logging:
+  level:
+    root: INFO
+    com.nexters.palang: INFO

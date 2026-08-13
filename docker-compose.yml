@@ -1,0 +1,96 @@
+# 운영 서버 배포용 compose 파일 (app + mysql + redis).
+# Nginx는 컨테이너로 띄우지 않고 호스트에 직접 설치한다 (deploy/nginx, deploy/scripts 참고).
+#
+# 사용법:
+#   - 수동 배포: cp deploy/.env.example .env 후 값 채우고 docker compose up -d --build
+#     (IMAGE_TAG 미지정 시 latest로 로컬 빌드)
+#   - CD(.github/workflows/cd.yml) 배포: 서버에서 IMAGE_TAG를 export한 뒤
+#     docker compose pull && docker compose up -d --remove-orphans 실행
+#     (ghcr.io/nexters/pallang-server 이미지를 그대로 pull, 로컬 재빌드 없음)
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/nexters/pallang-server:${IMAGE_TAG:-latest}
+    container_name: pallang-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # dev 서버는 .env에 SPRING_PROFILES_ACTIVE=dev를 넣어서 이 기본값을 덮어쓴다.
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE}?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      DB_USERNAME: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      IMAGE_UPLOAD_DIR: ${IMAGE_UPLOAD_DIR:-/app/uploads}
+      # mysql 서비스와 동일하게 컨테이너 시간대를 KST로 맞춘다. LocalDateTime.now()(BaseEntity의
+      # @CreatedDate/@LastModifiedDate 등)는 JVM 기본 시간대를 따르는데, 이게 없으면 컨테이너 OS
+      # 기본값인 UTC로 떠서 생성/수정 시각이 9시간 느리게 기록된다.
+      TZ: Asia/Seoul
+    # deploy/nginx/pallang.conf.template의 upstream이 127.0.0.1:8080을 하드코딩하고 있으므로
+    # 호스트 포트를 가변으로 두지 않는다 (바꾸려면 이 파일과 nginx 템플릿을 함께 수정할 것).
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # 업로드된 이미지(책 표지, 프로필)를 컨테이너 재배포 후에도 유지한다.
+      - uploads-data:/app/uploads
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - pallang-net
+
+  mysql:
+    image: mysql:8.0
+    container_name: pallang-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+09:00
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - pallang-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: pallang-redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - pallang-net
+
+volumes:
+  mysql-data:
+  redis-data:
+  uploads-data:
+
+networks:
+  pallang-net:
+    driver: bridge

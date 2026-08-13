@@ -57,6 +57,9 @@ out/
 *.jks
 *.pem
 *.key
+*.p8
+application-local.yaml
+application-local.yml
 
 ### OS ###
 .DS_Store
@@ -66,3 +69,8 @@ desktop.ini
 ### Logs ###
 *.log
 logs/
+
+### QueryDSL ###
+src/main/generated/
+
+*.env

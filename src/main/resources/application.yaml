@@ -1,3 +1,36 @@
 spring:
   application:
     name: palang
+  profiles:
+    active: local
+
+aladin:
+  base-url: https://www.aladin.co.kr/ttb/api
+  ttb-key: ${ALADIN_TTB_KEY:}
+
+kakao:
+  base-url: https://kapi.kakao.com
+  admin-key: ${KAKAO_ADMIN_KEY:}
+
+apple:
+  base-url: https://appleid.apple.com
+  web-client-id: ${APPLE_WEB_CLIENT_ID:}
+  app-client-id: ${APPLE_APP_CLIENT_ID:}
+
+  team-id: ${APPLE_TEAM_ID:}
+  key-id: ${APPLE_KEY_ID:}
+  private-key: ${APPLE_PRIVATE_KEY:}
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
+jwt:
+  secret: ${JWT_SECRET:local-dev-jwt-secret-key-please-change-this-01234567890123456789}
+  access-token-expiration-seconds: ${JWT_ACCESS_EXPIRATION_SECONDS:3600}
+  refresh-token-expiration-seconds: ${JWT_REFRESH_EXPIRATION_SECONDS:1209600}
+
+# 이미지 업로드 저장 경로. 가비아 상용 클라우드에는 오브젝트 스토리지 상품이 없어
+# 서버(Docker volume)에 직접 저장하고 /images/** 경로로 서빙한다.
+storage:
+  upload-dir: ${IMAGE_UPLOAD_DIR:./uploads}
+  base-url: /images

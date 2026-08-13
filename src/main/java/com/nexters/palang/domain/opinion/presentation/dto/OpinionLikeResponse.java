@@ -1,0 +1,15 @@
+package com.nexters.palang.domain.opinion.presentation.dto;
+
+import com.nexters.palang.domain.opinion.application.OpinionLikeResult;
+import io.swagger.v3.oas.annotations.media.Schema;
+
+public record OpinionLikeResponse(
+        @Schema(example = "1", requiredMode = Schema.RequiredMode.REQUIRED) Long opinionId,
+        @Schema(example = "true", requiredMode = Schema.RequiredMode.REQUIRED) boolean liked,
+        @Schema(example = "42", requiredMode = Schema.RequiredMode.REQUIRED) int likeCount
+) {
+
+    public static OpinionLikeResponse from(OpinionLikeResult result) {
+        return new OpinionLikeResponse(result.opinionId(), result.liked(), result.likeCount());
+    }
+}
