@@ -25,7 +25,7 @@ public class BookQueryRepository {
     private final JPAQueryFactory queryFactory;
 
     // 띄어쓰기 차이를 무시하고 검색할 수 있도록 제목/키워드 모두에서 공백을 제거한 뒤 비교한다.
-    // 흔적(Opinion)이 하나도 없는 도서는 결과에서 제외하므로 leftJoin이 아닌 innerJoin을 사용한다.
+    // 흔적(Opinion)/대목(Passage) 유무와 무관하게 DB에 저장된 도서 전부를 대상으로 하므로 leftJoin을 사용한다.
     public Page<BookSearchProjection> searchByTitle(String keyword, BookSearchSort sort, Pageable pageable) {
         QBook book = QBook.book;
         QPassage passage = QPassage.passage;
@@ -40,8 +40,8 @@ public class BookQueryRepository {
                         book.isbn, book.coverImageUrl, book.source,
                         passage.countDistinct(), opinion.countDistinct()))
                 .from(book)
-                .innerJoin(passage).on(passage.book.eq(book))
-                .innerJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
+                .leftJoin(passage).on(passage.book.eq(book))
+                .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .where(normalizedTitle.containsIgnoreCase(normalizedKeyword))
                 .groupBy(book.id, book.title, book.author, book.publisher, book.pageCount,
                         book.isbn, book.coverImageUrl, book.source)
@@ -50,11 +50,10 @@ public class BookQueryRepository {
                 .limit(pageable.getPageSize())
                 .fetch();
 
+        // 흔적/대목 유무로 필터링하지 않으므로 count 쪽은 join 없이 제목 조건만으로 센다.
         Long total = queryFactory
                 .select(book.countDistinct())
                 .from(book)
-                .innerJoin(passage).on(passage.book.eq(book))
-                .innerJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .where(normalizedTitle.containsIgnoreCase(normalizedKeyword))
                 .fetchOne();
 
