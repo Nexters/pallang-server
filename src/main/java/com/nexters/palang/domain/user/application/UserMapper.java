@@ -24,8 +24,8 @@ public final class UserMapper {
 
     public static MyOpinionResponse toMyOpinionResponse(MyOpinionProjection projection) {
         return new MyOpinionResponse(
-                projection.opinionId(), projection.bookId(), projection.bookTitle(), projection.bookCoverImageUrl(),
-                projection.passageId(), projection.quotedText(), projection.pageNumber(),
+                projection.opinionId(), projection.bookId(), projection.bookTitle(), projection.author(),
+                projection.bookCoverImageUrl(), projection.passageId(), projection.quotedText(), projection.pageNumber(),
                 projection.content(), projection.likeCount(), projection.createdAt());
     }
 
