@@ -19,6 +19,7 @@ import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.application.BookSearchSort;
 import com.nexters.palang.domain.book.application.BookService;
 import com.nexters.palang.domain.book.application.ExternalBookResult;
+import com.nexters.palang.domain.book.application.OpinionCountScope;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.book.presentation.dto.CreateBookRequest;
@@ -180,17 +181,31 @@ class BookControllerTest {
     }
 
     @Test
-    @DisplayName("내 서재 도서 목록을 요청하면 현재 사용자 기준으로 조회한다")
+    @DisplayName("내 서재 도서 목록을 요청하면 현재 사용자 기준, opinionCountScope 기본값 ALL로 조회한다")
     void getMyLibraryBooks() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(bookService.getMyLibraryBooks(eq(1L), isNull(), anyInt())).willReturn(
-                new BookCarouselPage(List.of(new BookActivityProjection(1L, "제목", "작가", "cover", 3, 7)), 0, 20, 1));
+        given(bookService.getMyLibraryBooks(eq(1L), any(Pageable.class), eq(OpinionCountScope.ALL))).willReturn(
+                new PageImpl<>(List.of(new BookActivityProjection(1L, "제목", "작가", "cover", 3, 7)),
+                        DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/my-library"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.books[0].bookId").value(1))
                 .andExpect(jsonPath("$.data.books[0].passageCount").value(3))
                 .andExpect(jsonPath("$.data.books[0].opinionCount").value(7));
+    }
+
+    @Test
+    @DisplayName("내 서재 도서 목록 조회 시 opinionCountScope=MINE을 지정하면 그대로 서비스에 전달한다")
+    void getMyLibraryBooksWithMineScope() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(bookService.getMyLibraryBooks(eq(1L), any(Pageable.class), eq(OpinionCountScope.MINE))).willReturn(
+                new PageImpl<>(List.of(new BookActivityProjection(1L, "제목", "작가", "cover", 3, 2)),
+                        DEFAULT_PAGEABLE, 1));
+
+        mockMvc.perform(get("/api/books/my-library").param("opinionCountScope", "MINE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.books[0].opinionCount").value(2));
     }
 
     @Test

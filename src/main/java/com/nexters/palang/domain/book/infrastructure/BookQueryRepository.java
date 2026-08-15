@@ -3,13 +3,16 @@ package com.nexters.palang.domain.book.infrastructure;
 import com.nexters.palang.domain.book.application.BookActivityProjection;
 import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.application.BookSearchSort;
+import com.nexters.palang.domain.book.application.OpinionCountScope;
 import com.nexters.palang.domain.book.domain.QBook;
 import com.nexters.palang.domain.opinion.domain.QOpinion;
 import com.nexters.palang.domain.passage.domain.QPassage;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.core.types.dsl.StringExpression;
+import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -94,32 +97,45 @@ public class BookQueryRepository {
         return countBooksWithPassages();
     }
 
-    // 내 서재는 로그인한 사용자가 흔적(Opinion)을 남긴 도서만 대상으로 하되, 대목/흔적 수는 홈 캐러셀과 동일하게
-    // 도서 전체 기준으로 보여준다. 정렬 기준은 사용자가 해당 도서에 남긴 가장 최근 흔적 시각이다(최신순).
-    public List<BookActivityProjection> findMyLibraryBooks(Long userId, long offset, int limit) {
+    // 내 서재는 로그인한 사용자가 흔적(Opinion)을 남긴 도서만 대상으로 한다. 대목 수는 홈 캐러셀과 동일하게
+    // 도서 전체 기준으로 보여주지만, 흔적 수는 opinionCountScope에 따라 도서 전체(ALL, 홈 노출용) 또는
+    // 로그인 사용자 본인이 남긴 것(MINE, 마이페이지 노출용)만 집계한다. 정렬 기준은 스코프와 무관하게 사용자가
+    // 해당 도서에 남긴 가장 최근 흔적 시각이다(최신순).
+    public Page<BookActivityProjection> findMyLibraryBooks(
+            Long userId, Pageable pageable, OpinionCountScope opinionCountScope) {
         QBook book = QBook.book;
         QPassage passage = QPassage.passage;
         QOpinion opinionMine = new QOpinion("opinionMine");
         QOpinion opinionAll = new QOpinion("opinionAll");
 
-        return queryFactory
+        NumberExpression<Long> opinionCount = opinionCountScope == OpinionCountScope.MINE
+                ? opinionMine.countDistinct()
+                : opinionAll.countDistinct();
+
+        JPAQuery<BookActivityProjection> query = queryFactory
                 .select(Projections.constructor(BookActivityProjection.class,
                         book.id, book.title, book.author, book.coverImageUrl,
-                        passage.countDistinct(), opinionAll.countDistinct()))
+                        passage.countDistinct(), opinionCount))
                 .from(book)
                 .innerJoin(passage).on(passage.book.eq(book))
                 .innerJoin(opinionMine).on(opinionMine.passage.eq(passage)
                         .and(opinionMine.user.id.eq(userId))
-                        .and(opinionMine.deletedAt.isNull()))
-                .leftJoin(opinionAll).on(opinionAll.passage.eq(passage).and(opinionAll.deletedAt.isNull()))
+                        .and(opinionMine.deletedAt.isNull()));
+        if (opinionCountScope == OpinionCountScope.ALL) {
+            query = query.leftJoin(opinionAll).on(opinionAll.passage.eq(passage).and(opinionAll.deletedAt.isNull()));
+        }
+
+        List<BookActivityProjection> content = query
                 .groupBy(book.id, book.title, book.author, book.coverImageUrl)
                 .orderBy(opinionMine.createdAt.max().desc(), book.id.asc())
-                .offset(offset)
-                .limit(limit)
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
                 .fetch();
+
+        return new PageImpl<>(content, pageable, countMyLibraryBooks(userId));
     }
 
-    public long countMyLibraryBooks(Long userId) {
+    private long countMyLibraryBooks(Long userId) {
         QBook book = QBook.book;
         QPassage passage = QPassage.passage;
         QOpinion opinionMine = QOpinion.opinion;

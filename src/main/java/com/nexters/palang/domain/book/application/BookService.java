@@ -81,13 +81,9 @@ public class BookService {
         return Math.max(0, (total - size) / 2);
     }
 
-    // 내 서재는 홈 캐러셀과 달리 가운데 기준 없이 최근 흔적 순으로 나열한다.
-    // findMyLibraryBooks가 이미 최근 흔적 순으로 정렬해 반환하므로, offset을 지정하지 않으면 0(=가장 최근 도서부터)을 사용한다.
-    public BookCarouselPage getMyLibraryBooks(Long userId, Long offset, int size) {
-        long total = bookQueryRepository.countMyLibraryBooks(userId);
-        long resolvedOffset = offset != null ? Math.max(0, offset) : 0;
-        List<BookActivityProjection> books = bookQueryRepository.findMyLibraryBooks(userId, resolvedOffset, size);
-        return new BookCarouselPage(books, resolvedOffset, size, total);
+    // 내 서재는 홈 캐러셀과 달리 가운데 기준 없이 최근 흔적 순으로 나열하며, 표준 page/size 페이지네이션을 사용한다.
+    public Page<BookActivityProjection> getMyLibraryBooks(Long userId, Pageable pageable, OpinionCountScope opinionCountScope) {
+        return bookQueryRepository.findMyLibraryBooks(userId, pageable, opinionCountScope);
     }
 
     public Page<Book> getRecentBooks(Long userId, Pageable pageable) {
