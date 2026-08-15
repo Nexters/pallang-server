@@ -81,7 +81,7 @@ public class BookService {
         return Math.max(0, (total - size) / 2);
     }
 
-    // 내 서재는 홈 캐러셀과 달리 "전체 목록의 중간"이 아니라 "내가 가장 최근에 남긴 흔적"이 가운데에 와야 한다.
+    // 내 서재는 홈 캐러셀과 달리 가운데 기준 없이 최근 흔적 순으로 나열한다.
     // findMyLibraryBooks가 이미 최근 흔적 순으로 정렬해 반환하므로, offset을 지정하지 않으면 0(=가장 최근 도서부터)을 사용한다.
     public BookCarouselPage getMyLibraryBooks(Long userId, Long offset, int size) {
         long total = bookQueryRepository.countMyLibraryBooks(userId);

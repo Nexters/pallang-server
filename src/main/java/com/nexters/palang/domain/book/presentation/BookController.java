@@ -78,7 +78,7 @@ public class BookController implements BookApi {
     }
 
     @Override
-    @GetMapping("/api/home/my-library")
+    @GetMapping("/api/books/my-library")
     public ResponseEntity<DataResponse<BookCarouselListResponse>> getMyLibraryBooks(
             @RequestParam(required = false) Long offset,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {

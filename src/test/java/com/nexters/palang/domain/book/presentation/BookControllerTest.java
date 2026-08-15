@@ -186,7 +186,7 @@ class BookControllerTest {
         given(bookService.getMyLibraryBooks(eq(1L), isNull(), anyInt())).willReturn(
                 new BookCarouselPage(List.of(new BookActivityProjection(1L, "제목", "작가", "cover", 3, 7)), 0, 20, 1));
 
-        mockMvc.perform(get("/api/home/my-library"))
+        mockMvc.perform(get("/api/books/my-library"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.books[0].bookId").value(1))
                 .andExpect(jsonPath("$.data.books[0].passageCount").value(3))
@@ -198,7 +198,7 @@ class BookControllerTest {
     void getMyLibraryBooksFailsWhenUnauthenticated() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willThrow(new LoginRequiredException());
 
-        mockMvc.perform(get("/api/home/my-library"))
+        mockMvc.perform(get("/api/books/my-library"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.title").value("AUTH_401_1"));
     }

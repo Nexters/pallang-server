@@ -95,7 +95,7 @@ public class BookQueryRepository {
     }
 
     // 내 서재는 로그인한 사용자가 흔적(Opinion)을 남긴 도서만 대상으로 하되, 대목/흔적 수는 홈 캐러셀과 동일하게
-    // 도서 전체 기준으로 보여준다. 가운데 정렬 기준은 사용자가 해당 도서에 남긴 가장 최근 흔적 시각이다.
+    // 도서 전체 기준으로 보여준다. 정렬 기준은 사용자가 해당 도서에 남긴 가장 최근 흔적 시각이다(최신순).
     public List<BookActivityProjection> findMyLibraryBooks(Long userId, long offset, int limit) {
         QBook book = QBook.book;
         QPassage passage = QPassage.passage;
