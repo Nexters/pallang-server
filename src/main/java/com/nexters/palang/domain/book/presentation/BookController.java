@@ -78,6 +78,17 @@ public class BookController implements BookApi {
     }
 
     @Override
+    @GetMapping("/api/books/my-library")
+    public ResponseEntity<DataResponse<BookCarouselListResponse>> getMyLibraryBooks(
+            @RequestParam(required = false) Long offset,
+            @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        int clampedSize = Math.clamp(size, 1, MAX_SIZE);
+        return ResponseEntity.ok(DataResponse.from(
+                BookMapper.toCarouselListResponse(bookService.getMyLibraryBooks(currentUserId, offset, clampedSize))));
+    }
+
+    @Override
     @GetMapping("/api/books/recent")
     public ResponseEntity<DataResponse<BookListResponse>> getRecentBooks(
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,

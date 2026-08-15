@@ -27,7 +27,7 @@ public class BookQueryRepository {
     // 띄어쓰기 차이를 무시하고 검색할 수 있도록, 저장 시점에 미리 정규화(공백 제거 + 소문자)해둔
     // title_normalized 컬럼(인덱스 적용, Book#normalizeTitle 참고)을 기준으로 비교한다. 매 검색마다
     // title에 함수를 걸어 계산하지 않아도 되고, 자동완성처럼 반복 호출되는 경로에서 유리하다.
-    // 흔적(Opinion)이 하나도 없는 도서는 결과에서 제외하므로 leftJoin이 아닌 innerJoin을 사용한다.
+    // 흔적(Opinion)/대목(Passage) 유무와 무관하게 DB에 저장된 도서 전부를 대상으로 하므로 leftJoin을 사용한다.
     public Page<BookSearchProjection> searchByTitle(String keyword, BookSearchSort sort, Pageable pageable) {
         QBook book = QBook.book;
         QPassage passage = QPassage.passage;
@@ -41,8 +41,8 @@ public class BookQueryRepository {
                         book.isbn, book.coverImageUrl, book.source,
                         passage.countDistinct(), opinion.countDistinct()))
                 .from(book)
-                .innerJoin(passage).on(passage.book.eq(book))
-                .innerJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
+                .leftJoin(passage).on(passage.book.eq(book))
+                .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .where(book.titleNormalized.contains(normalizedKeyword))
                 .groupBy(book.id, book.title, book.author, book.publisher, book.pageCount,
                         book.isbn, book.coverImageUrl, book.source)
@@ -51,11 +51,10 @@ public class BookQueryRepository {
                 .limit(pageable.getPageSize())
                 .fetch();
 
+        // 흔적/대목 유무로 필터링하지 않으므로 count 쪽은 join 없이 제목 조건만으로 센다.
         Long total = queryFactory
                 .select(book.countDistinct())
                 .from(book)
-                .innerJoin(passage).on(passage.book.eq(book))
-                .innerJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .where(book.titleNormalized.contains(normalizedKeyword))
                 .fetchOne();
 
@@ -106,6 +105,47 @@ public class BookQueryRepository {
 
     public long countCarouselBooks() {
         return countBooksWithPassages();
+    }
+
+    // 내 서재는 로그인한 사용자가 흔적(Opinion)을 남긴 도서만 대상으로 하되, 대목/흔적 수는 홈 캐러셀과 동일하게
+    // 도서 전체 기준으로 보여준다. 정렬 기준은 사용자가 해당 도서에 남긴 가장 최근 흔적 시각이다(최신순).
+    public List<BookActivityProjection> findMyLibraryBooks(Long userId, long offset, int limit) {
+        QBook book = QBook.book;
+        QPassage passage = QPassage.passage;
+        QOpinion opinionMine = new QOpinion("opinionMine");
+        QOpinion opinionAll = new QOpinion("opinionAll");
+
+        return queryFactory
+                .select(Projections.constructor(BookActivityProjection.class,
+                        book.id, book.title, book.author, book.coverImageUrl,
+                        passage.countDistinct(), opinionAll.countDistinct()))
+                .from(book)
+                .innerJoin(passage).on(passage.book.eq(book))
+                .innerJoin(opinionMine).on(opinionMine.passage.eq(passage)
+                        .and(opinionMine.user.id.eq(userId))
+                        .and(opinionMine.deletedAt.isNull()))
+                .leftJoin(opinionAll).on(opinionAll.passage.eq(passage).and(opinionAll.deletedAt.isNull()))
+                .groupBy(book.id, book.title, book.author, book.coverImageUrl)
+                .orderBy(opinionMine.createdAt.max().desc(), book.id.asc())
+                .offset(offset)
+                .limit(limit)
+                .fetch();
+    }
+
+    public long countMyLibraryBooks(Long userId) {
+        QBook book = QBook.book;
+        QPassage passage = QPassage.passage;
+        QOpinion opinionMine = QOpinion.opinion;
+
+        Long count = queryFactory
+                .select(book.countDistinct())
+                .from(book)
+                .innerJoin(passage).on(passage.book.eq(book))
+                .innerJoin(opinionMine).on(opinionMine.passage.eq(passage)
+                        .and(opinionMine.user.id.eq(userId))
+                        .and(opinionMine.deletedAt.isNull()))
+                .fetchOne();
+        return count != null ? count : 0L;
     }
 
     public Page<BookActivityProjection> findPopularBooks(Pageable pageable) {

@@ -215,6 +215,8 @@ class OpinionQueryRepositoryTest {
 
         assertThat(results.getContent()).extracting(MyOpinionProjection::opinionId)
                 .containsExactly(newer.getId(), older.getId());
+        assertThat(results.getContent()).extracting(MyOpinionProjection::author)
+                .containsOnly(book.getAuthor());
         assertThat(results.getTotalElements()).isEqualTo(2);
     }
 

@@ -217,4 +217,29 @@ class BookServiceTest {
 
         assertThat(result.offset()).isEqualTo(0L);
     }
+
+    @Test
+    @DisplayName("내 서재는 offset을 지정하지 않으면 가장 최근에 흔적을 남긴 도서부터(offset 0) 조회한다")
+    void getMyLibraryBooksDefaultsToZeroOffsetWhenOffsetIsNull() {
+        given(bookQueryRepository.countMyLibraryBooks(10L)).willReturn(100L);
+        given(bookQueryRepository.findMyLibraryBooks(10L, 0L, 20))
+                .willReturn(List.of(new BookActivityProjection(1L, "책1", "작가", "cover", 5, 10)));
+
+        BookCarouselPage result = bookService.getMyLibraryBooks(10L, null, 20);
+
+        assertThat(result.offset()).isEqualTo(0L);
+        assertThat(result.totalElements()).isEqualTo(100L);
+        assertThat(result.books()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("내 서재는 offset을 직접 지정하면 그 값을 그대로 사용해 조회한다")
+    void getMyLibraryBooksUsesGivenOffset() {
+        given(bookQueryRepository.countMyLibraryBooks(10L)).willReturn(100L);
+        given(bookQueryRepository.findMyLibraryBooks(10L, 60L, 20)).willReturn(List.of());
+
+        BookCarouselPage result = bookService.getMyLibraryBooks(10L, 60L, 20);
+
+        assertThat(result.offset()).isEqualTo(60L);
+    }
 }

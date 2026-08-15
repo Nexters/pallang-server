@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.book.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.nexters.palang.domain.book.application.BookActivityProjection;
 import com.nexters.palang.domain.book.application.BookSearchProjection;
@@ -90,8 +91,8 @@ class BookQueryRepositoryTest {
     }
 
     @Test
-    @DisplayName("흔적(Opinion)이 없는 도서는 검색 결과에서 제외된다")
-    void searchByTitleExcludesBooksWithoutOpinions() {
+    @DisplayName("흔적(Opinion)이나 대목(Passage)이 없는 도서도 검색 결과에 포함된다")
+    void searchByTitleIncludesBooksWithoutOpinions() {
         User writer = user("wsr2");
         Book bookWithoutPassage = book("대목도 없는 책");
         Book bookWithoutOpinion = book("대목만 있는 책");
@@ -100,23 +101,28 @@ class BookQueryRepositoryTest {
         Page<BookSearchProjection> results = bookQueryRepository.searchByTitle("책", BookSearchSort.RECENT,
                 PageRequest.of(0, 20));
 
-        assertThat(results.getContent()).isEmpty();
-        assertThat(bookWithoutPassage.getId()).isNotNull();
+        assertThat(results.getContent()).extracting(BookSearchProjection::bookId)
+                .containsExactlyInAnyOrder(bookWithoutPassage.getId(), bookWithoutOpinion.getId());
+        assertThat(results.getContent()).extracting(BookSearchProjection::passageCount, BookSearchProjection::opinionCount)
+                .containsExactlyInAnyOrder(tuple(0L, 0L), tuple(1L, 0L));
     }
 
     @Test
-    @DisplayName("검색어가 빈 문자열이면 흔적이 있는 전체 도서 목록을 반환한다")
+    @DisplayName("검색어가 빈 문자열이면 흔적 유무와 무관하게 전체 도서 목록을 반환한다")
     void searchByTitleReturnsAllBooksWhenKeywordIsBlank() {
         User writer = user("wsr3");
         Book book1 = book("책1");
         Book book2 = book("책2");
+        Book bookWithoutOpinion = book("책3");
         opinion(passage(book1, writer, 1), writer);
         opinion(passage(book2, writer, 1), writer);
 
         Page<BookSearchProjection> results = bookQueryRepository.searchByTitle(
                 "", BookSearchSort.RECENT, PageRequest.of(0, 20));
 
-        assertThat(results.getTotalElements()).isEqualTo(2);
+        assertThat(results.getTotalElements()).isEqualTo(3);
+        assertThat(results.getContent()).extracting(BookSearchProjection::bookId)
+                .contains(bookWithoutOpinion.getId());
     }
 
     @Test
@@ -275,6 +281,42 @@ class BookQueryRepositoryTest {
 
         assertThat(results.getContent()).containsExactly(myBook.getId());
         assertThat(results.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("내 서재는 내가 흔적을 남긴 도서만 포함하고 대목/흔적 수는 도서 전체 기준으로 집계한다")
+    void findMyLibraryBooksOnlyIncludesBooksWithMyOpinion() {
+        User me = user("me-lib");
+        User other = user("other-lib");
+        Book myBook = book("내가 흔적을 남긴 책");
+        Book othersBook = book("다른 사람만 흔적을 남긴 책");
+        Passage myPassage = passage(myBook, me, 1);
+        opinion(myPassage, me);
+        opinion(myPassage, other);
+        opinion(passage(othersBook, other, 1), other);
+
+        List<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(me.getId(), 0, 20);
+
+        assertThat(results).extracting(BookActivityProjection::bookId).containsExactly(myBook.getId());
+        assertThat(results.get(0).passageCount()).isEqualTo(1);
+        assertThat(results.get(0).opinionCount()).isEqualTo(2);
+        assertThat(bookQueryRepository.countMyLibraryBooks(me.getId())).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("내 서재는 내가 가장 최근에 흔적을 남긴 도서부터 반환한다")
+    void findMyLibraryBooksOrdersByMyMostRecentOpinion() throws InterruptedException {
+        User me = user("me-lib-order");
+        Book olderBook = book("먼저 흔적을 남긴 책");
+        Book newerBook = book("나중에 흔적을 남긴 책");
+        opinion(passage(olderBook, me, 1), me);
+        Thread.sleep(10);
+        opinion(passage(newerBook, me, 1), me);
+
+        List<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(me.getId(), 0, 20);
+
+        assertThat(results).extracting(BookActivityProjection::bookId)
+                .containsExactly(newerBook.getId(), olderBook.getId());
     }
 
     @Test
