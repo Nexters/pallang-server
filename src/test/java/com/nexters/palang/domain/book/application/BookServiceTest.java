@@ -195,15 +195,15 @@ class BookServiceTest {
     }
 
     @Test
-    @DisplayName("내 서재는 offset을 지정하지 않으면 사용자의 흔적 도서 개수를 기준으로 가운데 offset을 계산한다")
-    void getMyLibraryBooksResolvesCenterOffsetWhenOffsetIsNull() {
+    @DisplayName("내 서재는 offset을 지정하지 않으면 가장 최근에 흔적을 남긴 도서부터(offset 0) 조회한다")
+    void getMyLibraryBooksDefaultsToZeroOffsetWhenOffsetIsNull() {
         given(bookQueryRepository.countMyLibraryBooks(10L)).willReturn(100L);
-        given(bookQueryRepository.findMyLibraryBooks(10L, 40L, 20))
+        given(bookQueryRepository.findMyLibraryBooks(10L, 0L, 20))
                 .willReturn(List.of(new BookActivityProjection(1L, "책1", "작가", "cover", 5, 10)));
 
         BookCarouselPage result = bookService.getMyLibraryBooks(10L, null, 20);
 
-        assertThat(result.offset()).isEqualTo(40L);
+        assertThat(result.offset()).isEqualTo(0L);
         assertThat(result.totalElements()).isEqualTo(100L);
         assertThat(result.books()).hasSize(1);
     }
