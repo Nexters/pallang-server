@@ -9,6 +9,8 @@ import org.springframework.data.redis.cache.RedisCacheManager;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
+import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+import tools.jackson.databind.jsontype.PolymorphicTypeValidator;
 
 @Configuration
 @EnableCaching
@@ -21,15 +23,21 @@ public class CacheConfig {
 
     @Bean
     public RedisCacheManager cacheManager(RedisConnectionFactory connectionFactory) {
+        // 캐시 값 타입(AladinSearchResult 등)을 역직렬화 시점에 정확히 복원하려면 타입 정보가
+        // JSON에 함께 저장돼야 한다. enableUnsafeDefaultTyping()은 클래스패스의 임의 타입을
+        // 전부 역직렬화 대상으로 허용해 다형적 역직렬화 공격에 노출될 수 있으므로, 우리 패키지
+        // 타입과 그 안에서 쓰는 JDK 컬렉션(List.of() 등의 내부 구현체 포함)만 허용하도록 제한한다.
+        PolymorphicTypeValidator typeValidator = BasicPolymorphicTypeValidator.builder()
+                .allowIfSubType("com.nexters.palang")
+                .allowIfSubType("java.util.")
+                .build();
+
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(ALADIN_BOOK_SEARCH_TTL)
                 .disableCachingNullValues()
-                // 캐시 값 타입(AladinSearchResult 등)을 역직렬화 시점에 정확히 복원하려면 타입 정보가
-                // JSON에 함께 저장돼야 한다. 우리가 신뢰하는 내부 타입만 캐싱하므로 unsafe default
-                // typing을 사용한다(사용자 입력을 그대로 역직렬화하는 경로가 아니라 안전하다).
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(GenericJacksonJsonRedisSerializer.builder()
-                                .enableUnsafeDefaultTyping()
+                                .enableDefaultTyping(typeValidator)
                                 .build()));
 
         return RedisCacheManager.builder(connectionFactory)
