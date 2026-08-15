@@ -93,6 +93,23 @@ public interface BookApi {
             @Parameter(description = "조회 개수 (기본값 20, 최대 100)") int size
     );
 
+    @Operation(summary = "내 서재 도서 목록",
+            description = "현재 로그인한 사용자가 흔적을 남긴 도서만 대상으로, 대목/흔적 수와 함께 조회합니다. "
+                    + "가장 최근에 흔적을 남긴 도서부터 내림차순으로 정렬되며, offset을 생략하면 0부터(=가장 최근 "
+                    + "도서부터) 조회합니다. 더 과거 도서를 이어서 보려면 응답으로 받은 pageInfo를 참고해 "
+                    + "offset + size로 다시 요청하면 됩니다. Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "offset/size 형식 오류 (COMMON_400_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    ResponseEntity<DataResponse<BookCarouselListResponse>> getMyLibraryBooks(
+            @Parameter(description = "조회 시작 위치 (0부터 시작). 생략하면 가장 최근에 흔적을 남긴 도서부터 조회") Long offset,
+            @Parameter(description = "조회 개수 (기본값 20, 최대 100)") int size
+    );
+
     @Operation(summary = "내가 최근에 남긴 도서 목록",
             description = "현재 로그인한 사용자가 최근에 대목을 남긴 도서 목록입니다. "
                     + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")

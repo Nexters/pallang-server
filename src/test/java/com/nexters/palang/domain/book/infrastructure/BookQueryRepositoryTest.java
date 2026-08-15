@@ -260,6 +260,42 @@ class BookQueryRepositoryTest {
     }
 
     @Test
+    @DisplayName("내 서재는 내가 흔적을 남긴 도서만 포함하고 대목/흔적 수는 도서 전체 기준으로 집계한다")
+    void findMyLibraryBooksOnlyIncludesBooksWithMyOpinion() {
+        User me = user("me-lib");
+        User other = user("other-lib");
+        Book myBook = book("내가 흔적을 남긴 책");
+        Book othersBook = book("다른 사람만 흔적을 남긴 책");
+        Passage myPassage = passage(myBook, me, 1);
+        opinion(myPassage, me);
+        opinion(myPassage, other);
+        opinion(passage(othersBook, other, 1), other);
+
+        List<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(me.getId(), 0, 20);
+
+        assertThat(results).extracting(BookActivityProjection::bookId).containsExactly(myBook.getId());
+        assertThat(results.get(0).passageCount()).isEqualTo(1);
+        assertThat(results.get(0).opinionCount()).isEqualTo(2);
+        assertThat(bookQueryRepository.countMyLibraryBooks(me.getId())).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("내 서재는 내가 가장 최근에 흔적을 남긴 도서부터 반환한다")
+    void findMyLibraryBooksOrdersByMyMostRecentOpinion() throws InterruptedException {
+        User me = user("me-lib-order");
+        Book olderBook = book("먼저 흔적을 남긴 책");
+        Book newerBook = book("나중에 흔적을 남긴 책");
+        opinion(passage(olderBook, me, 1), me);
+        Thread.sleep(10);
+        opinion(passage(newerBook, me, 1), me);
+
+        List<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(me.getId(), 0, 20);
+
+        assertThat(results).extracting(BookActivityProjection::bookId)
+                .containsExactly(newerBook.getId(), olderBook.getId());
+    }
+
+    @Test
     @DisplayName("직접 대목을 만들지 않고 기존 대목에 흔적만 남긴 도서도 포함한다")
     void findRecentlyActiveBookIdsIncludesBooksWhereUserOnlyLeftOpinion() {
         User creator = user("creator");
