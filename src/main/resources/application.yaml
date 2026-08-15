@@ -31,6 +31,9 @@ jwt:
 
 # 이미지 업로드 저장 경로. 가비아 상용 클라우드에는 오브젝트 스토리지 상품이 없어
 # 서버(Docker volume)에 직접 저장하고 /images/** 경로로 서빙한다.
+# base-url: Spring 리소스 핸들러 매핑 경로(WebStorageConfig), public-base-url: 클라이언트에 내려줄 절대 URL(FileStorageService).
+# 이 둘을 분리하지 않으면 base-url이 상대 경로라 클라이언트가 자기 자신의 origin 기준으로 이미지를 요청해 404가 난다.
 storage:
   upload-dir: ${IMAGE_UPLOAD_DIR:./uploads}
   base-url: /images
+  public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8080/images}
