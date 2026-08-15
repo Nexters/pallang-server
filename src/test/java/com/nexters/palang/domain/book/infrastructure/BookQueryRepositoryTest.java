@@ -282,6 +282,26 @@ class BookQueryRepositoryTest {
     }
 
     @Test
+    @DisplayName("내가 흔적을 남기지 않은 같은 도서의 다른 대목/흔적도 도서 전체 집계에 포함한다")
+    void findMyLibraryBooksCountsWholeBookEvenForPassagesWithoutMyOpinion() {
+        User me = user("me-whole");
+        User other = user("other-whole");
+        Book myBook = book("여러 대목이 있는 책");
+        Passage myPassage = passage(myBook, me, 1);
+        Passage othersPassage = passage(myBook, other, 2);
+        opinion(myPassage, me);
+        opinion(othersPassage, other);
+        opinion(othersPassage, other);
+
+        Page<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(
+                me.getId(), PageRequest.of(0, 20), OpinionCountScope.ALL);
+
+        assertThat(results.getContent()).extracting(BookActivityProjection::bookId).containsExactly(myBook.getId());
+        assertThat(results.getContent().get(0).passageCount()).isEqualTo(2);
+        assertThat(results.getContent().get(0).opinionCount()).isEqualTo(3);
+    }
+
+    @Test
     @DisplayName("내 서재는 MINE 스코프에서 흔적 수를 로그인 사용자가 남긴 것만으로 집계한다")
     void findMyLibraryBooksCountsOnlyMyOpinionsWhenScopeIsMine() {
         User me = user("me-mine");

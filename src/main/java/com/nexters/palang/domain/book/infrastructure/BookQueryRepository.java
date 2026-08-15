@@ -112,17 +112,21 @@ public class BookQueryRepository {
                 ? opinionMine.countDistinct()
                 : opinionAll.countDistinct();
 
+        // opinionMine/opinionAll은 도서 전체 집계용 passage 조인과 별개로 passage.book을 통해 book에 직접
+        // 연결한다. 특정 passage 행을 공유해서 조인하면 opinionMine의 innerJoin이 passage를 "내가 흔적을 남긴
+        // 대목"으로 제한해버려서, passageCount/opinionAll(ALL)이 도서 전체가 아니라 그 대목만 집계하게 된다.
         JPAQuery<BookActivityProjection> query = queryFactory
                 .select(Projections.constructor(BookActivityProjection.class,
                         book.id, book.title, book.author, book.coverImageUrl,
                         passage.countDistinct(), opinionCount))
                 .from(book)
                 .innerJoin(passage).on(passage.book.eq(book))
-                .innerJoin(opinionMine).on(opinionMine.passage.eq(passage)
+                .innerJoin(opinionMine).on(opinionMine.passage.book.eq(book)
                         .and(opinionMine.user.id.eq(userId))
                         .and(opinionMine.deletedAt.isNull()));
         if (opinionCountScope == OpinionCountScope.ALL) {
-            query = query.leftJoin(opinionAll).on(opinionAll.passage.eq(passage).and(opinionAll.deletedAt.isNull()));
+            query = query.leftJoin(opinionAll)
+                    .on(opinionAll.passage.book.eq(book).and(opinionAll.deletedAt.isNull()));
         }
 
         List<BookActivityProjection> content = query
