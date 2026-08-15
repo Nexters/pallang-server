@@ -50,6 +50,18 @@ class AladinBookApiClientCacheTest {
         cacheManager.getCache(CACHE_NAME).clear();
     }
 
+    // Redis write가 반영되는 짧은 지연을 흡수하기 위한 폴링. 최대 200ms(20ms x 10회)까지만
+    // 기다리고, 그래도 안 보이면 진짜 버그로 간주해 실패시킨다.
+    private void awaitCacheEntry(String cacheKey) throws InterruptedException {
+        for (int attempt = 0; attempt < 10; attempt++) {
+            if (cacheManager.getCache(CACHE_NAME).get(cacheKey) != null) {
+                return;
+            }
+            Thread.sleep(20);
+        }
+        assertThat(cacheManager.getCache(CACHE_NAME).get(cacheKey)).isNotNull();
+    }
+
     private static ClientResponse jsonResponse(String json) {
         return ClientResponse.create(HttpStatus.OK)
                 .header("Content-Type", "application/json")
@@ -78,7 +90,7 @@ class AladinBookApiClientCacheTest {
 
     @Test
     @DisplayName("같은 키워드로 다시 검색하면 캐시에서 응답하고 알라딘을 다시 호출하지 않는다")
-    void searchUsesCacheOnSecondCall() {
+    void searchUsesCacheOnSecondCall() throws InterruptedException {
         given(exchangeFunction.exchange(any())).willReturn(Mono.just(jsonResponse("""
                 {
                   "totalResults": 1,
@@ -91,6 +103,15 @@ class AladinBookApiClientCacheTest {
         Pageable pageable = PageRequest.of(0, 8);
 
         AladinSearchResult first = aladinBookApiClient.search("채식주의자캐시테스트", pageable);
+        assertThat(first.items()).as("첫 호출 결과가 비어있으면 unless 조건 때문에 애초에 캐싱되지 않는다").isNotEmpty();
+
+        // @Cacheable의 캐시 put은 원래 메서드가 결과를 반환하기 "전에" 같은 스레드에서 동기적으로
+        // 일어나지만, 전체 테스트 스위트를 함께 돌려 스프링 컨텍스트가 많이 떠 있는 상황에서는 Redis
+        // write가 반영되는 데 짧은 지연이 생기는 걸 관찰했다. 캐시가 실제로 없는 버그와 "아직 반영
+        // 안 됐을 뿐"인 경우를 구분하기 위해 짧게 재시도하며 기다린다.
+        String cacheKey = "채식주의자캐시테스트:0:8";
+        awaitCacheEntry(cacheKey);
+
         AladinSearchResult second = aladinBookApiClient.search("채식주의자캐시테스트", pageable);
 
         assertThat(second).isEqualTo(first);
