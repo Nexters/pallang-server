@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nexters.palang.domain.book.application.BookActivityProjection;
 import com.nexters.palang.domain.book.application.BookSearchProjection;
+import com.nexters.palang.domain.book.application.BookSearchSort;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.passage.domain.Passage;
@@ -78,34 +79,95 @@ class BookQueryRepositoryTest {
     @Test
     @DisplayName("검색어와 제목의 띄어쓰기가 달라도 도서를 찾는다")
     void searchByTitleIgnoresWhitespaceDifferences() {
+        User writer = user("wsr1");
         Book book = book("두 번째 산책");
+        opinion(passage(book, writer, 1), writer);
 
-        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle("두번째산책", PageRequest.of(0, 20));
+        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle(
+                "두번째산책", BookSearchSort.RECENT, PageRequest.of(0, 20));
 
         assertThat(results.getContent()).extracting(BookSearchProjection::bookId).containsExactly(book.getId());
     }
 
     @Test
-    @DisplayName("대목/흔적이 없는 도서도 검색 결과에 포함되고 수는 0으로 집계된다")
-    void searchByTitleIncludesBooksWithoutPassages() {
-        Book book = book("아직 흔적 없는 책");
+    @DisplayName("흔적(Opinion)이 없는 도서는 검색 결과에서 제외된다")
+    void searchByTitleExcludesBooksWithoutOpinions() {
+        User writer = user("wsr2");
+        Book bookWithoutPassage = book("대목도 없는 책");
+        Book bookWithoutOpinion = book("대목만 있는 책");
+        passage(bookWithoutOpinion, writer, 1);
 
-        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle("아직", PageRequest.of(0, 20));
+        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle("책", BookSearchSort.RECENT,
+                PageRequest.of(0, 20));
 
-        assertThat(results.getContent()).extracting(BookSearchProjection::bookId).containsExactly(book.getId());
-        assertThat(results.getContent().get(0).passageCount()).isEqualTo(0);
-        assertThat(results.getContent().get(0).opinionCount()).isEqualTo(0);
+        assertThat(results.getContent()).isEmpty();
+        assertThat(bookWithoutPassage.getId()).isNotNull();
     }
 
     @Test
-    @DisplayName("검색어가 빈 문자열이면 전체 도서 목록을 반환한다")
+    @DisplayName("검색어가 빈 문자열이면 흔적이 있는 전체 도서 목록을 반환한다")
     void searchByTitleReturnsAllBooksWhenKeywordIsBlank() {
-        book("책1");
-        book("책2");
+        User writer = user("wsr3");
+        Book book1 = book("책1");
+        Book book2 = book("책2");
+        opinion(passage(book1, writer, 1), writer);
+        opinion(passage(book2, writer, 1), writer);
 
-        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle("", PageRequest.of(0, 20));
+        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle(
+                "", BookSearchSort.RECENT, PageRequest.of(0, 20));
 
         assertThat(results.getTotalElements()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("이름순 정렬은 제목 오름차순으로 도서를 반환한다")
+    void searchByTitleSortsByNameAscending() {
+        User writer = user("wsr4");
+        Book bookB = book("나책");
+        Book bookA = book("가책");
+        opinion(passage(bookB, writer, 1), writer);
+        opinion(passage(bookA, writer, 1), writer);
+
+        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle(
+                "책", BookSearchSort.NAME, PageRequest.of(0, 20));
+
+        assertThat(results.getContent()).extracting(BookSearchProjection::bookId)
+                .containsExactly(bookA.getId(), bookB.getId());
+    }
+
+    @Test
+    @DisplayName("최신순 정렬은 가장 최근에 흔적이 남은 도서부터 반환한다")
+    void searchByTitleSortsByRecentOpinion() throws InterruptedException {
+        User writer = user("wsr5");
+        Book olderBook = book("먼저 남긴 책");
+        Book newerBook = book("나중에 남긴 책");
+        opinion(passage(olderBook, writer, 1), writer);
+        Thread.sleep(10);
+        opinion(passage(newerBook, writer, 1), writer);
+
+        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle(
+                "책", BookSearchSort.RECENT, PageRequest.of(0, 20));
+
+        assertThat(results.getContent()).extracting(BookSearchProjection::bookId)
+                .containsExactly(newerBook.getId(), olderBook.getId());
+    }
+
+    @Test
+    @DisplayName("의견순 정렬은 흔적이 많은 도서부터 반환한다")
+    void searchByTitleSortsByOpinionCountDescending() {
+        User writer = user("wsr6");
+        Book popularBook = book("의견 많은 책");
+        Book lessPopularBook = book("의견 적은 책");
+        Passage popularPassage = passage(popularBook, writer, 1);
+        opinion(popularPassage, writer);
+        opinion(popularPassage, writer);
+        opinion(passage(lessPopularBook, writer, 1), writer);
+
+        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle(
+                "책", BookSearchSort.OPINION, PageRequest.of(0, 20));
+
+        assertThat(results.getContent()).extracting(BookSearchProjection::bookId)
+                .containsExactly(popularBook.getId(), lessPopularBook.getId());
     }
 
     @Test

@@ -2,9 +2,11 @@ package com.nexters.palang.domain.book.infrastructure;
 
 import com.nexters.palang.domain.book.application.BookActivityProjection;
 import com.nexters.palang.domain.book.application.BookSearchProjection;
+import com.nexters.palang.domain.book.application.BookSearchSort;
 import com.nexters.palang.domain.book.domain.QBook;
 import com.nexters.palang.domain.opinion.domain.QOpinion;
 import com.nexters.palang.domain.passage.domain.QPassage;
+import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.StringExpression;
@@ -23,7 +25,8 @@ public class BookQueryRepository {
     private final JPAQueryFactory queryFactory;
 
     // 띄어쓰기 차이를 무시하고 검색할 수 있도록 제목/키워드 모두에서 공백을 제거한 뒤 비교한다.
-    public Page<BookSearchProjection> searchByTitle(String keyword, Pageable pageable) {
+    // 흔적(Opinion)이 하나도 없는 도서는 결과에서 제외하므로 leftJoin이 아닌 innerJoin을 사용한다.
+    public Page<BookSearchProjection> searchByTitle(String keyword, BookSearchSort sort, Pageable pageable) {
         QBook book = QBook.book;
         QPassage passage = QPassage.passage;
         QOpinion opinion = QOpinion.opinion;
@@ -37,12 +40,12 @@ public class BookQueryRepository {
                         book.isbn, book.coverImageUrl, book.source,
                         passage.countDistinct(), opinion.countDistinct()))
                 .from(book)
-                .leftJoin(passage).on(passage.book.eq(book))
-                .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
+                .innerJoin(passage).on(passage.book.eq(book))
+                .innerJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .where(normalizedTitle.containsIgnoreCase(normalizedKeyword))
                 .groupBy(book.id, book.title, book.author, book.publisher, book.pageCount,
                         book.isbn, book.coverImageUrl, book.source)
-                .orderBy(book.id.asc())
+                .orderBy(searchOrderSpecifiers(sort, book, opinion))
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
@@ -50,10 +53,20 @@ public class BookQueryRepository {
         Long total = queryFactory
                 .select(book.countDistinct())
                 .from(book)
+                .innerJoin(passage).on(passage.book.eq(book))
+                .innerJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .where(normalizedTitle.containsIgnoreCase(normalizedKeyword))
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
+    }
+
+    private OrderSpecifier<?>[] searchOrderSpecifiers(BookSearchSort sort, QBook book, QOpinion opinion) {
+        return switch (sort) {
+            case NAME -> new OrderSpecifier[]{book.title.asc(), book.id.asc()};
+            case RECENT -> new OrderSpecifier[]{opinion.createdAt.max().desc(), book.id.asc()};
+            case OPINION -> new OrderSpecifier[]{opinion.countDistinct().desc(), book.id.asc()};
+        };
     }
 
     // 홈 캐러셀은 전체 목록 중 임의의 가운데 offset에서 좌우로 조회해야 해서, page*size로 offset이
