@@ -3,13 +3,13 @@ package com.nexters.palang.domain.book.infrastructure;
 import com.nexters.palang.domain.book.application.BookActivityProjection;
 import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.application.BookSearchSort;
+import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.QBook;
 import com.nexters.palang.domain.opinion.domain.QOpinion;
 import com.nexters.palang.domain.passage.domain.QPassage;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
-import com.querydsl.core.types.dsl.Expressions;
-import com.querydsl.core.types.dsl.StringExpression;
+import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -24,15 +24,16 @@ public class BookQueryRepository {
 
     private final JPAQueryFactory queryFactory;
 
-    // 띄어쓰기 차이를 무시하고 검색할 수 있도록 제목/키워드 모두에서 공백을 제거한 뒤 비교한다.
+    // 띄어쓰기 차이를 무시하고 검색할 수 있도록, 저장 시점에 미리 정규화(공백 제거 + 소문자)해둔
+    // title_normalized 컬럼(인덱스 적용, Book#normalizeTitle 참고)을 기준으로 비교한다. 매 검색마다
+    // title에 함수를 걸어 계산하지 않아도 되고, 자동완성처럼 반복 호출되는 경로에서 유리하다.
     // 흔적(Opinion)/대목(Passage) 유무와 무관하게 DB에 저장된 도서 전부를 대상으로 하므로 leftJoin을 사용한다.
     public Page<BookSearchProjection> searchByTitle(String keyword, BookSearchSort sort, Pageable pageable) {
         QBook book = QBook.book;
         QPassage passage = QPassage.passage;
         QOpinion opinion = QOpinion.opinion;
 
-        String normalizedKeyword = keyword.replace(" ", "");
-        StringExpression normalizedTitle = Expressions.stringTemplate("replace({0}, ' ', '')", book.title);
+        String normalizedKeyword = Book.normalize(keyword);
 
         List<BookSearchProjection> content = queryFactory
                 .select(Projections.constructor(BookSearchProjection.class,
@@ -42,10 +43,10 @@ public class BookQueryRepository {
                 .from(book)
                 .leftJoin(passage).on(passage.book.eq(book))
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
-                .where(normalizedTitle.containsIgnoreCase(normalizedKeyword))
+                .where(book.titleNormalized.contains(normalizedKeyword))
                 .groupBy(book.id, book.title, book.author, book.publisher, book.pageCount,
                         book.isbn, book.coverImageUrl, book.source)
-                .orderBy(searchOrderSpecifiers(sort, book, opinion))
+                .orderBy(searchOrderSpecifiers(sort, book, opinion, normalizedKeyword))
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
@@ -54,18 +55,31 @@ public class BookQueryRepository {
         Long total = queryFactory
                 .select(book.countDistinct())
                 .from(book)
-                .where(normalizedTitle.containsIgnoreCase(normalizedKeyword))
+                .where(book.titleNormalized.contains(normalizedKeyword))
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
     }
 
-    private OrderSpecifier<?>[] searchOrderSpecifiers(BookSearchSort sort, QBook book, QOpinion opinion) {
-        return switch (sort) {
+    // 자동완성으로 쓰일 때 관련도가 높은 결과(제목이 검색어로 시작하는 도서)가 먼저 보이도록,
+    // 선택된 정렬 기준보다 접두어 일치 여부를 우선한다.
+    private OrderSpecifier<?>[] searchOrderSpecifiers(
+            BookSearchSort sort, QBook book, QOpinion opinion, String normalizedKeyword) {
+        OrderSpecifier<Integer> prefixMatchFirst = new CaseBuilder()
+                .when(book.titleNormalized.startsWith(normalizedKeyword)).then(0)
+                .otherwise(1)
+                .asc();
+
+        OrderSpecifier<?>[] tieBreakers = switch (sort) {
             case NAME -> new OrderSpecifier[]{book.title.asc(), book.id.asc()};
             case RECENT -> new OrderSpecifier[]{opinion.createdAt.max().desc(), book.id.asc()};
             case OPINION -> new OrderSpecifier[]{opinion.countDistinct().desc(), book.id.asc()};
         };
+
+        OrderSpecifier<?>[] result = new OrderSpecifier<?>[tieBreakers.length + 1];
+        result[0] = prefixMatchFirst;
+        System.arraycopy(tieBreakers, 0, result, 1, tieBreakers.length);
+        return result;
     }
 
     // 홈 캐러셀은 전체 목록 중 임의의 가운데 offset에서 좌우로 조회해야 해서, page*size로 offset이

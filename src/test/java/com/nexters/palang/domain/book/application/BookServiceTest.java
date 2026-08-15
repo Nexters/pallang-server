@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.book.infrastructure.AladinBookApiClient;
+import com.nexters.palang.domain.book.infrastructure.AladinSearchResult;
 import com.nexters.palang.domain.book.infrastructure.BookQueryRepository;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.book.common.error.BookException;
@@ -65,13 +67,35 @@ class BookServiceTest {
     @DisplayName("키워드로 외부 검색을 하면 알라딘 API 클라이언트의 결과를 그대로 반환한다")
     void searchExternalBooks() {
         Pageable pageable = PageRequest.of(0, 20);
-        Page<ExternalBookResult> expected = new PageImpl<>(
-                List.of(new ExternalBookResult("제목", "작가", "출판사", "isbn", "cover")), pageable, 1);
-        given(aladinBookApiClient.search("제목", pageable)).willReturn(expected);
+        ExternalBookResult book = new ExternalBookResult("제목", "작가", "출판사", "isbn", "cover");
+        given(aladinBookApiClient.search("제목", pageable)).willReturn(new AladinSearchResult(List.of(book), 1));
 
         Page<ExternalBookResult> results = bookService.searchExternalBooks("제목", pageable);
 
-        assertThat(results).isEqualTo(expected);
+        assertThat(results.getContent()).containsExactly(book);
+        assertThat(results.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("검색어 앞뒤 공백은 제거하고 알라딘을 호출한다")
+    void searchExternalBooksTrimsKeyword() {
+        Pageable pageable = PageRequest.of(0, 20);
+        given(aladinBookApiClient.search("제목", pageable)).willReturn(AladinSearchResult.empty());
+
+        bookService.searchExternalBooks("  제목  ", pageable);
+
+        verify(aladinBookApiClient).search("제목", pageable);
+    }
+
+    @Test
+    @DisplayName("검색어가 2글자 미만이면 알라딘을 호출하지 않고 빈 결과를 반환한다")
+    void searchExternalBooksReturnsEmptyWhenKeywordTooShort() {
+        Pageable pageable = PageRequest.of(0, 20);
+
+        Page<ExternalBookResult> results = bookService.searchExternalBooks("책", pageable);
+
+        assertThat(results.getContent()).isEmpty();
+        verifyNoInteractions(aladinBookApiClient);
     }
 
     @Test

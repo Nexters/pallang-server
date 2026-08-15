@@ -126,6 +126,24 @@ class BookQueryRepositoryTest {
     }
 
     @Test
+    @DisplayName("정렬 기준과 무관하게 검색어로 시작하는 제목이 그렇지 않은 제목보다 먼저 나온다")
+    void searchByTitlePrioritizesPrefixMatchOverSortCriteria() {
+        User writer = user("wsr-prefix");
+        // "책" 정렬 기준(NAME)으로는 "가나책"이 "책모음"보다 먼저 와야 정상이지만,
+        // 검색어 "책"으로 시작하는 "책모음"이 접두어 일치이므로 먼저 나와야 한다.
+        Book containsMatch = book("가나책");
+        Book prefixMatch = book("책모음");
+        opinion(passage(containsMatch, writer, 1), writer);
+        opinion(passage(prefixMatch, writer, 1), writer);
+
+        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle(
+                "책", BookSearchSort.NAME, PageRequest.of(0, 20));
+
+        assertThat(results.getContent()).extracting(BookSearchProjection::bookId)
+                .containsExactly(prefixMatch.getId(), containsMatch.getId());
+    }
+
+    @Test
     @DisplayName("이름순 정렬은 제목 오름차순으로 도서를 반환한다")
     void searchByTitleSortsByNameAscending() {
         User writer = user("wsr4");
