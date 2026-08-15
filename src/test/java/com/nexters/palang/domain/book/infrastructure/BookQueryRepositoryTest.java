@@ -106,6 +106,23 @@ class BookQueryRepositoryTest {
     }
 
     @Test
+    @DisplayName("흔적이 없는 대목도 도서의 passageCount 집계에 포함한다")
+    void searchByTitleCountsPassagesWithoutOpinionsToo() {
+        User writer = user("wsr-cnt");
+        Book book = book("여러 대목 검색용 책");
+        Passage withOpinion = passage(book, writer, 1);
+        passage(book, writer, 2); // 흔적 없는 대목
+        opinion(withOpinion, writer);
+
+        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle(
+                "여러 대목", BookSearchSort.RECENT, PageRequest.of(0, 20));
+
+        assertThat(results.getContent()).hasSize(1);
+        assertThat(results.getContent().get(0).passageCount()).isEqualTo(2);
+        assertThat(results.getContent().get(0).opinionCount()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("검색어가 빈 문자열이면 흔적이 있는 전체 도서 목록을 반환한다")
     void searchByTitleReturnsAllBooksWhenKeywordIsBlank() {
         User writer = user("wsr3");

@@ -29,6 +29,8 @@ public class BookQueryRepository {
 
     // 띄어쓰기 차이를 무시하고 검색할 수 있도록 제목/키워드 모두에서 공백을 제거한 뒤 비교한다.
     // 흔적(Opinion)이 하나도 없는 도서는 결과에서 제외하므로 leftJoin이 아닌 innerJoin을 사용한다.
+    // opinion은 passage.book으로 book에 직접 연결한다 (특정 passage 행에 걸면 그 passage로만 결과가
+    // 제한되어, 흔적 없는 다른 대목이 passageCount/opinionCount 집계에서 빠지게 된다).
     public Page<BookSearchProjection> searchByTitle(String keyword, BookSearchSort sort, Pageable pageable) {
         QBook book = QBook.book;
         QPassage passage = QPassage.passage;
@@ -44,7 +46,7 @@ public class BookQueryRepository {
                         passage.countDistinct(), opinion.countDistinct()))
                 .from(book)
                 .innerJoin(passage).on(passage.book.eq(book))
-                .innerJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
+                .innerJoin(opinion).on(opinion.passage.book.eq(book).and(opinion.deletedAt.isNull()))
                 .where(normalizedTitle.containsIgnoreCase(normalizedKeyword))
                 .groupBy(book.id, book.title, book.author, book.publisher, book.pageCount,
                         book.isbn, book.coverImageUrl, book.source)
@@ -57,7 +59,7 @@ public class BookQueryRepository {
                 .select(book.countDistinct())
                 .from(book)
                 .innerJoin(passage).on(passage.book.eq(book))
-                .innerJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
+                .innerJoin(opinion).on(opinion.passage.book.eq(book).and(opinion.deletedAt.isNull()))
                 .where(normalizedTitle.containsIgnoreCase(normalizedKeyword))
                 .fetchOne();
 
