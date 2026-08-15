@@ -81,6 +81,15 @@ public class BookService {
         return Math.max(0, (total - size) / 2);
     }
 
+    // 내 서재도 홈 캐러셀과 동일하게 offset을 지정하지 않으면 가운데를 기준으로 조회하며,
+    // 가운데에는 사용자가 가장 최근에 흔적을 남긴 도서가 오도록 정렬한다.
+    public BookCarouselPage getMyLibraryBooks(Long userId, Long offset, int size) {
+        long total = bookQueryRepository.countMyLibraryBooks(userId);
+        long resolvedOffset = offset != null ? Math.max(0, offset) : centerOffset(total, size);
+        List<BookActivityProjection> books = bookQueryRepository.findMyLibraryBooks(userId, resolvedOffset, size);
+        return new BookCarouselPage(books, resolvedOffset, size, total);
+    }
+
     public Page<Book> getRecentBooks(Long userId, Pageable pageable) {
         Page<Long> bookIds = bookQueryRepository.findRecentlyActiveBookIds(userId, pageable);
         Map<Long, Book> booksById = bookRepository.findAllById(bookIds.getContent()).stream()

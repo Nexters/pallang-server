@@ -180,6 +180,30 @@ class BookControllerTest {
     }
 
     @Test
+    @DisplayName("내 서재 도서 목록을 요청하면 현재 사용자 기준으로 조회한다")
+    void getMyLibraryBooks() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(bookService.getMyLibraryBooks(eq(1L), isNull(), anyInt())).willReturn(
+                new BookCarouselPage(List.of(new BookActivityProjection(1L, "제목", "작가", "cover", 3, 7)), 0, 20, 1));
+
+        mockMvc.perform(get("/api/home/my-library"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.books[0].bookId").value(1))
+                .andExpect(jsonPath("$.data.books[0].passageCount").value(3))
+                .andExpect(jsonPath("$.data.books[0].opinionCount").value(7));
+    }
+
+    @Test
+    @DisplayName("인증 없이 내 서재 도서 목록을 요청하면 401 에러가 발생한다")
+    void getMyLibraryBooksFailsWhenUnauthenticated() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willThrow(new LoginRequiredException());
+
+        mockMvc.perform(get("/api/home/my-library"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("AUTH_401_1"));
+    }
+
+    @Test
     @DisplayName("내가 최근에 남긴 도서 목록을 요청하면 현재 사용자 기준으로 조회한다")
     void getRecentBooks() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);

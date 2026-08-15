@@ -193,4 +193,29 @@ class BookServiceTest {
 
         assertThat(result.offset()).isEqualTo(0L);
     }
+
+    @Test
+    @DisplayName("내 서재는 offset을 지정하지 않으면 사용자의 흔적 도서 개수를 기준으로 가운데 offset을 계산한다")
+    void getMyLibraryBooksResolvesCenterOffsetWhenOffsetIsNull() {
+        given(bookQueryRepository.countMyLibraryBooks(10L)).willReturn(100L);
+        given(bookQueryRepository.findMyLibraryBooks(10L, 40L, 20))
+                .willReturn(List.of(new BookActivityProjection(1L, "책1", "작가", "cover", 5, 10)));
+
+        BookCarouselPage result = bookService.getMyLibraryBooks(10L, null, 20);
+
+        assertThat(result.offset()).isEqualTo(40L);
+        assertThat(result.totalElements()).isEqualTo(100L);
+        assertThat(result.books()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("내 서재는 offset을 직접 지정하면 그 값을 그대로 사용해 조회한다")
+    void getMyLibraryBooksUsesGivenOffset() {
+        given(bookQueryRepository.countMyLibraryBooks(10L)).willReturn(100L);
+        given(bookQueryRepository.findMyLibraryBooks(10L, 60L, 20)).willReturn(List.of());
+
+        BookCarouselPage result = bookService.getMyLibraryBooks(10L, 60L, 20);
+
+        assertThat(result.offset()).isEqualTo(60L);
+    }
 }
