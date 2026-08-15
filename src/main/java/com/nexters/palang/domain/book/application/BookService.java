@@ -41,8 +41,8 @@ public class BookService {
         return aladinBookApiClient.search(keyword, pageable);
     }
 
-    public Page<BookSearchProjection> searchInternalBooks(String keyword, Pageable pageable) {
-        return bookQueryRepository.searchByTitle(keyword, pageable);
+    public Page<BookSearchProjection> searchInternalBooks(String keyword, BookSearchSort sort, Pageable pageable) {
+        return bookQueryRepository.searchByTitle(keyword, sort, pageable);
     }
 
     @Transactional

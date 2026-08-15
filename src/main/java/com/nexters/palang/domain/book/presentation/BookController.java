@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.book.presentation;
 
 import com.nexters.palang.domain.book.application.BookMapper;
+import com.nexters.palang.domain.book.application.BookSearchSort;
 import com.nexters.palang.domain.book.application.BookService;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.presentation.dto.BookActivityListResponse;
@@ -50,10 +51,11 @@ public class BookController implements BookApi {
     @GetMapping("/api/books/internal-search")
     public ResponseEntity<DataResponse<BookSearchListResponse>> searchInternalBooks(
             @RequestParam String keyword,
+            @RequestParam(defaultValue = "RECENT") BookSearchSort sort,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
-        return ResponseEntity.ok(DataResponse.from(
-                BookMapper.toSearchListResponse(bookService.searchInternalBooks(keyword, pageable(page, size)))));
+        return ResponseEntity.ok(DataResponse.from(BookMapper.toSearchListResponse(
+                bookService.searchInternalBooks(keyword, sort, pageable(page, size)))));
     }
 
     @Override

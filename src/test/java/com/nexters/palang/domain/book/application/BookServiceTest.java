@@ -82,9 +82,9 @@ class BookServiceTest {
                 List.of(new BookSearchProjection(
                         1L, "프랑켄슈타인", "작가", "출판사", 300, "isbn", "cover", BookSource.MANUAL, 5, 10)),
                 pageable, 1);
-        given(bookQueryRepository.searchByTitle("프랑", pageable)).willReturn(expected);
+        given(bookQueryRepository.searchByTitle("프랑", BookSearchSort.RECENT, pageable)).willReturn(expected);
 
-        Page<BookSearchProjection> results = bookService.searchInternalBooks("프랑", pageable);
+        Page<BookSearchProjection> results = bookService.searchInternalBooks("프랑", BookSearchSort.RECENT, pageable);
 
         assertThat(results).isEqualTo(expected);
     }
