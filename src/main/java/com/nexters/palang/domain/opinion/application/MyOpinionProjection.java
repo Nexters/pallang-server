@@ -6,6 +6,7 @@ public record MyOpinionProjection(
         Long opinionId,
         Long bookId,
         String bookTitle,
+        String author,
         String bookCoverImageUrl,
         Long passageId,
         String quotedText,

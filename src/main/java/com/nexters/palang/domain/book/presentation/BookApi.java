@@ -29,7 +29,9 @@ public interface BookApi {
 
     @Operation(summary = "도서 외부 검색",
             description = "알라딘 Open API로 도서를 검색합니다. 응답 속도를 위해 pageCount는 내려주지 않으며, "
-                    + "등록 시 사용자가 직접 입력합니다.")
+                    + "등록 시 사용자가 직접 입력합니다. 타이핑 중 자동완성 미리보기 용도로도 재사용되므로, "
+                    + "keyword가 공백 제거 후 2글자 미만이면 알라딘을 호출하지 않고 빈 목록을 반환합니다. "
+                    + "동일 keyword+size 조합은 최대 12시간 캐싱되어 결과가 즉시 반영되지 않을 수 있습니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "검색 성공"),
             @ApiResponse(responseCode = "400", description = "keyword 누락, page/size 형식 오류(COMMON_400_1) "
@@ -43,8 +45,8 @@ public interface BookApi {
     );
 
     @Operation(summary = "도서 내부 검색",
-            description = "서비스 DB에 등록된 도서 중 흔적(Opinion)이 하나 이상 있는 도서만 제목으로 검색하며, "
-                    + "도서별 대목/흔적 수를 함께 반환합니다. "
+            description = "서비스 DB에 등록된 도서 전체를 흔적(Opinion) 유무와 무관하게 제목으로 검색하며, "
+                    + "도서별 대목/흔적 수를 함께 반환합니다(흔적이 없으면 0). "
                     + "제목과 검색어의 띄어쓰기 차이는 무시하고 매칭합니다. keyword에 빈 문자열을 넘기면 전체 목록을 반환합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "검색 성공"),

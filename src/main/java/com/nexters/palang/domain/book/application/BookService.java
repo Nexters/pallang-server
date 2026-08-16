@@ -5,6 +5,7 @@ import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.book.infrastructure.AladinBookApiClient;
+import com.nexters.palang.domain.book.infrastructure.AladinSearchResult;
 import com.nexters.palang.domain.book.infrastructure.BookQueryRepository;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.book.presentation.dto.CreateBookRequest;
@@ -29,6 +30,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class BookService {
 
     private static final String COVER_IMAGE_SUB_DIRECTORY = "book-covers";
+    // 1글자 검색은 자동완성 노이즈만 크고 알라딘 쿼터만 소모하므로, 호출 자체를 하지 않는다.
+    private static final int EXTERNAL_SEARCH_MIN_KEYWORD_LENGTH = 2;
 
     private final BookRepository bookRepository;
     private final BookQueryRepository bookQueryRepository;
@@ -38,7 +41,12 @@ public class BookService {
     // DB를 사용하지 않고 알라딘 API 호출(최대 수 초)만 하므로, DB 커넥션을 불필요하게 오래 붙잡지 않도록 트랜잭션에서 제외한다.
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Page<ExternalBookResult> searchExternalBooks(String keyword, Pageable pageable) {
-        return aladinBookApiClient.search(keyword, pageable);
+        String trimmedKeyword = keyword == null ? "" : keyword.trim();
+        if (trimmedKeyword.length() < EXTERNAL_SEARCH_MIN_KEYWORD_LENGTH) {
+            return Page.empty(pageable);
+        }
+        AladinSearchResult result = aladinBookApiClient.search(trimmedKeyword, pageable);
+        return new PageImpl<>(result.items(), pageable, result.totalResults());
     }
 
     public Page<BookSearchProjection> searchInternalBooks(String keyword, BookSearchSort sort, Pageable pageable) {

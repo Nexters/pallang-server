@@ -13,7 +13,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -66,23 +65,23 @@ class AladinBookApiClientTest {
                 }
                 """);
 
-        Page<ExternalBookResult> results = aladinBookApiClient().search("프랑켄슈타인", PageRequest.of(0, 20));
+        AladinSearchResult result = aladinBookApiClient().search("프랑켄슈타인", PageRequest.of(0, 20));
 
-        assertThat(results.getContent()).containsExactly(
+        assertThat(result.items()).containsExactly(
                 new ExternalBookResult("프랑켄슈타인", "메리 셸리", "문학동네", "9788954429721",
                         "https://image.aladin.co.kr/cover.jpg"));
-        assertThat(results.getTotalElements()).isEqualTo(1);
+        assertThat(result.totalResults()).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("검색 결과가 없으면 빈 페이지를 반환한다")
-    void searchReturnsEmptyPageWhenNoItems() {
+    @DisplayName("검색 결과가 없으면 빈 결과를 반환한다")
+    void searchReturnsEmptyResultWhenNoItems() {
         stubSearch("{}");
 
-        Page<ExternalBookResult> results = aladinBookApiClient().search("없는 책", PageRequest.of(0, 20));
+        AladinSearchResult result = aladinBookApiClient().search("없는 책", PageRequest.of(0, 20));
 
-        assertThat(results.getContent()).isEmpty();
-        assertThat(results.getTotalElements()).isZero();
+        assertThat(result.items()).isEmpty();
+        assertThat(result.totalResults()).isZero();
     }
 
     @Test

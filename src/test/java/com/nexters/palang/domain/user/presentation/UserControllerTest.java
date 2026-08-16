@@ -269,14 +269,15 @@ class UserControllerTest {
     void getMyOpinions() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         MyOpinionProjection projection = new MyOpinionProjection(
-                1L, 10L, "책 제목", "cover", 100L, "발췌 문장", 5, "흔적 내용", 0, LocalDateTime.now());
+                1L, 10L, "책 제목", "작가", "cover", 100L, "발췌 문장", 5, "흔적 내용", 0, LocalDateTime.now());
         given(opinionService.getMyOpinions(eq(1L), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/users/me/opinions"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.opinions[0].opinionId").value(1))
-                .andExpect(jsonPath("$.data.opinions[0].bookTitle").value("책 제목"));
+                .andExpect(jsonPath("$.data.opinions[0].bookTitle").value("책 제목"))
+                .andExpect(jsonPath("$.data.opinions[0].author").value("작가"));
     }
 
     @Test

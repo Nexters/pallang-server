@@ -275,7 +275,7 @@ class OpinionServiceTest {
     void getMyOpinionsReturnsPageFromQueryRepository() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<MyOpinionProjection> expected = new PageImpl<>(
-                List.of(new MyOpinionProjection(1L, 10L, "제목", "cover", 100L, "발췌", 5, "흔적", 0, LocalDateTime.now())),
+                List.of(new MyOpinionProjection(1L, 10L, "제목", "작가", "cover", 100L, "발췌", 5, "흔적", 0, LocalDateTime.now())),
                 pageable, 1);
         given(opinionQueryRepository.findMyOpinions(1L, pageable)).willReturn(expected);
 

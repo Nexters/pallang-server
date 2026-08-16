@@ -96,7 +96,7 @@ public class OpinionQueryRepository {
 
         List<MyOpinionProjection> content = queryFactory
                 .select(Projections.constructor(MyOpinionProjection.class,
-                        opinion.id, book.id, book.title, book.coverImageUrl,
+                        opinion.id, book.id, book.title, book.author, book.coverImageUrl,
                         passage.id, passage.quotedText, passage.pageNumber,
                         opinion.content, opinion.likeCount, opinion.createdAt))
                 .from(opinion)
