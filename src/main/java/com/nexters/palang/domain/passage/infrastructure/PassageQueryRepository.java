@@ -31,6 +31,7 @@ public class PassageQueryRepository {
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .where(
                         passage.book.id.eq(bookId),
+                        passage.deletedAt.isNull(),
                         passage.pageNumber.between(pageNumber - 1, pageNumber + 1),
                         passage.normalizedHash.eq(normalizedHash)
                 )
@@ -46,7 +47,7 @@ public class PassageQueryRepository {
         List<Integer> content = queryFactory
                 .select(passage.pageNumber)
                 .from(passage)
-                .where(passage.book.id.eq(bookId))
+                .where(passage.book.id.eq(bookId), passage.deletedAt.isNull())
                 .groupBy(passage.pageNumber)
                 .orderBy(passage.pageNumber.asc())
                 .offset(pageable.getOffset())
@@ -56,7 +57,7 @@ public class PassageQueryRepository {
         Long total = queryFactory
                 .select(passage.pageNumber.countDistinct())
                 .from(passage)
-                .where(passage.book.id.eq(bookId))
+                .where(passage.book.id.eq(bookId), passage.deletedAt.isNull())
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
@@ -68,7 +69,7 @@ public class PassageQueryRepository {
 
         return queryFactory
                 .selectFrom(passage)
-                .where(passage.book.id.eq(bookId), passage.pageNumber.eq(pageNumber))
+                .where(passage.book.id.eq(bookId), passage.pageNumber.eq(pageNumber), passage.deletedAt.isNull())
                 .orderBy(passage.id.asc())
                 .fetch();
     }

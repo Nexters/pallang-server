@@ -11,6 +11,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -60,6 +61,10 @@ public class Passage extends BaseEntity {
     @Column(name = "normalized_hash", length = 64, nullable = false)
     private String normalizedHash;
 
+    // 대목에 달린 마지막 흔적이 삭제되면(OpinionService) 대목도 함께 소프트 삭제된다 (PM 요구사항).
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @Builder
     private Passage(Book book, User creator, int pageNumber, String quotedText, boolean isSpoiler, String normalizedHash) {
         this.book = book;
@@ -68,5 +73,13 @@ public class Passage extends BaseEntity {
         this.quotedText = quotedText;
         this.isSpoiler = isSpoiler;
         this.normalizedHash = normalizedHash;
+    }
+
+    public void delete() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    public boolean isDeleted() {
+        return this.deletedAt != null;
     }
 }

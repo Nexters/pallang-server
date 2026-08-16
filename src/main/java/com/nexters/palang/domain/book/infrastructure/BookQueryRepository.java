@@ -45,7 +45,7 @@ public class BookQueryRepository {
                         book.isbn, book.coverImageUrl, book.source,
                         passage.countDistinct(), opinion.countDistinct()))
                 .from(book)
-                .innerJoin(passage).on(passage.book.eq(book))
+                .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .innerJoin(opinion).on(opinion.passage.book.eq(book).and(opinion.deletedAt.isNull()))
                 .where(normalizedTitle.containsIgnoreCase(normalizedKeyword))
                 .groupBy(book.id, book.title, book.author, book.publisher, book.pageCount,
@@ -58,7 +58,7 @@ public class BookQueryRepository {
         Long total = queryFactory
                 .select(book.countDistinct())
                 .from(book)
-                .innerJoin(passage).on(passage.book.eq(book))
+                .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .innerJoin(opinion).on(opinion.passage.book.eq(book).and(opinion.deletedAt.isNull()))
                 .where(normalizedTitle.containsIgnoreCase(normalizedKeyword))
                 .fetchOne();
@@ -86,7 +86,7 @@ public class BookQueryRepository {
                         book.id, book.title, book.author, book.coverImageUrl,
                         passage.countDistinct(), opinion.countDistinct()))
                 .from(book)
-                .innerJoin(passage).on(passage.book.eq(book))
+                .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .groupBy(book.id, book.title, book.author, book.coverImageUrl)
                 .orderBy(passage.createdAt.max().desc(), book.id.asc())
@@ -122,7 +122,7 @@ public class BookQueryRepository {
                         book.id, book.title, book.author, book.coverImageUrl,
                         passage.countDistinct(), opinionCount))
                 .from(book)
-                .innerJoin(passage).on(passage.book.eq(book))
+                .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .innerJoin(opinionMine).on(opinionMine.passage.book.eq(book)
                         .and(opinionMine.user.id.eq(userId))
                         .and(opinionMine.deletedAt.isNull()));
@@ -167,7 +167,7 @@ public class BookQueryRepository {
                         book.id, book.title, book.author, book.coverImageUrl,
                         passage.countDistinct(), opinion.countDistinct()))
                 .from(book)
-                .innerJoin(passage).on(passage.book.eq(book))
+                .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .groupBy(book.id, book.title, book.author, book.coverImageUrl)
                 .orderBy(opinion.countDistinct().desc(), book.id.asc())
@@ -212,7 +212,7 @@ public class BookQueryRepository {
         Long count = queryFactory
                 .select(book.countDistinct())
                 .from(book)
-                .innerJoin(passage).on(passage.book.eq(book))
+                .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .fetchOne();
         return count != null ? count : 0L;
     }

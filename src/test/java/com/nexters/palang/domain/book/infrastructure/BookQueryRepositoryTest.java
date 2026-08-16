@@ -123,6 +123,28 @@ class BookQueryRepositoryTest {
     }
 
     @Test
+    @DisplayName("소프트 삭제된 대목은 passageCount 집계에서 제외된다")
+    void searchByTitleExcludesDeletedPassageFromCount() {
+        User writer = user("wsr-del");
+        Book book = book("삭제된 대목이 있는 책");
+        Passage withOpinion = passage(book, writer, 1);
+        opinion(withOpinion, writer);
+        // 대목은 그 대목의 마지막 흔적이 삭제될 때만 함께 삭제되므로(PM 요구사항), 흔적도 함께 삭제된 상태를 만든다.
+        Passage deleted = passage(book, writer, 2);
+        Opinion deletedOpinion = opinion(deleted, writer);
+        deletedOpinion.delete();
+        deleted.delete();
+        entityManager.persistAndFlush(deleted);
+
+        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle(
+                "삭제된 대목", BookSearchSort.RECENT, PageRequest.of(0, 20));
+
+        assertThat(results.getContent()).hasSize(1);
+        assertThat(results.getContent().get(0).passageCount()).isEqualTo(1);
+        assertThat(results.getContent().get(0).opinionCount()).isEqualTo(1);
+    }
+
+    @Test
     @DisplayName("검색어가 빈 문자열이면 흔적이 있는 전체 도서 목록을 반환한다")
     void searchByTitleReturnsAllBooksWhenKeywordIsBlank() {
         User writer = user("wsr3");
