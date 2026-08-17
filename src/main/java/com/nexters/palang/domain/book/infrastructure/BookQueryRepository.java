@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.book.infrastructure;
 
 import com.nexters.palang.domain.book.application.BookActivityProjection;
+import com.nexters.palang.domain.book.application.BookDetailProjection;
 import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.application.BookSearchSort;
 import com.nexters.palang.domain.book.application.OpinionCountScope;
@@ -15,6 +16,7 @@ import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -96,12 +98,12 @@ public class BookQueryRepository {
 
         return queryFactory
                 .select(Projections.constructor(BookActivityProjection.class,
-                        book.id, book.title, book.author, book.coverImageUrl,
+                        book.id, book.title, book.author, book.publisher, book.coverImageUrl,
                         passage.countDistinct(), opinion.countDistinct()))
                 .from(book)
                 .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
-                .groupBy(book.id, book.title, book.author, book.coverImageUrl)
+                .groupBy(book.id, book.title, book.author, book.publisher, book.coverImageUrl)
                 .orderBy(passage.createdAt.max().desc(), book.id.asc())
                 .offset(offset)
                 .limit(limit)
@@ -132,7 +134,7 @@ public class BookQueryRepository {
         // 대목"으로 제한해버려서, passageCount/opinionAll(ALL)이 도서 전체가 아니라 그 대목만 집계하게 된다.
         JPAQuery<BookActivityProjection> query = queryFactory
                 .select(Projections.constructor(BookActivityProjection.class,
-                        book.id, book.title, book.author, book.coverImageUrl,
+                        book.id, book.title, book.author, book.publisher, book.coverImageUrl,
                         passage.countDistinct(), opinionCount))
                 .from(book)
                 .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
@@ -145,7 +147,7 @@ public class BookQueryRepository {
         }
 
         List<BookActivityProjection> content = query
-                .groupBy(book.id, book.title, book.author, book.coverImageUrl)
+                .groupBy(book.id, book.title, book.author, book.publisher, book.coverImageUrl)
                 .orderBy(opinionMine.createdAt.max().desc(), book.id.asc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
@@ -177,18 +179,39 @@ public class BookQueryRepository {
 
         List<BookActivityProjection> content = queryFactory
                 .select(Projections.constructor(BookActivityProjection.class,
-                        book.id, book.title, book.author, book.coverImageUrl,
+                        book.id, book.title, book.author, book.publisher, book.coverImageUrl,
                         passage.countDistinct(), opinion.countDistinct()))
                 .from(book)
                 .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
-                .groupBy(book.id, book.title, book.author, book.coverImageUrl)
+                .groupBy(book.id, book.title, book.author, book.publisher, book.coverImageUrl)
                 .orderBy(opinion.countDistinct().desc(), book.id.asc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
 
         return new PageImpl<>(content, pageable, countBooksWithPassages());
+    }
+
+    // 도서 상세는 목록 API와 달리 대목이 하나도 없는 도서도 조회 대상이므로(단건 조회 후 404 판별 용도),
+    // passage/opinion 모두 leftJoin으로 집계해 존재하지 않으면 0으로 내려준다.
+    public Optional<BookDetailProjection> findBookDetail(Long bookId) {
+        QBook book = QBook.book;
+        QPassage passage = QPassage.passage;
+        QOpinion opinion = QOpinion.opinion;
+
+        BookDetailProjection result = queryFactory
+                .select(Projections.constructor(BookDetailProjection.class,
+                        book.id, book.title, book.author, book.publisher, book.pageCount, book.coverImageUrl,
+                        passage.countDistinct(), opinion.countDistinct()))
+                .from(book)
+                .leftJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
+                .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
+                .where(book.id.eq(bookId))
+                .groupBy(book.id, book.title, book.author, book.publisher, book.pageCount, book.coverImageUrl)
+                .fetchOne();
+
+        return Optional.ofNullable(result);
     }
 
     // "최근에 남긴 책"은 Passage를 새로 만든 책이 아니라 흔적(Opinion)을 남긴 책 기준이다 (FR-WRITE-01).

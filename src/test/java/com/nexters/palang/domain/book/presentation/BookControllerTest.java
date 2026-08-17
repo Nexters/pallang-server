@@ -6,22 +6,31 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexters.palang.domain.book.application.BookActivityProjection;
 import com.nexters.palang.domain.book.application.BookCarouselPage;
+import com.nexters.palang.domain.book.application.BookDetail;
+import com.nexters.palang.domain.book.application.BookDetailProjection;
 import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.application.BookSearchSort;
 import com.nexters.palang.domain.book.application.BookService;
 import com.nexters.palang.domain.book.application.ExternalBookResult;
 import com.nexters.palang.domain.book.application.OpinionCountScope;
+import com.nexters.palang.domain.book.common.error.BookErrorCode;
+import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
+import com.nexters.palang.domain.book.domain.ReadingStatus;
+import com.nexters.palang.domain.book.domain.UserBookStatus;
 import com.nexters.palang.domain.book.presentation.dto.CreateBookRequest;
 import com.nexters.palang.global.security.CurrentUserProvider;
 import com.nexters.palang.global.security.LoginRequiredException;
@@ -159,7 +168,7 @@ class BookControllerTest {
     @DisplayName("홈 캐러셀 도서 목록을 요청하면 대목/흔적 수와 함께 반환한다")
     void getHomeCarouselBooks() throws Exception {
         given(bookService.getHomeCarouselBooks(isNull(), anyInt())).willReturn(
-                new BookCarouselPage(List.of(new BookActivityProjection(1L, "제목", "작가", "cover", 3, 7)), 0, 20, 1));
+                new BookCarouselPage(List.of(new BookActivityProjection(1L, "제목", "작가", "출판사", "cover", 3, 7)), 0, 20, 1));
 
         mockMvc.perform(get("/api/home/books"))
                 .andExpect(status().isOk())
@@ -171,7 +180,7 @@ class BookControllerTest {
     @DisplayName("홈 캐러셀 도서 목록 조회 시 offset을 지정하면 그대로 전달하고, 응답에 이전/다음 여부를 함께 내려준다")
     void getHomeCarouselBooksWithOffset() throws Exception {
         given(bookService.getHomeCarouselBooks(eq(40L), anyInt())).willReturn(
-                new BookCarouselPage(List.of(new BookActivityProjection(1L, "제목", "작가", "cover", 3, 7)), 40, 20, 100));
+                new BookCarouselPage(List.of(new BookActivityProjection(1L, "제목", "작가", "출판사", "cover", 3, 7)), 40, 20, 100));
 
         mockMvc.perform(get("/api/home/books").param("offset", "40").param("size", "20"))
                 .andExpect(status().isOk())
@@ -185,7 +194,7 @@ class BookControllerTest {
     void getMyLibraryBooks() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         given(bookService.getMyLibraryBooks(eq(1L), any(Pageable.class), eq(OpinionCountScope.ALL))).willReturn(
-                new PageImpl<>(List.of(new BookActivityProjection(1L, "제목", "작가", "cover", 3, 7)),
+                new PageImpl<>(List.of(new BookActivityProjection(1L, "제목", "작가", "출판사", "cover", 3, 7)),
                         DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/my-library"))
@@ -200,7 +209,7 @@ class BookControllerTest {
     void getMyLibraryBooksWithMineScope() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         given(bookService.getMyLibraryBooks(eq(1L), any(Pageable.class), eq(OpinionCountScope.MINE))).willReturn(
-                new PageImpl<>(List.of(new BookActivityProjection(1L, "제목", "작가", "cover", 3, 2)),
+                new PageImpl<>(List.of(new BookActivityProjection(1L, "제목", "작가", "출판사", "cover", 3, 2)),
                         DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/my-library").param("opinionCountScope", "MINE"))
@@ -256,7 +265,7 @@ class BookControllerTest {
     @DisplayName("인기 도서 목록을 요청하면 흔적 많은 순 목록을 반환한다")
     void getPopularBooks() throws Exception {
         given(bookService.getPopularBooks(any(Pageable.class))).willReturn(
-                new PageImpl<>(List.of(new BookActivityProjection(1L, "인기 도서", "작가", "cover", 3, 10)),
+                new PageImpl<>(List.of(new BookActivityProjection(1L, "인기 도서", "작가", "출판사", "cover", 3, 10)),
                         DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/popular"))
@@ -277,5 +286,51 @@ class BookControllerTest {
         verify(bookService).getPopularBooks(captor.capture());
         assertThat(captor.getValue().getPageNumber()).isEqualTo(2);
         assertThat(captor.getValue().getPageSize()).isEqualTo(5);
+    }
+
+    @Test
+    @DisplayName("로그인한 사용자가 도서 단건을 조회하면 myStatus/myCurrentPage를 함께 반환한다")
+    void getBookDetailIncludesMyStatusWhenLoggedIn() throws Exception {
+        given(currentUserProvider.findCurrentUserId()).willReturn(java.util.Optional.of(1L));
+        BookDetailProjection projection = new BookDetailProjection(1L, "제목", "작가", "출판사", 300, "cover", 3, 7);
+        UserBookStatus status = UserBookStatus.builder()
+                .user(null).book(book(1L, "제목")).status(ReadingStatus.READING).currentPage(87).build();
+        given(bookService.getBookDetail(1L, 1L)).willReturn(new BookDetail(projection, status));
+
+        mockMvc.perform(get("/api/books/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.bookId").value(1))
+                .andExpect(jsonPath("$.data.publisher").value("출판사"))
+                .andExpect(jsonPath("$.data.myStatus").value("READING"))
+                .andExpect(jsonPath("$.data.myCurrentPage").value(87));
+    }
+
+    @Test
+    @DisplayName("인증 없이 도서 단건을 조회하면 myStatus 없이 도서 메타만 반환한다")
+    void getBookDetailWithoutAuthOmitsMyStatus() throws Exception {
+        given(currentUserProvider.findCurrentUserId()).willReturn(java.util.Optional.empty());
+        BookDetailProjection projection = new BookDetailProjection(1L, "제목", "작가", "출판사", 300, "cover", 3, 7);
+        given(bookService.getBookDetail(1L, null)).willReturn(new BookDetail(projection, null));
+
+        mockMvc.perform(get("/api/books/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.bookId").value(1))
+                .andExpect(jsonPath("$.data.myStatus").doesNotExist())
+                .andExpect(jsonPath("$.data.myCurrentPage").doesNotExist())
+                // jsonPath(...).doesNotExist()는 값이 null이어도(키는 존재) 통과하므로, 필드 자체가
+                // 응답 JSON에서 빠졌는지는 원문 문자열로 별도 검증한다.
+                .andExpect(content().string(not(containsString("myStatus"))))
+                .andExpect(content().string(not(containsString("myCurrentPage"))));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 도서를 조회하면 404 에러가 발생한다")
+    void getBookDetailReturns404WhenBookNotFound() throws Exception {
+        given(currentUserProvider.findCurrentUserId()).willReturn(java.util.Optional.empty());
+        given(bookService.getBookDetail(999L, null)).willThrow(new BookException(BookErrorCode.BOOK_NOT_FOUND));
+
+        mockMvc.perform(get("/api/books/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("BOOK_404_1"));
     }
 }

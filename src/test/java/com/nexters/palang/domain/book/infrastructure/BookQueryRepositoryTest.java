@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
 import com.nexters.palang.domain.book.application.BookActivityProjection;
+import com.nexters.palang.domain.book.application.BookDetailProjection;
 import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.application.BookSearchSort;
 import com.nexters.palang.domain.book.application.OpinionCountScope;
@@ -443,5 +444,38 @@ class BookQueryRepositoryTest {
         Page<Long> results = bookQueryRepository.findRecentlyActiveBookIds(me.getId(), null, PageRequest.of(0, 10));
 
         assertThat(results.getContent()).containsExactly(book.getId());
+    }
+
+    @Test
+    @DisplayName("도서 상세는 대목/흔적 유무와 무관하게 도서 메타와 집계 수를 함께 반환한다")
+    void findBookDetailReturnsBookWithCounts() {
+        User writer = user("wsr-dtl");
+        Book book = book("상세 조회용 책");
+        Passage passage1 = passage(book, writer, 1);
+        opinion(passage1, writer);
+        opinion(passage1, writer);
+
+        BookDetailProjection result = bookQueryRepository.findBookDetail(book.getId()).orElseThrow();
+
+        assertThat(result.bookId()).isEqualTo(book.getId());
+        assertThat(result.passageCount()).isEqualTo(1);
+        assertThat(result.opinionCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("대목이 없는 도서도 도서 상세 조회 대상에 포함되고 집계 수는 0이다")
+    void findBookDetailIncludesBookWithoutPassages() {
+        Book book = book("대목 없는 책");
+
+        BookDetailProjection result = bookQueryRepository.findBookDetail(book.getId()).orElseThrow();
+
+        assertThat(result.passageCount()).isEqualTo(0);
+        assertThat(result.opinionCount()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 도서를 조회하면 빈 Optional을 반환한다")
+    void findBookDetailReturnsEmptyWhenBookNotFound() {
+        assertThat(bookQueryRepository.findBookDetail(999L)).isEmpty();
     }
 }
