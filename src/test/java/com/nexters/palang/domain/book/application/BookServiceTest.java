@@ -10,10 +10,14 @@ import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.book.infrastructure.AladinBookApiClient;
 import com.nexters.palang.domain.book.infrastructure.AladinSearchResult;
+import com.nexters.palang.domain.book.domain.ReadingStatus;
+import com.nexters.palang.domain.book.domain.UserBookStatus;
 import com.nexters.palang.domain.book.infrastructure.BookQueryRepository;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
+import com.nexters.palang.domain.book.infrastructure.UserBookStatusRepository;
 import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.presentation.dto.CreateBookRequest;
+import java.util.Optional;
 import com.nexters.palang.global.storage.FileStorageService;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +44,9 @@ class BookServiceTest {
     private BookQueryRepository bookQueryRepository;
 
     @Mock
+    private UserBookStatusRepository userBookStatusRepository;
+
+    @Mock
     private AladinBookApiClient aladinBookApiClient;
 
     @Mock
@@ -49,7 +56,8 @@ class BookServiceTest {
 
     @BeforeEach
     void setUp() {
-        bookService = new BookService(bookRepository, bookQueryRepository, aladinBookApiClient, fileStorageService);
+        bookService = new BookService(
+                bookRepository, bookQueryRepository, userBookStatusRepository, aladinBookApiClient, fileStorageService);
     }
 
     private Book book(Long id, String title) {
@@ -174,7 +182,7 @@ class BookServiceTest {
     void getPopularBooks() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<BookActivityProjection> expected = new PageImpl<>(
-                List.of(new BookActivityProjection(1L, "책1", "작가", "cover", 5, 10)), pageable, 1);
+                List.of(new BookActivityProjection(1L, "책1", "작가", "출판사", "cover", 5, 10)), pageable, 1);
         given(bookQueryRepository.findPopularBooks(pageable)).willReturn(expected);
 
         Page<BookActivityProjection> results = bookService.getPopularBooks(pageable);
@@ -187,7 +195,7 @@ class BookServiceTest {
     void getHomeCarouselBooksResolvesCenterOffsetWhenOffsetIsNull() {
         given(bookQueryRepository.countCarouselBooks()).willReturn(100L);
         given(bookQueryRepository.findCarouselBooks(40L, 20))
-                .willReturn(List.of(new BookActivityProjection(1L, "책1", "작가", "cover", 5, 10)));
+                .willReturn(List.of(new BookActivityProjection(1L, "책1", "작가", "출판사", "cover", 5, 10)));
 
         BookCarouselPage result = bookService.getHomeCarouselBooks(null, 20);
 
@@ -223,7 +231,7 @@ class BookServiceTest {
     void getMyLibraryBooksDelegatesToRepository() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<BookActivityProjection> expected = new PageImpl<>(
-                List.of(new BookActivityProjection(1L, "책1", "작가", "cover", 5, 10)), pageable, 1);
+                List.of(new BookActivityProjection(1L, "책1", "작가", "출판사", "cover", 5, 10)), pageable, 1);
         given(bookQueryRepository.findMyLibraryBooks(10L, pageable, OpinionCountScope.ALL)).willReturn(expected);
 
         Page<BookActivityProjection> results = bookService.getMyLibraryBooks(10L, pageable, OpinionCountScope.ALL);
@@ -241,5 +249,41 @@ class BookServiceTest {
         Page<BookActivityProjection> results = bookService.getMyLibraryBooks(10L, pageable, OpinionCountScope.MINE);
 
         assertThat(results).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("로그인한 사용자가 도서 상세를 조회하면 myStatus/myCurrentPage를 함께 반환한다")
+    void getBookDetailIncludesMyStatusWhenLoggedIn() {
+        BookDetailProjection projection = new BookDetailProjection(1L, "책1", "작가", "출판사", 300, "cover", 5, 10);
+        UserBookStatus status = UserBookStatus.builder()
+                .user(null).book(book(1L, "책1")).status(ReadingStatus.READING).currentPage(87).build();
+        given(bookQueryRepository.findBookDetail(1L)).willReturn(Optional.of(projection));
+        given(userBookStatusRepository.findByUserIdAndBookId(10L, 1L)).willReturn(Optional.of(status));
+
+        BookDetail result = bookService.getBookDetail(1L, 10L);
+
+        assertThat(result.book()).isEqualTo(projection);
+        assertThat(result.myStatus()).isSameAs(status);
+    }
+
+    @Test
+    @DisplayName("비로그인 요청은 UserBookStatus를 조회하지 않고 myStatus를 null로 반환한다")
+    void getBookDetailSkipsMyStatusWhenNotLoggedIn() {
+        BookDetailProjection projection = new BookDetailProjection(1L, "책1", "작가", "출판사", 300, "cover", 5, 10);
+        given(bookQueryRepository.findBookDetail(1L)).willReturn(Optional.of(projection));
+
+        BookDetail result = bookService.getBookDetail(1L, null);
+
+        assertThat(result.myStatus()).isNull();
+        verifyNoInteractions(userBookStatusRepository);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 도서를 조회하면 BOOK_NOT_FOUND 예외가 발생한다")
+    void getBookDetailThrowsWhenBookNotFound() {
+        given(bookQueryRepository.findBookDetail(1L)).willReturn(Optional.empty());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> bookService.getBookDetail(1L, null))
+                .isInstanceOf(BookException.class);
     }
 }
