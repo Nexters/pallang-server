@@ -17,6 +17,8 @@ import com.nexters.palang.domain.auth.application.AuthService;
 import com.nexters.palang.domain.opinion.application.LikedOpinionProjection;
 import com.nexters.palang.domain.opinion.application.MyOpinionProjection;
 import com.nexters.palang.domain.opinion.application.OpinionService;
+import com.nexters.palang.domain.passage.application.MyPassageProjection;
+import com.nexters.palang.domain.passage.application.PassageService;
 import com.nexters.palang.domain.user.application.UserService;
 import com.nexters.palang.domain.user.common.error.UserErrorCode;
 import com.nexters.palang.domain.user.common.error.UserException;
@@ -60,6 +62,9 @@ class UserControllerTest {
 
     @MockitoBean
     private OpinionService opinionService;
+
+    @MockitoBean
+    private PassageService passageService;
 
     @MockitoBean
     private CurrentUserProvider currentUserProvider;
@@ -293,5 +298,33 @@ class UserControllerTest {
         mockMvc.perform(get("/api/users/me/likes"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.opinions[0].opinionId").value(1));
+    }
+
+    @Test
+    @DisplayName("내가 남긴 스포일러 대목 목록을 조회한다")
+    void getMyPassages() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        MyPassageProjection projection = new MyPassageProjection(
+                1L, 10L, 5, "발췌 문장", true, LocalDateTime.now());
+        given(passageService.getMyPassages(eq(1L), eq(10L), eq(true), any())).willReturn(
+                new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
+
+        mockMvc.perform(get("/api/users/me/passages")
+                        .param("bookId", "10")
+                        .param("spoilerOnly", "true"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.passages[0].passageId").value(1))
+                .andExpect(jsonPath("$.data.passages[0].bookId").value(10))
+                .andExpect(jsonPath("$.data.passages[0].isSpoiler").value(true));
+    }
+
+    @Test
+    @DisplayName("인증 없이 내 대목 목록을 요청하면 401 에러가 발생한다")
+    void getMyPassagesFailsWhenUnauthenticated() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willThrow(new LoginRequiredException());
+
+        mockMvc.perform(get("/api/users/me/passages"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("AUTH_401_1"));
     }
 }

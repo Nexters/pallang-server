@@ -3,6 +3,7 @@ package com.nexters.palang.domain.user.presentation;
 import com.nexters.palang.domain.user.presentation.dto.LikedOpinionListResponse;
 import com.nexters.palang.domain.user.presentation.dto.MeResponse;
 import com.nexters.palang.domain.user.presentation.dto.MyOpinionListResponse;
+import com.nexters.palang.domain.user.presentation.dto.MyPassageListResponse;
 import com.nexters.palang.domain.user.presentation.dto.OnboardingCompleteResponse;
 import com.nexters.palang.domain.user.presentation.dto.UpdateBackgroundColorRequest;
 import com.nexters.palang.domain.user.presentation.dto.UpdateNicknameRequest;
@@ -174,6 +175,29 @@ public interface UserApi {
                                     + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}")))
     })
     ResponseEntity<DataResponse<LikedOpinionListResponse>> getLikedOpinions(
+            @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,
+            @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
+    );
+
+    @Operation(summary = "내 스포일러 대목 목록", description = "내가 흔적을 남긴 대목을 최신순으로 조회합니다. "
+            + "소유 기준은 최초 작성자가 아니라 해당 대목에 흔적을 남긴 사용자이며, 병합된 대목은 흔적을 남긴 모든 사용자에게 노출됩니다. "
+            + "bookId를 지정하면 해당 책으로 한정하고, 생략하면 전체 책을 대상으로 합니다. "
+            + "spoilerOnly=true면 스포일러 대목만 조회합니다. "
+            + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/users/me/passages\",\"title\":\"COMMON_400_1\","
+                                    + "\"status\":400,\"detail\":\"'size' 파라미터의 값이 올바르지 않습니다.\"}"))),
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/users/me/passages\",\"title\":\"AUTH_401_1\","
+                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}")))
+    })
+    ResponseEntity<DataResponse<MyPassageListResponse>> getMyPassages(
+            @Parameter(description = "책 ID (생략 시 전체 책 대상)") Long bookId,
+            @Parameter(description = "스포일러 대목만 조회 여부 (기본값 false)") boolean spoilerOnly,
             @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,
             @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
     );

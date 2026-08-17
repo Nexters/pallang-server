@@ -41,6 +41,11 @@ public class PassageService {
         return passageQueryRepository.findPassagesByPage(bookId, pageNumber);
     }
 
+    // 내가 남긴 대목 목록: bookId 미지정 시 전체 도서, spoilerOnly=true 시 스포일러 대목만.
+    public Page<MyPassageProjection> getMyPassages(Long userId, Long bookId, boolean spoilerOnly, Pageable pageable) {
+        return passageQueryRepository.findMyPassages(userId, bookId, spoilerOnly, pageable);
+    }
+
     public Map<Long, List<DecorationMergeCandidate>> getMergedDecorationsByPassageId(List<Passage> passages) {
         Map<Long, List<DecorationMergeCandidate>> mergedByPassageId = new LinkedHashMap<>();
         for (Passage passage : passages) {
