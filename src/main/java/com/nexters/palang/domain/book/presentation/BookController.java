@@ -7,6 +7,7 @@ import com.nexters.palang.domain.book.application.OpinionCountScope;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.presentation.dto.BookActivityListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookCarouselListResponse;
+import com.nexters.palang.domain.book.presentation.dto.BookDetailResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookSearchListResponse;
@@ -21,6 +22,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -106,6 +108,14 @@ public class BookController implements BookApi {
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         return ResponseEntity.ok(DataResponse.from(
                 BookMapper.toActivityListResponse(bookService.getPopularBooks(pageable(page, size)))));
+    }
+
+    @Override
+    @GetMapping("/api/books/{bookId}")
+    public ResponseEntity<DataResponse<BookDetailResponse>> getBookDetail(@PathVariable Long bookId) {
+        Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
+        return ResponseEntity.ok(DataResponse.from(
+                BookMapper.toDetailResponse(bookService.getBookDetail(bookId, currentUserId))));
     }
 
     private Pageable pageable(int page, int size) {

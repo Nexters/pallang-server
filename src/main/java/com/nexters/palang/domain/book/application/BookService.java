@@ -4,10 +4,12 @@ import com.nexters.palang.domain.book.common.error.BookErrorCode;
 import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
+import com.nexters.palang.domain.book.domain.UserBookStatus;
 import com.nexters.palang.domain.book.infrastructure.AladinBookApiClient;
 import com.nexters.palang.domain.book.infrastructure.AladinSearchResult;
 import com.nexters.palang.domain.book.infrastructure.BookQueryRepository;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
+import com.nexters.palang.domain.book.infrastructure.UserBookStatusRepository;
 import com.nexters.palang.domain.book.presentation.dto.CreateBookRequest;
 import com.nexters.palang.global.storage.FileStorageService;
 import com.nexters.palang.global.storage.ImageMimeType;
@@ -35,6 +37,7 @@ public class BookService {
 
     private final BookRepository bookRepository;
     private final BookQueryRepository bookQueryRepository;
+    private final UserBookStatusRepository userBookStatusRepository;
     private final AladinBookApiClient aladinBookApiClient;
     private final FileStorageService fileStorageService;
 
@@ -104,5 +107,15 @@ public class BookService {
 
     public Page<BookActivityProjection> getPopularBooks(Pageable pageable) {
         return bookQueryRepository.findPopularBooks(pageable);
+    }
+
+    // 비로그인 요청(currentUserId == null)은 myStatus 없이 도서 메타만 조회한다 (Soft Authentication).
+    public BookDetail getBookDetail(Long bookId, Long currentUserId) {
+        BookDetailProjection projection = bookQueryRepository.findBookDetail(bookId)
+                .orElseThrow(() -> new BookException(BookErrorCode.BOOK_NOT_FOUND));
+        UserBookStatus myStatus = currentUserId != null
+                ? userBookStatusRepository.findByUserIdAndBookId(currentUserId, bookId).orElse(null)
+                : null;
+        return new BookDetail(projection, myStatus);
     }
 }
