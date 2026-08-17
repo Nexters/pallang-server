@@ -235,6 +235,26 @@ class BookQueryRepositoryTest {
     }
 
     @Test
+    @DisplayName("offset/limit을 직접 주면 Pageable의 page*size로는 표현할 수 없는 임의 위치부터 조회한다")
+    void searchByTitleWithRawOffsetAndLimitReturnsArbitrarySlice() {
+        User writer = user("wsr-offset");
+        Book book1 = book("오프셋 책1");
+        Book book2 = book("오프셋 책2");
+        Book book3 = book("오프셋 책3");
+        opinion(passage(book1, writer, 1), writer);
+        opinion(passage(book2, writer, 1), writer);
+        opinion(passage(book3, writer, 1), writer);
+
+        List<BookSearchProjection> all = bookQueryRepository.searchByTitle(
+                "오프셋", BookSearchSort.NAME, 0L, 10);
+        List<BookSearchProjection> middleOnly = bookQueryRepository.searchByTitle(
+                "오프셋", BookSearchSort.NAME, 1L, 1);
+
+        assertThat(middleOnly).extracting(BookSearchProjection::bookId)
+                .containsExactly(all.get(1).bookId());
+    }
+
+    @Test
     @DisplayName("대목이 있는 도서만 캐러셀에 노출되고 대목/흔적 수가 함께 집계된다")
     void findCarouselBooksOnlyIncludesBooksWithPassages() {
         User writer = user("writer-1");

@@ -18,8 +18,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
@@ -100,9 +98,8 @@ class AladinBookApiClientCacheTest {
                   ]
                 }
                 """)));
-        Pageable pageable = PageRequest.of(0, 8);
 
-        AladinSearchResult first = aladinBookApiClient.search("채식주의자캐시테스트", pageable);
+        AladinSearchResult first = aladinBookApiClient.search("채식주의자캐시테스트", 0, 8);
         assertThat(first.items()).as("첫 호출 결과가 비어있으면 unless 조건 때문에 애초에 캐싱되지 않는다").isNotEmpty();
 
         // @Cacheable의 캐시 put은 원래 메서드가 결과를 반환하기 "전에" 같은 스레드에서 동기적으로
@@ -112,7 +109,7 @@ class AladinBookApiClientCacheTest {
         String cacheKey = "채식주의자캐시테스트:0:8";
         awaitCacheEntry(cacheKey);
 
-        AladinSearchResult second = aladinBookApiClient.search("채식주의자캐시테스트", pageable);
+        AladinSearchResult second = aladinBookApiClient.search("채식주의자캐시테스트", 0, 8);
 
         assertThat(second).isEqualTo(first);
         verify(exchangeFunction, times(1)).exchange(any());
@@ -124,11 +121,10 @@ class AladinBookApiClientCacheTest {
         given(exchangeFunction.exchange(any()))
                 .willReturn(Mono.just(ClientResponse.create(HttpStatus.INTERNAL_SERVER_ERROR).body("error").build()))
                 .willReturn(Mono.just(jsonResponse("{}")));
-        Pageable pageable = PageRequest.of(0, 8);
 
-        assertThatThrownBy(() -> aladinBookApiClient.search("실패캐시테스트", pageable))
+        assertThatThrownBy(() -> aladinBookApiClient.search("실패캐시테스트", 0, 8))
                 .isInstanceOf(BookException.class);
-        AladinSearchResult second = aladinBookApiClient.search("실패캐시테스트", pageable);
+        AladinSearchResult second = aladinBookApiClient.search("실패캐시테스트", 0, 8);
 
         assertThat(second.items()).isEmpty();
         verify(exchangeFunction, times(2)).exchange(any());
@@ -138,10 +134,9 @@ class AladinBookApiClientCacheTest {
     @DisplayName("빈 결과는 캐싱되지 않아 다음 호출에서 알라딘을 다시 호출한다")
     void searchDoesNotCacheEmptyResult() {
         given(exchangeFunction.exchange(any())).willReturn(Mono.just(jsonResponse("{}")));
-        Pageable pageable = PageRequest.of(0, 8);
 
-        aladinBookApiClient.search("빈결과캐시테스트", pageable);
-        aladinBookApiClient.search("빈결과캐시테스트", pageable);
+        aladinBookApiClient.search("빈결과캐시테스트", 0, 8);
+        aladinBookApiClient.search("빈결과캐시테스트", 0, 8);
 
         verify(exchangeFunction, times(2)).exchange(any());
     }

@@ -13,8 +13,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.ClientRequest;
 import org.springframework.web.reactive.function.client.ClientResponse;
@@ -65,7 +63,7 @@ class AladinBookApiClientTest {
                 }
                 """);
 
-        AladinSearchResult result = aladinBookApiClient().search("프랑켄슈타인", PageRequest.of(0, 20));
+        AladinSearchResult result = aladinBookApiClient().search("프랑켄슈타인", 0, 20);
 
         assertThat(result.items()).containsExactly(
                 new ExternalBookResult("프랑켄슈타인", "메리 셸리", "문학동네", "9788954429721",
@@ -78,7 +76,7 @@ class AladinBookApiClientTest {
     void searchReturnsEmptyResultWhenNoItems() {
         stubSearch("{}");
 
-        AladinSearchResult result = aladinBookApiClient().search("없는 책", PageRequest.of(0, 20));
+        AladinSearchResult result = aladinBookApiClient().search("없는 책", 0, 20);
 
         assertThat(result.items()).isEmpty();
         assertThat(result.totalResults()).isZero();
@@ -90,18 +88,17 @@ class AladinBookApiClientTest {
         given(exchangeFunction.exchange(any())).willReturn(
                 Mono.just(ClientResponse.create(HttpStatus.INTERNAL_SERVER_ERROR).body("error").build()));
 
-        assertThatThrownBy(() -> aladinBookApiClient().search("프랑켄슈타인", PageRequest.of(0, 20)))
+        assertThatThrownBy(() -> aladinBookApiClient().search("프랑켄슈타인", 0, 20))
                 .isInstanceOf(BookException.class);
     }
 
     @Test
-    @DisplayName("page/size를 알라딘의 1부터 시작하는 start/MaxResults 파라미터로 변환해서 요청한다")
-    void searchConvertsPageableToAladinStartAndMaxResults() {
+    @DisplayName("offset/maxResults를 알라딘의 1부터 시작하는 start/MaxResults 파라미터로 변환해서 요청한다")
+    void searchConvertsOffsetToAladinStartAndMaxResults() {
         ArgumentCaptor<ClientRequest> requestCaptor = ArgumentCaptor.forClass(ClientRequest.class);
         given(exchangeFunction.exchange(requestCaptor.capture())).willReturn(Mono.just(jsonResponse("{}")));
 
-        Pageable secondPageOfFive = PageRequest.of(1, 5);
-        aladinBookApiClient().search("프랑켄슈타인", secondPageOfFive);
+        aladinBookApiClient().search("프랑켄슈타인", 5, 5);
 
         String query = requestCaptor.getValue().url().getQuery();
         assertThat(query).contains("start=6").contains("MaxResults=5");
@@ -113,7 +110,7 @@ class AladinBookApiClientTest {
         ArgumentCaptor<ClientRequest> requestCaptor = ArgumentCaptor.forClass(ClientRequest.class);
         given(exchangeFunction.exchange(requestCaptor.capture())).willReturn(Mono.just(jsonResponse("{}")));
 
-        aladinBookApiClient().search("프랑켄슈타인", PageRequest.of(0, 20));
+        aladinBookApiClient().search("프랑켄슈타인", 0, 20);
 
         String query = requestCaptor.getValue().url().getQuery();
         assertThat(query).contains("Cover=Big");

@@ -34,13 +34,22 @@ public class BookQueryRepository {
     // 소프트 삭제된 대목/그 흔적은 leftJoin의 ON 절에서 제외한다 (WHERE에 두면 대목이 전부 삭제된
     // 도서까지 결과에서 사라진다 — ON에 두어야 매칭 실패로 취급되어 passageCount 0인 채로 남는다).
     public Page<BookSearchProjection> searchByTitle(String keyword, BookSearchSort sort, Pageable pageable) {
+        List<BookSearchProjection> content = searchByTitle(keyword, sort, pageable.getOffset(), pageable.getPageSize());
+        // 흔적/대목 유무로 필터링하지 않으므로 count 쪽은 join 없이 제목 조건만으로 센다.
+        return new PageImpl<>(content, pageable, countByTitle(keyword));
+    }
+
+    // GET /api/books/search가 DB 검색 결과를 알라딘 결과와 하나의 연속된 목록처럼 취급해 페이지네이션할 때
+    // 쓰는 오버로드다. Pageable은 offset이 page*size로 고정돼 임의의 offset을 표현할 수 없어
+    // (findCarouselBooks와 동일한 이유) offset/limit을 직접 받는다.
+    public List<BookSearchProjection> searchByTitle(String keyword, BookSearchSort sort, long offset, int limit) {
         QBook book = QBook.book;
         QPassage passage = QPassage.passage;
         QOpinion opinion = QOpinion.opinion;
 
         String normalizedKeyword = Book.normalize(keyword);
 
-        List<BookSearchProjection> content = queryFactory
+        return queryFactory
                 .select(Projections.constructor(BookSearchProjection.class,
                         book.id, book.title, book.author, book.publisher, book.pageCount,
                         book.isbn, book.coverImageUrl, book.source,
@@ -52,12 +61,9 @@ public class BookQueryRepository {
                 .groupBy(book.id, book.title, book.author, book.publisher, book.pageCount,
                         book.isbn, book.coverImageUrl, book.source)
                 .orderBy(searchOrderSpecifiers(sort, book, opinion, normalizedKeyword))
-                .offset(pageable.getOffset())
-                .limit(pageable.getPageSize())
+                .offset(offset)
+                .limit(limit)
                 .fetch();
-
-        // 흔적/대목 유무로 필터링하지 않으므로 count 쪽은 join 없이 제목 조건만으로 센다.
-        return new PageImpl<>(content, pageable, countByTitle(keyword));
     }
 
     // 제목으로 매칭되는 DB 도서의 전체 개수. join 없이 단순 COUNT라 자주 호출해도 부담이 적다.
