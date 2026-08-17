@@ -43,7 +43,7 @@ public class OpinionService {
     // 흔적 목록(FR-OPINION-03): 최신순(기본)/좋아요순. currentUserId는 비로그인 시 null(liked는 항상 false).
     public Page<OpinionSummaryProjection> getOpinions(
             Long passageId, OpinionSortType sortType, Pageable pageable, Long currentUserId) {
-        if (!passageRepository.existsById(passageId)) {
+        if (!passageRepository.existsByIdAndDeletedAtIsNull(passageId)) {
             throw new PassageException(PassageErrorCode.PASSAGE_NOT_FOUND);
         }
         return opinionQueryRepository.findOpinions(passageId, sortType, pageable, currentUserId);
@@ -62,11 +62,18 @@ public class OpinionService {
         return opinion;
     }
 
+    // 대목은 여러 사용자가 공유하는 단위이므로, 이 삭제로 그 대목에 살아있는 흔적이 하나도 남지 않을 때만
+    // 대목도 함께 소프트 삭제한다 (PM 요구사항: 흔적 0개인 대목은 존재할 수 없다).
     @Transactional
     public void removeOpinion(Long opinionId, Long userId) {
         Opinion opinion = getExistingOpinion(opinionId);
         validateOwner(opinion, userId);
         opinion.delete();
+
+        Long passageId = opinion.getPassage().getId();
+        if (!opinionRepository.existsByPassageIdAndDeletedAtIsNullAndIdNot(passageId, opinion.getId())) {
+            opinion.getPassage().delete();
+        }
     }
 
     private Opinion getExistingOpinion(Long opinionId) {
@@ -110,6 +117,9 @@ public class OpinionService {
     private Passage mergeIntoExistingPassage(CreateOpinionRequest request) {
         Passage existing = passageRepository.findById(request.passageId())
                 .orElseThrow(() -> new PassageException(PassageErrorCode.PASSAGE_NOT_FOUND));
+        if (existing.isDeleted()) {
+            throw new PassageException(PassageErrorCode.PASSAGE_NOT_FOUND);
+        }
         if (!existing.getBook().getId().equals(request.bookId())) {
             throw new PassageException(PassageErrorCode.PASSAGE_BOOK_MISMATCH);
         }

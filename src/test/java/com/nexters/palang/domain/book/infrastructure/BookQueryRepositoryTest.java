@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import com.nexters.palang.domain.book.application.BookActivityProjection;
 import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.application.BookSearchSort;
+import com.nexters.palang.domain.book.application.OpinionCountScope;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.passage.domain.Passage;
@@ -105,6 +106,45 @@ class BookQueryRepositoryTest {
                 .containsExactlyInAnyOrder(bookWithoutPassage.getId(), bookWithoutOpinion.getId());
         assertThat(results.getContent()).extracting(BookSearchProjection::passageCount, BookSearchProjection::opinionCount)
                 .containsExactlyInAnyOrder(tuple(0L, 0L), tuple(1L, 0L));
+    }
+
+    @Test
+    @DisplayName("흔적이 없는 대목도 도서의 passageCount 집계에 포함한다")
+    void searchByTitleCountsPassagesWithoutOpinionsToo() {
+        User writer = user("wsr-cnt");
+        Book book = book("여러 대목 검색용 책");
+        Passage withOpinion = passage(book, writer, 1);
+        passage(book, writer, 2); // 흔적 없는 대목
+        opinion(withOpinion, writer);
+
+        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle(
+                "여러 대목", BookSearchSort.RECENT, PageRequest.of(0, 20));
+
+        assertThat(results.getContent()).hasSize(1);
+        assertThat(results.getContent().get(0).passageCount()).isEqualTo(2);
+        assertThat(results.getContent().get(0).opinionCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("소프트 삭제된 대목은 passageCount 집계에서 제외된다")
+    void searchByTitleExcludesDeletedPassageFromCount() {
+        User writer = user("wsr-del");
+        Book book = book("삭제된 대목이 있는 책");
+        Passage withOpinion = passage(book, writer, 1);
+        opinion(withOpinion, writer);
+        // 대목은 그 대목의 마지막 흔적이 삭제될 때만 함께 삭제되므로(PM 요구사항), 흔적도 함께 삭제된 상태를 만든다.
+        Passage deleted = passage(book, writer, 2);
+        Opinion deletedOpinion = opinion(deleted, writer);
+        deletedOpinion.delete();
+        deleted.delete();
+        entityManager.persistAndFlush(deleted);
+
+        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle(
+                "삭제된 대목", BookSearchSort.RECENT, PageRequest.of(0, 20));
+
+        assertThat(results.getContent()).hasSize(1);
+        assertThat(results.getContent().get(0).passageCount()).isEqualTo(1);
+        assertThat(results.getContent().get(0).opinionCount()).isEqualTo(1);
     }
 
     @Test
@@ -284,7 +324,7 @@ class BookQueryRepositoryTest {
     }
 
     @Test
-    @DisplayName("내 서재는 내가 흔적을 남긴 도서만 포함하고 대목/흔적 수는 도서 전체 기준으로 집계한다")
+    @DisplayName("내 서재는 내가 흔적을 남긴 도서만 포함하고, ALL 스코프에서는 대목/흔적 수를 도서 전체 기준으로 집계한다")
     void findMyLibraryBooksOnlyIncludesBooksWithMyOpinion() {
         User me = user("me-lib");
         User other = user("other-lib");
@@ -295,16 +335,56 @@ class BookQueryRepositoryTest {
         opinion(myPassage, other);
         opinion(passage(othersBook, other, 1), other);
 
-        List<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(me.getId(), 0, 20);
+        Page<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(
+                me.getId(), PageRequest.of(0, 20), OpinionCountScope.ALL);
 
-        assertThat(results).extracting(BookActivityProjection::bookId).containsExactly(myBook.getId());
-        assertThat(results.get(0).passageCount()).isEqualTo(1);
-        assertThat(results.get(0).opinionCount()).isEqualTo(2);
-        assertThat(bookQueryRepository.countMyLibraryBooks(me.getId())).isEqualTo(1);
+        assertThat(results.getContent()).extracting(BookActivityProjection::bookId).containsExactly(myBook.getId());
+        assertThat(results.getContent().get(0).passageCount()).isEqualTo(1);
+        assertThat(results.getContent().get(0).opinionCount()).isEqualTo(2);
+        assertThat(results.getTotalElements()).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("내 서재는 내가 가장 최근에 흔적을 남긴 도서부터 반환한다")
+    @DisplayName("내가 흔적을 남기지 않은 같은 도서의 다른 대목/흔적도 도서 전체 집계에 포함한다")
+    void findMyLibraryBooksCountsWholeBookEvenForPassagesWithoutMyOpinion() {
+        User me = user("me-whole");
+        User other = user("other-whole");
+        Book myBook = book("여러 대목이 있는 책");
+        Passage myPassage = passage(myBook, me, 1);
+        Passage othersPassage = passage(myBook, other, 2);
+        opinion(myPassage, me);
+        opinion(othersPassage, other);
+        opinion(othersPassage, other);
+
+        Page<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(
+                me.getId(), PageRequest.of(0, 20), OpinionCountScope.ALL);
+
+        assertThat(results.getContent()).extracting(BookActivityProjection::bookId).containsExactly(myBook.getId());
+        assertThat(results.getContent().get(0).passageCount()).isEqualTo(2);
+        assertThat(results.getContent().get(0).opinionCount()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("내 서재는 MINE 스코프에서 흔적 수를 로그인 사용자가 남긴 것만으로 집계한다")
+    void findMyLibraryBooksCountsOnlyMyOpinionsWhenScopeIsMine() {
+        User me = user("me-mine");
+        User other = user("other-mine");
+        Book myBook = book("내가 흔적을 남긴 책 - mine scope");
+        Passage myPassage = passage(myBook, me, 1);
+        opinion(myPassage, me);
+        opinion(myPassage, other);
+        opinion(myPassage, other);
+
+        Page<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(
+                me.getId(), PageRequest.of(0, 20), OpinionCountScope.MINE);
+
+        assertThat(results.getContent()).extracting(BookActivityProjection::bookId).containsExactly(myBook.getId());
+        assertThat(results.getContent().get(0).passageCount()).isEqualTo(1);
+        assertThat(results.getContent().get(0).opinionCount()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("내 서재는 스코프와 무관하게 내가 가장 최근에 흔적을 남긴 도서부터 반환한다")
     void findMyLibraryBooksOrdersByMyMostRecentOpinion() throws InterruptedException {
         User me = user("me-lib-order");
         Book olderBook = book("먼저 흔적을 남긴 책");
@@ -313,9 +393,10 @@ class BookQueryRepositoryTest {
         Thread.sleep(10);
         opinion(passage(newerBook, me, 1), me);
 
-        List<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(me.getId(), 0, 20);
+        Page<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(
+                me.getId(), PageRequest.of(0, 20), OpinionCountScope.ALL);
 
-        assertThat(results).extracting(BookActivityProjection::bookId)
+        assertThat(results.getContent()).extracting(BookActivityProjection::bookId)
                 .containsExactly(newerBook.getId(), olderBook.getId());
     }
 

@@ -127,6 +127,19 @@ class OpinionServiceTest {
     }
 
     @Test
+    @DisplayName("passageId가 삭제된 대목을 가리키면 예외가 발생한다")
+    void createOpinionThrowsExceptionWhenPassageIsDeleted() {
+        Book book = book(10L);
+        Passage deleted = passage(100L, book);
+        deleted.delete();
+        given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+        given(passageRepository.findById(100L)).willReturn(Optional.of(deleted));
+
+        assertThatThrownBy(() -> opinionService.createOpinion(1L, request(10L, 100L)))
+                .isInstanceOf(PassageException.class);
+    }
+
+    @Test
     @DisplayName("passageId가 요청의 bookId와 다른 도서에 속하면 예외가 발생한다")
     void createOpinionThrowsExceptionWhenPassageBelongsToDifferentBook() {
         Book otherBook = book(99L);
@@ -151,7 +164,7 @@ class OpinionServiceTest {
     @Test
     @DisplayName("존재하는 대목으로 흔적 목록을 조회하면 QueryRepository 결과를 그대로 반환한다")
     void getOpinionsReturnsQueryRepositoryResult() {
-        given(passageRepository.existsById(100L)).willReturn(true);
+        given(passageRepository.existsByIdAndDeletedAtIsNull(100L)).willReturn(true);
         Pageable pageable = PageRequest.of(0, 20);
 
         opinionService.getOpinions(100L, OpinionSortType.LATEST, pageable, 1L);
@@ -162,7 +175,7 @@ class OpinionServiceTest {
     @Test
     @DisplayName("존재하지 않는 대목으로 흔적 목록을 조회하면 예외가 발생한다")
     void getOpinionsThrowsExceptionWhenPassageDoesNotExist() {
-        given(passageRepository.existsById(100L)).willReturn(false);
+        given(passageRepository.existsByIdAndDeletedAtIsNull(100L)).willReturn(false);
 
         assertThatThrownBy(() -> opinionService.getOpinions(100L, OpinionSortType.LATEST, PageRequest.of(0, 20), 1L))
                 .isInstanceOf(PassageException.class);
@@ -216,10 +229,35 @@ class OpinionServiceTest {
     void removeOpinionDeletesWhenOwner() {
         Opinion opinion = opinionOwnedBy(1L, 10L);
         given(opinionRepository.findDetailById(1L)).willReturn(Optional.of(opinion));
+        given(opinionRepository.existsByPassageIdAndDeletedAtIsNullAndIdNot(100L, 1L)).willReturn(true);
 
         opinionService.removeOpinion(1L, 10L);
 
         assertThat(opinion.isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("삭제 후에도 대목에 다른 살아있는 흔적이 남아있으면 대목은 삭제되지 않는다")
+    void removeOpinionKeepsPassageWhenOtherOpinionRemains() {
+        Opinion opinion = opinionOwnedBy(1L, 10L);
+        given(opinionRepository.findDetailById(1L)).willReturn(Optional.of(opinion));
+        given(opinionRepository.existsByPassageIdAndDeletedAtIsNullAndIdNot(100L, 1L)).willReturn(true);
+
+        opinionService.removeOpinion(1L, 10L);
+
+        assertThat(opinion.getPassage().isDeleted()).isFalse();
+    }
+
+    @Test
+    @DisplayName("삭제 후 대목에 살아있는 흔적이 하나도 남지 않으면 대목도 함께 삭제된다 (PM 요구사항)")
+    void removeOpinionDeletesPassageWhenNoOpinionsRemain() {
+        Opinion opinion = opinionOwnedBy(1L, 10L);
+        given(opinionRepository.findDetailById(1L)).willReturn(Optional.of(opinion));
+        given(opinionRepository.existsByPassageIdAndDeletedAtIsNullAndIdNot(100L, 1L)).willReturn(false);
+
+        opinionService.removeOpinion(1L, 10L);
+
+        assertThat(opinion.getPassage().isDeleted()).isTrue();
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.nexters.palang.domain.book.presentation;
 import com.nexters.palang.domain.book.application.BookMapper;
 import com.nexters.palang.domain.book.application.BookSearchSort;
 import com.nexters.palang.domain.book.application.BookService;
+import com.nexters.palang.domain.book.application.OpinionCountScope;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.presentation.dto.BookActivityListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookCarouselListResponse;
@@ -79,13 +80,13 @@ public class BookController implements BookApi {
 
     @Override
     @GetMapping("/api/books/my-library")
-    public ResponseEntity<DataResponse<BookCarouselListResponse>> getMyLibraryBooks(
-            @RequestParam(required = false) Long offset,
-            @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
+    public ResponseEntity<DataResponse<BookActivityListResponse>> getMyLibraryBooks(
+            @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size,
+            @RequestParam(defaultValue = "ALL") OpinionCountScope opinionCountScope) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        int clampedSize = Math.clamp(size, 1, MAX_SIZE);
-        return ResponseEntity.ok(DataResponse.from(
-                BookMapper.toCarouselListResponse(bookService.getMyLibraryBooks(currentUserId, offset, clampedSize))));
+        return ResponseEntity.ok(DataResponse.from(BookMapper.toActivityListResponse(
+                bookService.getMyLibraryBooks(currentUserId, pageable(page, size), opinionCountScope))));
     }
 
     @Override

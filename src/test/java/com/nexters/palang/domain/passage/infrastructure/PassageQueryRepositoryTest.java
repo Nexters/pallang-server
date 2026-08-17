@@ -119,6 +119,20 @@ class PassageQueryRepositoryTest {
     }
 
     @Test
+    @DisplayName("소프트 삭제된 대목은 유사 후보에서 제외된다")
+    void findSimilarCandidatesExcludesDeletedPassage() {
+        User writer = user("writer-4");
+        Book book = book("책");
+        Passage deleted = passage(book, writer, 5, "발췌 문장", "hash-1");
+        deleted.delete();
+        entityManager.persistAndFlush(deleted);
+
+        List<SimilarPassageProjection> results = passageQueryRepository.findSimilarCandidates(book.getId(), 5, "hash-1");
+
+        assertThat(results).isEmpty();
+    }
+
+    @Test
     @DisplayName("서로 다른 페이지 번호만 오름차순으로 조회한다 (스포일러 페이지도 포함)")
     void findPageNumbersReturnsDistinctPagesInAscendingOrderIncludingSpoilers() {
         User writer = user("writer-5");
@@ -131,6 +145,22 @@ class PassageQueryRepositoryTest {
         Page<Integer> result = passageQueryRepository.findPageNumbers(book.getId(), PageRequest.of(0, 10));
 
         assertThat(result.getContent()).containsExactly(1, 2, 5);
+    }
+
+    @Test
+    @DisplayName("소프트 삭제된 대목의 페이지 번호는 제외된다")
+    void findPageNumbersExcludesDeletedPassage() {
+        User writer = user("writer-7");
+        Book book = book("책");
+        passage(book, writer, 1, false);
+        Passage deleted = passage(book, writer, 9, false);
+        deleted.delete();
+        entityManager.persistAndFlush(deleted);
+
+        Page<Integer> result = passageQueryRepository.findPageNumbers(book.getId(), PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).containsExactly(1);
+        assertThat(result.getTotalElements()).isEqualTo(1);
     }
 
     @Test
@@ -156,5 +186,20 @@ class PassageQueryRepositoryTest {
 
         assertThat(result).extracting(Passage::getId)
                 .containsExactly(first.getId(), second.getId(), spoiler.getId());
+    }
+
+    @Test
+    @DisplayName("소프트 삭제된 대목은 페이지 전환 조회에서 제외된다")
+    void findPassagesByPageExcludesDeletedPassage() {
+        User writer = user("writer-8");
+        Book book = book("책");
+        Passage alive = passage(book, writer, 3, false);
+        Passage deleted = passage(book, writer, 3, false);
+        deleted.delete();
+        entityManager.persistAndFlush(deleted);
+
+        List<Passage> result = passageQueryRepository.findPassagesByPage(book.getId(), 3);
+
+        assertThat(result).extracting(Passage::getId).containsExactly(alive.getId());
     }
 }

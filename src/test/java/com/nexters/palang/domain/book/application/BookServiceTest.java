@@ -219,27 +219,27 @@ class BookServiceTest {
     }
 
     @Test
-    @DisplayName("내 서재는 offset을 지정하지 않으면 가장 최근에 흔적을 남긴 도서부터(offset 0) 조회한다")
-    void getMyLibraryBooksDefaultsToZeroOffsetWhenOffsetIsNull() {
-        given(bookQueryRepository.countMyLibraryBooks(10L)).willReturn(100L);
-        given(bookQueryRepository.findMyLibraryBooks(10L, 0L, 20))
-                .willReturn(List.of(new BookActivityProjection(1L, "책1", "작가", "cover", 5, 10)));
+    @DisplayName("내 서재 조회는 표준 page/size 페이지네이션과 opinionCountScope를 그대로 리포지토리에 위임한다")
+    void getMyLibraryBooksDelegatesToRepository() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<BookActivityProjection> expected = new PageImpl<>(
+                List.of(new BookActivityProjection(1L, "책1", "작가", "cover", 5, 10)), pageable, 1);
+        given(bookQueryRepository.findMyLibraryBooks(10L, pageable, OpinionCountScope.ALL)).willReturn(expected);
 
-        BookCarouselPage result = bookService.getMyLibraryBooks(10L, null, 20);
+        Page<BookActivityProjection> results = bookService.getMyLibraryBooks(10L, pageable, OpinionCountScope.ALL);
 
-        assertThat(result.offset()).isEqualTo(0L);
-        assertThat(result.totalElements()).isEqualTo(100L);
-        assertThat(result.books()).hasSize(1);
+        assertThat(results).isEqualTo(expected);
     }
 
     @Test
-    @DisplayName("내 서재는 offset을 직접 지정하면 그 값을 그대로 사용해 조회한다")
-    void getMyLibraryBooksUsesGivenOffset() {
-        given(bookQueryRepository.countMyLibraryBooks(10L)).willReturn(100L);
-        given(bookQueryRepository.findMyLibraryBooks(10L, 60L, 20)).willReturn(List.of());
+    @DisplayName("내 서재 조회는 opinionCountScope가 MINE이어도 그대로 리포지토리에 위임한다")
+    void getMyLibraryBooksDelegatesMineScopeToRepository() {
+        Pageable pageable = PageRequest.of(1, 20);
+        Page<BookActivityProjection> expected = new PageImpl<>(List.of(), pageable, 0);
+        given(bookQueryRepository.findMyLibraryBooks(10L, pageable, OpinionCountScope.MINE)).willReturn(expected);
 
-        BookCarouselPage result = bookService.getMyLibraryBooks(10L, 60L, 20);
+        Page<BookActivityProjection> results = bookService.getMyLibraryBooks(10L, pageable, OpinionCountScope.MINE);
 
-        assertThat(result.offset()).isEqualTo(60L);
+        assertThat(results).isEqualTo(expected);
     }
 }

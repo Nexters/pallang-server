@@ -3,6 +3,7 @@ package com.nexters.palang.domain.book.infrastructure;
 import com.nexters.palang.domain.book.application.BookActivityProjection;
 import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.application.BookSearchSort;
+import com.nexters.palang.domain.book.application.OpinionCountScope;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.QBook;
 import com.nexters.palang.domain.opinion.domain.QOpinion;
@@ -10,6 +11,8 @@ import com.nexters.palang.domain.passage.domain.QPassage;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.CaseBuilder;
+import com.querydsl.core.types.dsl.NumberExpression;
+import com.querydsl.jpa.impl.JPAQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +31,8 @@ public class BookQueryRepository {
     // title_normalized 컬럼(인덱스 적용, Book#normalizeTitle 참고)을 기준으로 비교한다. 매 검색마다
     // title에 함수를 걸어 계산하지 않아도 되고, 자동완성처럼 반복 호출되는 경로에서 유리하다.
     // 흔적(Opinion)/대목(Passage) 유무와 무관하게 DB에 저장된 도서 전부를 대상으로 하므로 leftJoin을 사용한다.
+    // 소프트 삭제된 대목/그 흔적은 leftJoin의 ON 절에서 제외한다 (WHERE에 두면 대목이 전부 삭제된
+    // 도서까지 결과에서 사라진다 — ON에 두어야 매칭 실패로 취급되어 passageCount 0인 채로 남는다).
     public Page<BookSearchProjection> searchByTitle(String keyword, BookSearchSort sort, Pageable pageable) {
         QBook book = QBook.book;
         QPassage passage = QPassage.passage;
@@ -41,7 +46,7 @@ public class BookQueryRepository {
                         book.isbn, book.coverImageUrl, book.source,
                         passage.countDistinct(), opinion.countDistinct()))
                 .from(book)
-                .leftJoin(passage).on(passage.book.eq(book))
+                .leftJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .where(book.titleNormalized.contains(normalizedKeyword))
                 .groupBy(book.id, book.title, book.author, book.publisher, book.pageCount,
@@ -94,7 +99,7 @@ public class BookQueryRepository {
                         book.id, book.title, book.author, book.coverImageUrl,
                         passage.countDistinct(), opinion.countDistinct()))
                 .from(book)
-                .innerJoin(passage).on(passage.book.eq(book))
+                .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .groupBy(book.id, book.title, book.author, book.coverImageUrl)
                 .orderBy(passage.createdAt.max().desc(), book.id.asc())
@@ -107,32 +112,49 @@ public class BookQueryRepository {
         return countBooksWithPassages();
     }
 
-    // 내 서재는 로그인한 사용자가 흔적(Opinion)을 남긴 도서만 대상으로 하되, 대목/흔적 수는 홈 캐러셀과 동일하게
-    // 도서 전체 기준으로 보여준다. 정렬 기준은 사용자가 해당 도서에 남긴 가장 최근 흔적 시각이다(최신순).
-    public List<BookActivityProjection> findMyLibraryBooks(Long userId, long offset, int limit) {
+    // 내 서재는 로그인한 사용자가 흔적(Opinion)을 남긴 도서만 대상으로 한다. 대목 수는 홈 캐러셀과 동일하게
+    // 도서 전체 기준으로 보여주지만, 흔적 수는 opinionCountScope에 따라 도서 전체(ALL, 홈 노출용) 또는
+    // 로그인 사용자 본인이 남긴 것(MINE, 마이페이지 노출용)만 집계한다. 정렬 기준은 스코프와 무관하게 사용자가
+    // 해당 도서에 남긴 가장 최근 흔적 시각이다(최신순).
+    public Page<BookActivityProjection> findMyLibraryBooks(
+            Long userId, Pageable pageable, OpinionCountScope opinionCountScope) {
         QBook book = QBook.book;
         QPassage passage = QPassage.passage;
         QOpinion opinionMine = new QOpinion("opinionMine");
         QOpinion opinionAll = new QOpinion("opinionAll");
 
-        return queryFactory
+        NumberExpression<Long> opinionCount = opinionCountScope == OpinionCountScope.MINE
+                ? opinionMine.countDistinct()
+                : opinionAll.countDistinct();
+
+        // opinionMine/opinionAll은 도서 전체 집계용 passage 조인과 별개로 passage.book을 통해 book에 직접
+        // 연결한다. 특정 passage 행을 공유해서 조인하면 opinionMine의 innerJoin이 passage를 "내가 흔적을 남긴
+        // 대목"으로 제한해버려서, passageCount/opinionAll(ALL)이 도서 전체가 아니라 그 대목만 집계하게 된다.
+        JPAQuery<BookActivityProjection> query = queryFactory
                 .select(Projections.constructor(BookActivityProjection.class,
                         book.id, book.title, book.author, book.coverImageUrl,
-                        passage.countDistinct(), opinionAll.countDistinct()))
+                        passage.countDistinct(), opinionCount))
                 .from(book)
-                .innerJoin(passage).on(passage.book.eq(book))
-                .innerJoin(opinionMine).on(opinionMine.passage.eq(passage)
+                .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
+                .innerJoin(opinionMine).on(opinionMine.passage.book.eq(book)
                         .and(opinionMine.user.id.eq(userId))
-                        .and(opinionMine.deletedAt.isNull()))
-                .leftJoin(opinionAll).on(opinionAll.passage.eq(passage).and(opinionAll.deletedAt.isNull()))
+                        .and(opinionMine.deletedAt.isNull()));
+        if (opinionCountScope == OpinionCountScope.ALL) {
+            query = query.leftJoin(opinionAll)
+                    .on(opinionAll.passage.book.eq(book).and(opinionAll.deletedAt.isNull()));
+        }
+
+        List<BookActivityProjection> content = query
                 .groupBy(book.id, book.title, book.author, book.coverImageUrl)
                 .orderBy(opinionMine.createdAt.max().desc(), book.id.asc())
-                .offset(offset)
-                .limit(limit)
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
                 .fetch();
+
+        return new PageImpl<>(content, pageable, countMyLibraryBooks(userId));
     }
 
-    public long countMyLibraryBooks(Long userId) {
+    private long countMyLibraryBooks(Long userId) {
         QBook book = QBook.book;
         QPassage passage = QPassage.passage;
         QOpinion opinionMine = QOpinion.opinion;
@@ -158,7 +180,7 @@ public class BookQueryRepository {
                         book.id, book.title, book.author, book.coverImageUrl,
                         passage.countDistinct(), opinion.countDistinct()))
                 .from(book)
-                .innerJoin(passage).on(passage.book.eq(book))
+                .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .groupBy(book.id, book.title, book.author, book.coverImageUrl)
                 .orderBy(opinion.countDistinct().desc(), book.id.asc())
@@ -203,7 +225,7 @@ public class BookQueryRepository {
         Long count = queryFactory
                 .select(book.countDistinct())
                 .from(book)
-                .innerJoin(passage).on(passage.book.eq(book))
+                .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .fetchOne();
         return count != null ? count : 0L;
     }
