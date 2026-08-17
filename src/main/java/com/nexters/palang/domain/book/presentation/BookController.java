@@ -11,7 +11,6 @@ import com.nexters.palang.domain.book.presentation.dto.BookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookSearchListResponse;
 import com.nexters.palang.domain.book.presentation.dto.CreateBookRequest;
-import com.nexters.palang.domain.book.presentation.dto.ExternalBookListResponse;
 import com.nexters.palang.global.common.response.DataResponse;
 import com.nexters.palang.global.security.CurrentUserProvider;
 import jakarta.validation.Valid;
@@ -40,12 +39,12 @@ public class BookController implements BookApi {
 
     @Override
     @GetMapping("/api/books/search")
-    public ResponseEntity<DataResponse<ExternalBookListResponse>> searchExternalBooks(
+    public ResponseEntity<DataResponse<BookSearchListResponse>> searchBooks(
             @RequestParam String keyword,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         return ResponseEntity.ok(DataResponse.from(
-                BookMapper.toExternalListResponse(bookService.searchExternalBooks(keyword, pageable(page, size)))));
+                BookMapper.toSearchListResponse(bookService.searchBooks(keyword, pageable(page, size)))));
     }
 
     @Override

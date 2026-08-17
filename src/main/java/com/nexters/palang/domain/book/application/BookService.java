@@ -11,13 +11,17 @@ import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.book.presentation.dto.CreateBookRequest;
 import com.nexters.palang.global.storage.FileStorageService;
 import com.nexters.palang.global.storage.ImageMimeType;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -38,15 +42,50 @@ public class BookService {
     private final AladinBookApiClient aladinBookApiClient;
     private final FileStorageService fileStorageService;
 
-    // DB를 사용하지 않고 알라딘 API 호출(최대 수 초)만 하므로, DB 커넥션을 불필요하게 오래 붙잡지 않도록 트랜잭션에서 제외한다.
+    // 알라딘 API 호출(최대 수 초)이 포함돼 있어, DB 커넥션을 불필요하게 오래 붙잡지 않도록 트랜잭션에서 제외한다.
+    // 아래 DB 조회(searchByTitle)는 이 메서드 안에서 트랜잭션 없이 실행되지만, 단순 조회(SELECT)라 문제 없다.
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public Page<ExternalBookResult> searchExternalBooks(String keyword, Pageable pageable) {
+    public Page<BookSearchProjection> searchBooks(String keyword, Pageable pageable) {
         String trimmedKeyword = keyword == null ? "" : keyword.trim();
         if (trimmedKeyword.length() < EXTERNAL_SEARCH_MIN_KEYWORD_LENGTH) {
             return Page.empty(pageable);
         }
-        AladinSearchResult result = aladinBookApiClient.search(trimmedKeyword, pageable);
-        return new PageImpl<>(result.items(), pageable, result.totalResults());
+
+        // 알라딘은 요청받은 page/size를 그대로 써서 조회한다(알라딘 자체 페이지 커서를 그대로 신뢰).
+        AladinSearchResult aladinResult = aladinBookApiClient.search(trimmedKeyword, pageable);
+
+        // 같은 책이 알라딘/DB 양쪽에 모두 있으면(ISBN 동일) 이미 등록된 DB 쪽만 남기고 알라딘 쪽은 페이지와
+        // 무관하게 항상 제외한다(findIsbnsByTitle은 페이지로 잘리지 않는 전체 매칭 ISBN 목록이라 2페이지
+        // 이후에도 정확하게 걸러낼 수 있다). ISBN이 없는 알라딘 결과는 비교 기준이 없으므로 그대로 둔다.
+        Set<String> registeredIsbns = Set.copyOf(bookQueryRepository.findIsbnsByTitle(trimmedKeyword));
+        List<BookSearchProjection> aladinBooks = aladinResult.items().stream()
+                .filter(item -> item.isbn() == null || item.isbn().isBlank() || !registeredIsbns.contains(item.isbn()))
+                .map(BookSearchProjection::from)
+                .toList();
+
+        if (pageable.getPageNumber() > 0) {
+            // 2페이지부터는 1페이지에서 이미 DB 매칭 도서를 전부 보여줬으므로 알라딘 결과만 채운다.
+            // (그렇지 않으면 같은 DB 도서가 페이지마다 반복해서 노출된다.) total은 1페이지와 같은 방식
+            // (DB total + 알라딘 total)으로 계산해, 페이지를 넘겨도 total이 흔들리지 않게 한다.
+            long dbTotal = bookQueryRepository.countByTitle(trimmedKeyword);
+            return new PageImpl<>(aladinBooks, pageable, dbTotal + aladinResult.totalResults());
+        }
+
+        // 1페이지에서만 DB에 등록된 도서(수동 등록 포함)를 함께 보여준다.
+        Page<BookSearchProjection> dbResult = bookQueryRepository.searchByTitle(
+                trimmedKeyword, BookSearchSort.OPINION, PageRequest.of(0, pageable.getPageSize()));
+
+        List<BookSearchProjection> merged = new ArrayList<>(dbResult.getContent());
+        merged.addAll(aladinBooks);
+        // 흔적(Opinion) 많은 순으로 정렬한다. 알라딘 결과는 opinionCount가 항상 0이라 자연히 DB 도서보다
+        // 뒤로 밀리고, 0으로 동점인 도서끼리는 stable sort라 DB가 먼저 오는 원래 순서가 유지된다.
+        merged.sort(Comparator.comparingLong(BookSearchProjection::opinionCount).reversed());
+        List<BookSearchProjection> content = merged.stream().limit(pageable.getPageSize()).toList();
+
+        // 알라딘/DB 결과가 겹칠 수 있어 정확한 합산은 아니지만, 중복 제거 건수를 그때그때 반영하지 않고
+        // 페이지마다 동일한 방식(단순 합)으로 계산해 total이 페이지 이동에 따라 들쭉날쭉하지 않게 한다.
+        long approximateTotal = dbResult.getTotalElements() + aladinResult.totalResults();
+        return new PageImpl<>(content, pageable, approximateTotal);
     }
 
     public Page<BookSearchProjection> searchInternalBooks(String keyword, BookSearchSort sort, Pageable pageable) {

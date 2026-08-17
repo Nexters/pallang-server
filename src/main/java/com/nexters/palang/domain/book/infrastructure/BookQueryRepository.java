@@ -57,13 +57,35 @@ public class BookQueryRepository {
                 .fetch();
 
         // 흔적/대목 유무로 필터링하지 않으므로 count 쪽은 join 없이 제목 조건만으로 센다.
-        Long total = queryFactory
+        return new PageImpl<>(content, pageable, countByTitle(keyword));
+    }
+
+    // 제목으로 매칭되는 DB 도서의 전체 개수. join 없이 단순 COUNT라 자주 호출해도 부담이 적다.
+    // (GET /api/books/search가 알라딘 결과와 합쳐 total을 계산할 때 페이지마다 이 값을 다시 구한다.)
+    public long countByTitle(String keyword) {
+        QBook book = QBook.book;
+        String normalizedKeyword = Book.normalize(keyword);
+
+        Long count = queryFactory
                 .select(book.countDistinct())
                 .from(book)
                 .where(book.titleNormalized.contains(normalizedKeyword))
                 .fetchOne();
+        return count != null ? count : 0L;
+    }
 
-        return new PageImpl<>(content, pageable, total != null ? total : 0L);
+    // GET /api/books/search에서 알라딘 결과 중 이미 DB에 등록된 도서와 ISBN이 같은 항목을 걸러내기 위한
+    // 용도다. join/groupBy 없이 isbn 컬럼만 조회하는 가벼운 쿼리라, 페이지와 무관하게 매 요청마다 호출해도
+    // 부담이 적다. searchByTitle과 달리 페이지 크기로 잘리지 않고 매칭되는 도서 전부의 ISBN을 반환한다.
+    public List<String> findIsbnsByTitle(String keyword) {
+        QBook book = QBook.book;
+        String normalizedKeyword = Book.normalize(keyword);
+
+        return queryFactory
+                .select(book.isbn)
+                .from(book)
+                .where(book.titleNormalized.contains(normalizedKeyword), book.isbn.isNotNull(), book.isbn.ne(""))
+                .fetch();
     }
 
     // 자동완성으로 쓰일 때 관련도가 높은 결과(제목이 검색어로 시작하는 도서)가 먼저 보이도록,

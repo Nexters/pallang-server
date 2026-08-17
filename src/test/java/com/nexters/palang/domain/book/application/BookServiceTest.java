@@ -3,6 +3,7 @@ package com.nexters.palang.domain.book.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
@@ -64,38 +65,97 @@ class BookServiceTest {
     }
 
     @Test
-    @DisplayName("키워드로 외부 검색을 하면 알라딘 API 클라이언트의 결과를 그대로 반환한다")
-    void searchExternalBooks() {
-        Pageable pageable = PageRequest.of(0, 20);
-        ExternalBookResult book = new ExternalBookResult("제목", "작가", "출판사", "isbn", "cover");
-        given(aladinBookApiClient.search("제목", pageable)).willReturn(new AladinSearchResult(List.of(book), 1));
-
-        Page<ExternalBookResult> results = bookService.searchExternalBooks("제목", pageable);
-
-        assertThat(results.getContent()).containsExactly(book);
-        assertThat(results.getTotalElements()).isEqualTo(1);
-    }
-
-    @Test
     @DisplayName("검색어 앞뒤 공백은 제거하고 알라딘을 호출한다")
-    void searchExternalBooksTrimsKeyword() {
+    void searchBooksTrimsKeyword() {
         Pageable pageable = PageRequest.of(0, 20);
+        given(bookQueryRepository.searchByTitle("제목", BookSearchSort.OPINION, PageRequest.of(0, 20)))
+                .willReturn(new PageImpl<>(List.of(), pageable, 0));
         given(aladinBookApiClient.search("제목", pageable)).willReturn(AladinSearchResult.empty());
 
-        bookService.searchExternalBooks("  제목  ", pageable);
+        bookService.searchBooks("  제목  ", pageable);
 
         verify(aladinBookApiClient).search("제목", pageable);
     }
 
     @Test
-    @DisplayName("검색어가 2글자 미만이면 알라딘을 호출하지 않고 빈 결과를 반환한다")
-    void searchExternalBooksReturnsEmptyWhenKeywordTooShort() {
+    @DisplayName("검색어가 2글자 미만이면 알라딘/DB 모두 조회하지 않고 빈 결과를 반환한다")
+    void searchBooksReturnsEmptyWhenKeywordTooShort() {
         Pageable pageable = PageRequest.of(0, 20);
 
-        Page<ExternalBookResult> results = bookService.searchExternalBooks("책", pageable);
+        Page<BookSearchProjection> results = bookService.searchBooks("책", pageable);
 
         assertThat(results.getContent()).isEmpty();
-        verifyNoInteractions(aladinBookApiClient);
+        verifyNoInteractions(aladinBookApiClient, bookQueryRepository);
+    }
+
+    @Test
+    @DisplayName("1페이지 검색 결과는 DB 매칭 도서를 흔적 많은 순으로 먼저 보여주고 알라딘 결과로 나머지를 채운다")
+    void searchBooksMergesDbAndAladinResultsOnFirstPage() {
+        Pageable pageable = PageRequest.of(0, 20);
+        BookSearchProjection dbBook = new BookSearchProjection(
+                1L, "프랑켄슈타인", "메리 셸리", "민음사", 300, "isbn-db", "cover-db", BookSource.MANUAL, 3, 5);
+        ExternalBookResult aladinBook = new ExternalBookResult(
+                "프랑켄슈타인", "메리 셸리", "문학동네", "isbn-aladin", "cover-aladin");
+        given(bookQueryRepository.searchByTitle("프랑켄슈타인", BookSearchSort.OPINION, PageRequest.of(0, 20)))
+                .willReturn(new PageImpl<>(List.of(dbBook), pageable, 1));
+        given(aladinBookApiClient.search("프랑켄슈타인", pageable))
+                .willReturn(new AladinSearchResult(List.of(aladinBook), 1));
+
+        Page<BookSearchProjection> results = bookService.searchBooks("프랑켄슈타인", pageable);
+
+        assertThat(results.getContent()).hasSize(2);
+        assertThat(results.getContent().get(0).bookId()).isEqualTo(1L);
+        assertThat(results.getContent().get(1).bookId()).isNull();
+        assertThat(results.getContent().get(1).source()).isNull();
+        assertThat(results.getTotalElements()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("ISBN이 같은 도서가 DB와 알라딘 양쪽에 있으면 DB에 등록된 도서만 남기고 알라딘 쪽은 제외한다")
+    void searchBooksDropsAladinDuplicateWhenIsbnMatchesRegisteredBook() {
+        Pageable pageable = PageRequest.of(0, 20);
+        BookSearchProjection dbBook = new BookSearchProjection(
+                1L, "프랑켄슈타인", "메리 셸리", "민음사", 300, "isbn-1234", "cover-db", BookSource.MANUAL, 3, 5);
+        ExternalBookResult duplicateAladinBook = new ExternalBookResult(
+                "프랑켄슈타인", "메리 셸리", "민음사", "isbn-1234", "cover-aladin");
+        ExternalBookResult otherAladinBook = new ExternalBookResult(
+                "프랑켄슈타인", "메리 셸리", "문학동네", "isbn-5678", "cover-aladin-2");
+        given(bookQueryRepository.findIsbnsByTitle("프랑켄슈타인")).willReturn(List.of("isbn-1234"));
+        given(bookQueryRepository.searchByTitle("프랑켄슈타인", BookSearchSort.OPINION, PageRequest.of(0, 20)))
+                .willReturn(new PageImpl<>(List.of(dbBook), pageable, 1));
+        given(aladinBookApiClient.search("프랑켄슈타인", pageable)).willReturn(
+                new AladinSearchResult(List.of(duplicateAladinBook, otherAladinBook), 2));
+
+        Page<BookSearchProjection> results = bookService.searchBooks("프랑켄슈타인", pageable);
+
+        assertThat(results.getContent()).extracting(BookSearchProjection::isbn)
+                .containsExactly("isbn-1234", "isbn-5678");
+        assertThat(results.getContent()).extracting(BookSearchProjection::bookId)
+                .containsExactly(1L, null);
+        // dbTotal(1) + aladinTotal(2) = 3을 넘겼지만, PageImpl은 offset(0)+size(20)가 그 값(3)보다
+        // 크면 "이 total로는 이 페이지 요청 자체가 설명이 안 된다"고 보고 offset+content.size()(0+2=2)로
+        // 스스로 보정한다. 그래서 실제 응답 total은 2다.
+        assertThat(results.getTotalElements()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("2페이지부터는 DB 매칭 도서를 다시 조회하지 않지만, ISBN 중복 제거와 total 계산은 1페이지와 동일하게 적용한다")
+    void searchBooksReturnsAladinOnlyFromSecondPage() {
+        Pageable pageable = PageRequest.of(1, 20);
+        ExternalBookResult duplicateAladinBook = new ExternalBookResult("제목", "작가", "출판사", "isbn-dup", "cover");
+        ExternalBookResult newAladinBook = new ExternalBookResult("제목", "작가", "출판사2", "isbn-new", "cover2");
+        given(bookQueryRepository.findIsbnsByTitle("제목")).willReturn(List.of("isbn-dup"));
+        given(bookQueryRepository.countByTitle("제목")).willReturn(5L);
+        given(aladinBookApiClient.search("제목", pageable))
+                .willReturn(new AladinSearchResult(List.of(duplicateAladinBook, newAladinBook), 21));
+
+        Page<BookSearchProjection> results = bookService.searchBooks("제목", pageable);
+
+        assertThat(results.getContent()).extracting(BookSearchProjection::isbn).containsExactly("isbn-new");
+        // dbTotal(5) + aladinTotal(21) = 26으로 계산하지만, offset(20)+size(20)=40이 26보다 커서
+        // PageImpl이 offset+content.size()(20+1=21)로 보정한다.
+        assertThat(results.getTotalElements()).isEqualTo(21);
+        verify(bookQueryRepository, never()).searchByTitle(any(), any(), any());
     }
 
     @Test
