@@ -193,15 +193,23 @@ public class BookQueryRepository {
 
     // "최근에 남긴 책"은 Passage를 새로 만든 책이 아니라 흔적(Opinion)을 남긴 책 기준이다 (FR-WRITE-01).
     // 기존 Passage에 Opinion만 추가한 경우도 포함해야 하므로 Opinion을 기준으로 조회한다.
-    public Page<Long> findRecentlyActiveBookIds(Long userId, Pageable pageable) {
+    // keyword가 있으면 홈 화면 검색용으로 제목을 추가 필터링한다 (searchByTitle과 동일하게
+    // title_normalized 컬럼 기준). keyword가 없거나 빈 문자열이면 필터링 없이 전체를 반환한다.
+    public Page<Long> findRecentlyActiveBookIds(Long userId, String keyword, Pageable pageable) {
         QOpinion opinion = QOpinion.opinion;
         QPassage passage = QPassage.passage;
+        QBook book = QBook.book;
+
+        String normalizedKeyword = Book.normalize(keyword);
+        boolean hasKeyword = !normalizedKeyword.isEmpty();
 
         List<Long> content = queryFactory
                 .select(passage.book.id)
                 .from(opinion)
                 .join(opinion.passage, passage)
-                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull())
+                .join(passage.book, book)
+                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(),
+                        hasKeyword ? book.titleNormalized.contains(normalizedKeyword) : null)
                 .groupBy(passage.book.id)
                 .orderBy(opinion.createdAt.max().desc(), passage.book.id.asc())
                 .offset(pageable.getOffset())
@@ -212,7 +220,9 @@ public class BookQueryRepository {
                 .select(passage.book.countDistinct())
                 .from(opinion)
                 .join(opinion.passage, passage)
-                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull())
+                .join(passage.book, book)
+                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(),
+                        hasKeyword ? book.titleNormalized.contains(normalizedKeyword) : null)
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);

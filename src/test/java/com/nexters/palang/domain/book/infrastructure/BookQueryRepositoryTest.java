@@ -317,10 +317,40 @@ class BookQueryRepositoryTest {
         opinion(passage(othersBook, other, 1), other);
 
         Pageable pageable = PageRequest.of(0, 10);
-        Page<Long> results = bookQueryRepository.findRecentlyActiveBookIds(me.getId(), pageable);
+        Page<Long> results = bookQueryRepository.findRecentlyActiveBookIds(me.getId(), null, pageable);
 
         assertThat(results.getContent()).containsExactly(myBook.getId());
         assertThat(results.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("keyword로 최근 흔적을 남긴 도서 제목을 필터링한다 (띄어쓰기 무시)")
+    void findRecentlyActiveBookIdsFiltersByKeyword() {
+        User me = user("me-keyword");
+        Book matchingBook = book("작별 인사");
+        Book otherBook = book("불편한 편의점");
+        opinion(passage(matchingBook, me, 1), me);
+        opinion(passage(otherBook, me, 1), me);
+
+        Page<Long> results = bookQueryRepository.findRecentlyActiveBookIds(me.getId(), "작별인사", PageRequest.of(0, 10));
+
+        assertThat(results.getContent()).containsExactly(matchingBook.getId());
+        assertThat(results.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("keyword가 빈 문자열이면 필터링 없이 전체 목록을 반환한다")
+    void findRecentlyActiveBookIdsReturnsAllWhenKeywordBlank() {
+        User me = user("me-kw-blank");
+        Book book1 = book("작별 인사");
+        Book book2 = book("불편한 편의점");
+        opinion(passage(book1, me, 1), me);
+        opinion(passage(book2, me, 1), me);
+
+        Page<Long> results = bookQueryRepository.findRecentlyActiveBookIds(me.getId(), "", PageRequest.of(0, 10));
+
+        assertThat(results.getContent()).containsExactlyInAnyOrder(book1.getId(), book2.getId());
+        assertThat(results.getTotalElements()).isEqualTo(2);
     }
 
     @Test
@@ -410,7 +440,7 @@ class BookQueryRepositoryTest {
 
         opinion(existingPassage, me);
 
-        Page<Long> results = bookQueryRepository.findRecentlyActiveBookIds(me.getId(), PageRequest.of(0, 10));
+        Page<Long> results = bookQueryRepository.findRecentlyActiveBookIds(me.getId(), null, PageRequest.of(0, 10));
 
         assertThat(results.getContent()).containsExactly(book.getId());
     }
