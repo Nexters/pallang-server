@@ -146,7 +146,8 @@ public interface BookApi {
 
     @Operation(summary = "도서 단건 조회", description = "bookId로 도서 메타(제목/저자/출판사/표지/대목·흔적 수)를 조회합니다. "
             + "인증 불필요. Authorization: Bearer {accessToken} 헤더를 보내면 myStatus/myCurrentPage(로그인 사용자의 "
-            + "읽기상태/현재페이지)도 함께 내려주며, 헤더가 없거나 상태가 없으면 둘 다 null입니다.")
+            + "읽기상태/현재페이지)도 함께 내려주며, 헤더가 없거나 로그인 사용자가 이 도서에 읽기상태를 남기지 않았으면 "
+            + "myStatus/myCurrentPage 필드 자체가 응답에서 제외됩니다(null이 아니라 키 자체가 없음).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "404", description = "해당 도서를 찾을 수 없음 (BOOK_404_1)",

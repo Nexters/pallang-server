@@ -6,9 +6,12 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -301,7 +304,11 @@ class BookControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.bookId").value(1))
                 .andExpect(jsonPath("$.data.myStatus").doesNotExist())
-                .andExpect(jsonPath("$.data.myCurrentPage").doesNotExist());
+                .andExpect(jsonPath("$.data.myCurrentPage").doesNotExist())
+                // jsonPath(...).doesNotExist()는 값이 null이어도(키는 존재) 통과하므로, 필드 자체가
+                // 응답 JSON에서 빠졌는지는 원문 문자열로 별도 검증한다.
+                .andExpect(content().string(not(containsString("myStatus"))))
+                .andExpect(content().string(not(containsString("myCurrentPage"))));
     }
 
     @Test
