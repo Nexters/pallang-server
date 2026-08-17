@@ -65,16 +65,19 @@ public class BookService {
                 ? bookQueryRepository.searchByTitle(trimmedKeyword, BookSearchSort.OPINION, globalStart, dbCountThisPage)
                 : List.of();
 
-        // 이 페이지에 알라딘 항목이 필요 없어도(DB만으로 이미 꽉 찬 경우) total 계산에 쓸 알라딘 total은
-        // 알아야 하므로 최소 1건은 요청한다. 실제 노출 개수는 아래에서 aladinLimitForContent로 다시 자른다.
-        int aladinRequestSize = Math.max(aladinLimitForContent, 1);
-        AladinSearchResult aladinResult = aladinBookApiClient.search(trimmedKeyword, (int) aladinOffset, aladinRequestSize);
+        // 알라딘 ItemSearch는 임의의 레코드 offset을 직접 요청할 방법이 없어(start는 페이지 번호,
+        // MaxResults 단위로만 페이지가 나뉨), AladinBookApiClient#searchAll이 키워드당 결과 전체
+        // (최대 200건, 알라딘 한도)를 미리 모아 캐싱해서 돌려준다. 여기서 그 리스트를 대상으로
+        // offset/limit 슬라이싱을 직접 수행한다.
+        AladinSearchResult aladinAll = aladinBookApiClient.searchAll(trimmedKeyword);
 
         // 같은 책이 알라딘/DB 양쪽에 모두 있으면(ISBN 동일) 이미 등록된 DB 쪽만 남기고 알라딘 쪽은 제외한다.
-        // ISBN이 없는 알라딘 결과는 비교 기준이 없으므로 그대로 둔다.
+        // ISBN이 없는 알라딘 결과는 비교 기준이 없으므로 그대로 둔다. dedup을 먼저 하고 나서 offset/limit을
+        // 적용하므로, 중복 때문에 페이지가 size보다 적게 채워지는 일도 없다.
         Set<String> registeredIsbns = Set.copyOf(bookQueryRepository.findIsbnsByTitle(trimmedKeyword));
-        List<BookSearchProjection> aladinBooks = aladinResult.items().stream()
+        List<BookSearchProjection> aladinBooks = aladinAll.items().stream()
                 .filter(item -> item.isbn() == null || item.isbn().isBlank() || !registeredIsbns.contains(item.isbn()))
+                .skip(aladinOffset)
                 .limit(aladinLimitForContent)
                 .map(BookSearchProjection::from)
                 .toList();
@@ -82,7 +85,7 @@ public class BookService {
         List<BookSearchProjection> content = new ArrayList<>(dbBooks);
         content.addAll(aladinBooks);
 
-        long total = dbTotal + aladinResult.totalResults();
+        long total = dbTotal + aladinAll.totalResults();
         return new PageImpl<>(content, pageable, total);
     }
 

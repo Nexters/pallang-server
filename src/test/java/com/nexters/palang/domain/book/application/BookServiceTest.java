@@ -80,16 +80,25 @@ class BookServiceTest {
         return books;
     }
 
+    // fromId..toId(포함) 범위의 더미 알라딘 검색 결과를 생성한다.
+    private List<ExternalBookResult> externalBooks(int fromId, int toId) {
+        List<ExternalBookResult> books = new ArrayList<>();
+        for (int id = fromId; id <= toId; id++) {
+            books.add(new ExternalBookResult("책" + id, "작가", "출판사", "isbn-aladin-" + id, "cover-" + id));
+        }
+        return books;
+    }
+
     @Test
     @DisplayName("검색어 앞뒤 공백은 제거하고 알라딘을 호출한다")
     void searchBooksTrimsKeyword() {
         Pageable pageable = PageRequest.of(0, 20);
         given(bookQueryRepository.countByTitle("제목")).willReturn(0L);
-        given(aladinBookApiClient.search("제목", 0, 20)).willReturn(AladinSearchResult.empty());
+        given(aladinBookApiClient.searchAll("제목")).willReturn(AladinSearchResult.empty());
 
         bookService.searchBooks("  제목  ", pageable);
 
-        verify(aladinBookApiClient).search("제목", 0, 20);
+        verify(aladinBookApiClient).searchAll("제목");
     }
 
     @Test
@@ -114,8 +123,7 @@ class BookServiceTest {
         given(bookQueryRepository.countByTitle("프랑켄슈타인")).willReturn(1L);
         given(bookQueryRepository.searchByTitle("프랑켄슈타인", BookSearchSort.OPINION, 0L, 1))
                 .willReturn(List.of(dbBook));
-        // DB가 1건이라 이 페이지에서 알라딘 slot은 19개(size 20 - db 1) 필요하다.
-        given(aladinBookApiClient.search("프랑켄슈타인", 0, 19))
+        given(aladinBookApiClient.searchAll("프랑켄슈타인"))
                 .willReturn(new AladinSearchResult(List.of(aladinBook), 1));
 
         Page<BookSearchProjection> results = bookService.searchBooks("프랑켄슈타인", pageable);
@@ -141,7 +149,7 @@ class BookServiceTest {
         given(bookQueryRepository.searchByTitle("프랑켄슈타인", BookSearchSort.OPINION, 0L, 1))
                 .willReturn(List.of(dbBook));
         given(bookQueryRepository.findIsbnsByTitle("프랑켄슈타인")).willReturn(List.of("isbn-1234"));
-        given(aladinBookApiClient.search("프랑켄슈타인", 0, 19)).willReturn(
+        given(aladinBookApiClient.searchAll("프랑켄슈타인")).willReturn(
                 new AladinSearchResult(List.of(duplicateAladinBook, otherAladinBook), 2));
 
         Page<BookSearchProjection> results = bookService.searchBooks("프랑켄슈타인", pageable);
@@ -153,10 +161,31 @@ class BookServiceTest {
     }
 
     @Test
+    @DisplayName("알라딘 배치 안에서 중복이 걸러져도, dedup을 먼저 적용한 뒤 skip/limit하므로 페이지가 짧아지지 않는다")
+    void searchBooksDedupDoesNotShortenPageWhenEnoughRealItemsExist() {
+        Pageable pageable = PageRequest.of(0, 3);
+        // 알라딘 5건 중 2건이 이미 등록된 도서와 중복이어도, 남는 3건으로 요청한 size(3)를 채울 수 있다.
+        ExternalBookResult dup1 = new ExternalBookResult("책들", "작가", "출판사", "isbn-dup-1", "cover");
+        ExternalBookResult real1 = new ExternalBookResult("책들", "작가", "출판사", "isbn-real-1", "cover");
+        ExternalBookResult dup2 = new ExternalBookResult("책들", "작가", "출판사", "isbn-dup-2", "cover");
+        ExternalBookResult real2 = new ExternalBookResult("책들", "작가", "출판사", "isbn-real-2", "cover");
+        ExternalBookResult real3 = new ExternalBookResult("책들", "작가", "출판사", "isbn-real-3", "cover");
+        given(bookQueryRepository.countByTitle("책들")).willReturn(0L);
+        given(bookQueryRepository.findIsbnsByTitle("책들")).willReturn(List.of("isbn-dup-1", "isbn-dup-2"));
+        given(aladinBookApiClient.searchAll("책들")).willReturn(
+                new AladinSearchResult(List.of(dup1, real1, dup2, real2, real3), 5));
+
+        Page<BookSearchProjection> results = bookService.searchBooks("책들", pageable);
+
+        assertThat(results.getContent()).extracting(BookSearchProjection::isbn)
+                .containsExactly("isbn-real-1", "isbn-real-2", "isbn-real-3");
+    }
+
+    @Test
     @DisplayName("DB 매칭이 페이지 크기보다 많으면 다음 페이지에서 이어지는 DB 도서를 보여주고, 같은 도서가 중복 노출되지 않는다")
     void searchBooksPaginatesAcrossDbOverflowIntoNextPage() {
-        // DB 매칭 25건, size 20 → 1페이지는 DB로 꽉 차서 알라딘 slot이 0개(total 파악용으로 알라딘은
-        // 최소 1건만 요청), 2페이지는 DB 나머지 5건(21~25번) + 알라딘 15건으로 채워진다.
+        // DB 매칭 25건, size 20 → 1페이지는 DB로 꽉 차서 알라딘 slot이 0개, 2페이지는 DB 나머지
+        // 5건(21~25번) + 알라딘 1건으로 채워진다.
         List<BookSearchProjection> firstPageDbBooks = dbBooks(1, 20);
         List<BookSearchProjection> secondPageDbBooks = dbBooks(21, 25);
         ExternalBookResult aladinBook = new ExternalBookResult("책모음", "작가", "출판사", "isbn-a", "cover-a");
@@ -165,9 +194,7 @@ class BookServiceTest {
                 .willReturn(firstPageDbBooks);
         given(bookQueryRepository.searchByTitle("책모음", BookSearchSort.OPINION, 20L, 5))
                 .willReturn(secondPageDbBooks);
-        given(aladinBookApiClient.search("책모음", 0, 1)).willReturn(new AladinSearchResult(List.of(), 7));
-        given(aladinBookApiClient.search("책모음", 0, 15))
-                .willReturn(new AladinSearchResult(List.of(aladinBook), 7));
+        given(aladinBookApiClient.searchAll("책모음")).willReturn(new AladinSearchResult(List.of(aladinBook), 7));
 
         Page<BookSearchProjection> firstPage = bookService.searchBooks("책모음", PageRequest.of(0, 20));
         Page<BookSearchProjection> secondPage = bookService.searchBooks("책모음", PageRequest.of(1, 20));
@@ -185,16 +212,18 @@ class BookServiceTest {
     }
 
     @Test
-    @DisplayName("DB 매칭이 1페이지 안에서 끝나면 2페이지부터는 알라딘 결과만 채우고, 알라딘 offset은 DB total만큼 당겨서 계산한다")
+    @DisplayName("DB 매칭이 1페이지 안에서 끝나면 2페이지부터는 알라딘 결과만 채우고, DB total만큼 알라딘 쪽을 건너뛴다")
     void searchBooksReturnsAladinOnlyWhenDbFitsInFirstPage() {
         Pageable pageable = PageRequest.of(1, 20);
         ExternalBookResult duplicateAladinBook = new ExternalBookResult("제목", "작가", "출판사", "isbn-dup", "cover");
         ExternalBookResult newAladinBook = new ExternalBookResult("제목", "작가", "출판사2", "isbn-new", "cover2");
+        // 1페이지(offset 0~19)에서 이미 노출됐어야 할 알라딘 15건(20 - dbTotal 5) 뒤에 중복/신규 도서가 이어진다.
+        List<ExternalBookResult> aladinItems = new ArrayList<>(externalBooks(1, 15));
+        aladinItems.add(duplicateAladinBook);
+        aladinItems.add(newAladinBook);
         given(bookQueryRepository.countByTitle("제목")).willReturn(5L);
         given(bookQueryRepository.findIsbnsByTitle("제목")).willReturn(List.of("isbn-dup"));
-        // DB total이 5라 2페이지(offset 20)에서는 DB slot이 0개이고, 알라딘 offset은 20-5=15부터 시작한다.
-        given(aladinBookApiClient.search("제목", 15, 20))
-                .willReturn(new AladinSearchResult(List.of(duplicateAladinBook, newAladinBook), 21));
+        given(aladinBookApiClient.searchAll("제목")).willReturn(new AladinSearchResult(aladinItems, 21));
 
         Page<BookSearchProjection> results = bookService.searchBooks("제목", pageable);
 
