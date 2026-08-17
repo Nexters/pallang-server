@@ -222,12 +222,24 @@ class BookControllerTest {
     @DisplayName("내가 최근에 남긴 도서 목록을 요청하면 현재 사용자 기준으로 조회한다")
     void getRecentBooks() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(bookService.getRecentBooks(eq(1L), any(Pageable.class))).willReturn(
+        given(bookService.getRecentBooks(eq(1L), isNull(), any(Pageable.class))).willReturn(
                 new PageImpl<>(List.of(book(1L, "최근 책")), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/recent"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.books[0].title").value("최근 책"));
+    }
+
+    @Test
+    @DisplayName("내가 최근에 남긴 도서 목록을 keyword로 요청하면 keyword를 그대로 전달한다")
+    void getRecentBooksWithKeyword() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(bookService.getRecentBooks(eq(1L), eq("작별인사"), any(Pageable.class))).willReturn(
+                new PageImpl<>(List.of(book(1L, "작별인사")), DEFAULT_PAGEABLE, 1));
+
+        mockMvc.perform(get("/api/books/recent").param("keyword", "작별인사"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.books[0].title").value("작별인사"));
     }
 
     @Test

@@ -92,11 +92,12 @@ public class BookController implements BookApi {
     @Override
     @GetMapping("/api/books/recent")
     public ResponseEntity<DataResponse<BookListResponse>> getRecentBooks(
+            @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        return ResponseEntity.ok(DataResponse.from(
-                BookMapper.toListResponse(bookService.getRecentBooks(currentUserId, pageable(page, size)))));
+        return ResponseEntity.ok(DataResponse.from(BookMapper.toListResponse(
+                bookService.getRecentBooks(currentUserId, keyword, pageable(page, size)))));
     }
 
     @Override

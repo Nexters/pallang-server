@@ -94,8 +94,8 @@ public class BookService {
         return bookQueryRepository.findMyLibraryBooks(userId, pageable, opinionCountScope);
     }
 
-    public Page<Book> getRecentBooks(Long userId, Pageable pageable) {
-        Page<Long> bookIds = bookQueryRepository.findRecentlyActiveBookIds(userId, pageable);
+    public Page<Book> getRecentBooks(Long userId, String keyword, Pageable pageable) {
+        Page<Long> bookIds = bookQueryRepository.findRecentlyActiveBookIds(userId, keyword, pageable);
         Map<Long, Book> booksById = bookRepository.findAllById(bookIds.getContent()).stream()
                 .collect(Collectors.toMap(Book::getId, book -> book));
         List<Book> books = bookIds.getContent().stream().map(booksById::get).filter(Objects::nonNull).toList();

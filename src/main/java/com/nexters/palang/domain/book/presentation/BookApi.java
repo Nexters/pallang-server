@@ -118,6 +118,8 @@ public interface BookApi {
 
     @Operation(summary = "내가 최근에 남긴 도서 목록",
             description = "현재 로그인한 사용자가 최근에 대목을 남긴 도서 목록입니다. "
+                    + "홈 화면 검색에서 사용할 수 있도록 keyword로 제목을 필터링할 수 있으며, "
+                    + "생략하거나 빈 문자열이면 전체 목록을 반환합니다. 제목과 검색어의 띄어쓰기 차이는 무시하고 매칭합니다. "
                     + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
@@ -127,6 +129,7 @@ public interface BookApi {
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     ResponseEntity<DataResponse<BookListResponse>> getRecentBooks(
+            @Parameter(description = "검색 키워드 (생략하거나 빈 문자열이면 전체 목록)") String keyword,
             @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,
             @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
     );

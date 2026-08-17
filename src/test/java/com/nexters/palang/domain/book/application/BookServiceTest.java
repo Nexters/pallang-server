@@ -158,15 +158,29 @@ class BookServiceTest {
         Book book1 = book(1L, "책1");
         Book book2 = book(2L, "책2");
         Book book3 = book(3L, "책3");
-        given(bookQueryRepository.findRecentlyActiveBookIds(10L, pageable))
+        given(bookQueryRepository.findRecentlyActiveBookIds(10L, null, pageable))
                 .willReturn(new PageImpl<>(List.of(3L, 1L, 2L), pageable, 3));
         given(bookRepository.findAllById(List.of(3L, 1L, 2L)))
                 .willReturn(List.of(book1, book2, book3));
 
-        Page<Book> results = bookService.getRecentBooks(10L, pageable);
+        Page<Book> results = bookService.getRecentBooks(10L, null, pageable);
 
         assertThat(results.getContent()).containsExactly(book3, book1, book2);
         assertThat(results.getTotalElements()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("내가 최근에 남긴 도서 목록 조회 시 keyword를 QueryRepository로 그대로 전달한다")
+    void getRecentBooksForwardsKeyword() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Book book1 = book(1L, "책1");
+        given(bookQueryRepository.findRecentlyActiveBookIds(10L, "책1", pageable))
+                .willReturn(new PageImpl<>(List.of(1L), pageable, 1));
+        given(bookRepository.findAllById(List.of(1L))).willReturn(List.of(book1));
+
+        Page<Book> results = bookService.getRecentBooks(10L, "책1", pageable);
+
+        assertThat(results.getContent()).containsExactly(book1);
     }
 
     @Test
