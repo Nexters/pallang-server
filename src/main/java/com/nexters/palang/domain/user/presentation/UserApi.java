@@ -179,7 +179,7 @@ public interface UserApi {
             @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
     );
 
-    @Operation(summary = "내 스포일러 대목 목록", description = "내가 흔적을 남긴 대목을 최신순으로 조회합니다. "
+    @Operation(summary = "내 대목 목록", description = "내가 흔적을 남긴 대목을 최신순으로 조회합니다. "
             + "소유 기준은 최초 작성자가 아니라 해당 대목에 흔적을 남긴 사용자이며, 병합된 대목은 흔적을 남긴 모든 사용자에게 노출됩니다. "
             + "bookId를 지정하면 해당 책으로 한정하고, 생략하면 전체 책을 대상으로 합니다. "
             + "spoilerOnly=true면 스포일러 대목만 조회합니다. "

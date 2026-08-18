@@ -77,7 +77,8 @@ public class PassageQueryRepository {
     }
 
     // 내가 남긴 대목(FR-...): 소유 기준은 흔적을 남긴 사용자다(최초 생성자가 아니어도 병합된 대목에 흔적을 남겼으면 포함).
-    // 같은 대목에 흔적을 여러 번 남긴 경우 중복 제거를 위해 대목 단위로 group by 한다.
+    // createdAt/정렬 기준은 대목 자체가 아니라 "내가 그 대목에 흔적을 남긴 시점"이어야 사용자 관점에서 의미가 있으므로
+    // opinion.createdAt의 최댓값을 쓴다(같은 대목에 흔적을 여러 번 남긴 경우 가장 최근 흔적 기준, 대목 단위 중복 제거).
     public Page<MyPassageProjection> findMyPassages(Long userId, Long bookId, boolean spoilerOnly, Pageable pageable) {
         QOpinion opinion = QOpinion.opinion;
         QPassage passage = QPassage.passage;
@@ -88,14 +89,13 @@ public class PassageQueryRepository {
         List<MyPassageProjection> content = queryFactory
                 .select(Projections.constructor(MyPassageProjection.class,
                         passage.id, passage.book.id, passage.pageNumber, passage.quotedText,
-                        passage.isSpoiler, passage.createdAt))
+                        passage.isSpoiler, opinion.createdAt.max()))
                 .from(opinion)
                 .join(opinion.passage, passage)
                 .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(), passage.deletedAt.isNull(),
                         bookFilter, spoilerFilter)
-                .groupBy(passage.id, passage.book.id, passage.pageNumber, passage.quotedText,
-                        passage.isSpoiler, passage.createdAt)
-                .orderBy(passage.createdAt.desc(), passage.id.desc())
+                .groupBy(passage.id, passage.book.id, passage.pageNumber, passage.quotedText, passage.isSpoiler)
+                .orderBy(opinion.createdAt.max().desc(), passage.id.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
