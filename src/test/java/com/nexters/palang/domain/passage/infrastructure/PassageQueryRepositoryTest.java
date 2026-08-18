@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.opinion.domain.Opinion;
+import com.nexters.palang.domain.passage.application.MyPassageProjection;
 import com.nexters.palang.domain.passage.application.SimilarPassageProjection;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.user.domain.SnsProvider;
@@ -201,5 +202,85 @@ class PassageQueryRepositoryTest {
         List<Passage> result = passageQueryRepository.findPassagesByPage(book.getId(), 3);
 
         assertThat(result).extracting(Passage::getId).containsExactly(alive.getId());
+    }
+
+    @Test
+    @DisplayName("병합된 대목은 최초 생성자가 아니어도 흔적을 남긴 사용자에게 노출된다")
+    void findMyPassagesIncludesMergedPassageForTraceOwner() {
+        User creator = user("creator-1");
+        User merger = user("merger-1");
+        Book book = book("책");
+        Passage passage = passage(book, creator, 5, "발췌 문장", "hash-1");
+        entityManager.persistAndFlush(Opinion.builder().passage(passage).user(merger).content("병합 흔적").build());
+
+        Page<MyPassageProjection> result = passageQueryRepository.findMyPassages(
+                merger.getId(), null, false, PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).extracting(MyPassageProjection::passageId).containsExactly(passage.getId());
+    }
+
+    @Test
+    @DisplayName("흔적을 남긴 적 없는 대목은 조회되지 않는다")
+    void findMyPassagesExcludesPassageWithoutMyOpinion() {
+        User creator = user("creator-2");
+        User other = user("other-2");
+        Book book = book("책");
+        Passage passage = passage(book, creator, 5, "발췌 문장", "hash-1");
+        entityManager.persistAndFlush(Opinion.builder().passage(passage).user(creator).content("흔적").build());
+
+        Page<MyPassageProjection> result = passageQueryRepository.findMyPassages(
+                other.getId(), null, false, PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("bookId를 지정하면 해당 책의 대목만 조회된다")
+    void findMyPassagesFiltersByBookId() {
+        User writer = user("writer-9");
+        Book targetBook = book("대상 책");
+        Book otherBook = book("다른 책");
+        Passage inTargetBook = passage(targetBook, writer, 5, "발췌 문장", "hash-1");
+        Passage inOtherBook = passage(otherBook, writer, 5, "발췌 문장", "hash-2");
+        entityManager.persistAndFlush(Opinion.builder().passage(inTargetBook).user(writer).content("흔적1").build());
+        entityManager.persistAndFlush(Opinion.builder().passage(inOtherBook).user(writer).content("흔적2").build());
+
+        Page<MyPassageProjection> result = passageQueryRepository.findMyPassages(
+                writer.getId(), targetBook.getId(), false, PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).extracting(MyPassageProjection::passageId)
+                .containsExactly(inTargetBook.getId());
+    }
+
+    @Test
+    @DisplayName("spoilerOnly=true면 스포일러 대목만 조회된다")
+    void findMyPassagesFiltersBySpoilerOnly() {
+        User writer = user("writer-10");
+        Book book = book("책");
+        Passage spoiler = passage(book, writer, 1, true);
+        Passage notSpoiler = passage(book, writer, 2, false);
+        entityManager.persistAndFlush(Opinion.builder().passage(spoiler).user(writer).content("흔적1").build());
+        entityManager.persistAndFlush(Opinion.builder().passage(notSpoiler).user(writer).content("흔적2").build());
+
+        Page<MyPassageProjection> result = passageQueryRepository.findMyPassages(
+                writer.getId(), null, true, PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).extracting(MyPassageProjection::passageId).containsExactly(spoiler.getId());
+    }
+
+    @Test
+    @DisplayName("같은 대목에 흔적을 여러 번 남겨도 대목은 한 번만 조회된다")
+    void findMyPassagesDeduplicatesSamePassage() {
+        User writer = user("writer-11");
+        Book book = book("책");
+        Passage passage = passage(book, writer, 5, "발췌 문장", "hash-1");
+        entityManager.persistAndFlush(Opinion.builder().passage(passage).user(writer).content("흔적1").build());
+        entityManager.persistAndFlush(Opinion.builder().passage(passage).user(writer).content("흔적2").build());
+
+        Page<MyPassageProjection> result = passageQueryRepository.findMyPassages(
+                writer.getId(), null, false, PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getTotalElements()).isEqualTo(1);
     }
 }

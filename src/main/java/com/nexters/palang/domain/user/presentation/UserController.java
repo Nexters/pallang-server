@@ -2,12 +2,14 @@ package com.nexters.palang.domain.user.presentation;
 
 import com.nexters.palang.domain.auth.application.AuthService;
 import com.nexters.palang.domain.opinion.application.OpinionService;
+import com.nexters.palang.domain.passage.application.PassageService;
 import com.nexters.palang.domain.user.application.UserMapper;
 import com.nexters.palang.domain.user.application.UserService;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.presentation.dto.LikedOpinionListResponse;
 import com.nexters.palang.domain.user.presentation.dto.MeResponse;
 import com.nexters.palang.domain.user.presentation.dto.MyOpinionListResponse;
+import com.nexters.palang.domain.user.presentation.dto.MyPassageListResponse;
 import com.nexters.palang.domain.user.presentation.dto.OnboardingCompleteResponse;
 import com.nexters.palang.domain.user.presentation.dto.UpdateBackgroundColorRequest;
 import com.nexters.palang.domain.user.presentation.dto.UpdateNicknameRequest;
@@ -39,6 +41,7 @@ public class UserController implements UserApi {
     private final UserService userService;
     private final AuthService authService;
     private final OpinionService opinionService;
+    private final PassageService passageService;
     private final CurrentUserProvider currentUserProvider;
 
     @Override
@@ -109,6 +112,18 @@ public class UserController implements UserApi {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         return ResponseEntity.ok(DataResponse.from(UserMapper.toLikedOpinionListResponse(
                 opinionService.getLikedOpinions(currentUserId, pageable(page, size)))));
+    }
+
+    @Override
+    @GetMapping("/api/users/me/passages")
+    public ResponseEntity<DataResponse<MyPassageListResponse>> getMyPassages(
+            @RequestParam(required = false) Long bookId,
+            @RequestParam(defaultValue = "false") boolean spoilerOnly,
+            @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        return ResponseEntity.ok(DataResponse.from(UserMapper.toMyPassageListResponse(
+                passageService.getMyPassages(currentUserId, bookId, spoilerOnly, pageable(page, size)))));
     }
 
     private MeResponse toMeResponse(Long userId, User user) {
