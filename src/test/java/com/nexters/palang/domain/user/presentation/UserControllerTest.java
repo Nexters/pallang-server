@@ -2,6 +2,7 @@ package com.nexters.palang.domain.user.presentation;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
@@ -14,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexters.palang.domain.auth.application.AuthService;
+import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.opinion.application.LikedOpinionProjection;
 import com.nexters.palang.domain.opinion.application.MyOpinionProjection;
 import com.nexters.palang.domain.opinion.application.OpinionService;
@@ -276,7 +278,7 @@ class UserControllerTest {
         given(currentUserProvider.findCurrentUserId()).willReturn(Optional.of(1L));
         MyOpinionProjection projection = new MyOpinionProjection(
                 1L, 10L, "책 제목", "작가", "cover", 100L, "발췌 문장", 5, "흔적 내용", 0, LocalDateTime.now());
-        given(opinionService.getMyOpinions(eq(1L), any())).willReturn(
+        given(opinionService.getMyOpinions(eq(1L), isNull(), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/users/me/opinions"))
@@ -287,13 +289,27 @@ class UserControllerTest {
     }
 
     @Test
+    @DisplayName("bookId를 지정해 내가 남긴 흔적 목록을 조회한다")
+    void getMyOpinionsFiltersByBookId() throws Exception {
+        given(currentUserProvider.findCurrentUserId()).willReturn(Optional.of(1L));
+        MyOpinionProjection projection = new MyOpinionProjection(
+                1L, 10L, "책 제목", "작가", "cover", 100L, "발췌 문장", 5, "흔적 내용", 0, LocalDateTime.now());
+        given(opinionService.getMyOpinions(eq(1L), eq(10L), any())).willReturn(
+                new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
+
+        mockMvc.perform(get("/api/users/me/opinions").param("bookId", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.opinions[0].bookId").value(10));
+    }
+
+    @Test
     @DisplayName("인증 없이 내가 남긴 흔적 목록을 요청하면 샘플 흔적 목록을 반환한다")
     void getMyOpinionsReturnsSampleWhenUnauthenticated() throws Exception {
         given(currentUserProvider.findCurrentUserId()).willReturn(Optional.empty());
         MyOpinionProjection projection = new MyOpinionProjection(
                 1L, 18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "cover", 1L, "인용문", 33, "애증의 관계", 5,
                 LocalDateTime.now());
-        given(opinionService.getMyOpinions(eq((Long) null), any())).willReturn(
+        given(opinionService.getMyOpinions(eq((Long) null), isNull(), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/users/me/opinions"))
@@ -306,14 +322,65 @@ class UserControllerTest {
     void getLikedOpinions() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         LikedOpinionProjection projection = new LikedOpinionProjection(
-                1L, 10L, "책 제목", "cover", 100L, "발췌 문장", 5, "흔적 내용", 0,
+                1L, 10L, "책 제목", "작가", "cover", 100L, "발췌 문장", 5, "흔적 내용", "닉네임", 0,
                 LocalDateTime.now(), LocalDateTime.now());
-        given(opinionService.getLikedOpinions(eq(1L), any())).willReturn(
+        given(opinionService.getLikedOpinions(eq(1L), isNull(), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/users/me/likes"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.opinions[0].opinionId").value(1));
+                .andExpect(jsonPath("$.data.opinions[0].opinionId").value(1))
+                .andExpect(jsonPath("$.data.opinions[0].nickname").value("닉네임"))
+                .andExpect(jsonPath("$.data.opinions[0].author").value("작가"));
+    }
+
+    @Test
+    @DisplayName("bookId를 지정해 좋아요 누른 흔적 목록을 조회한다")
+    void getLikedOpinionsFiltersByBookId() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        LikedOpinionProjection projection = new LikedOpinionProjection(
+                1L, 10L, "책 제목", "작가", "cover", 100L, "발췌 문장", 5, "흔적 내용", "닉네임", 0,
+                LocalDateTime.now(), LocalDateTime.now());
+        given(opinionService.getLikedOpinions(eq(1L), eq(10L), any())).willReturn(
+                new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
+
+        mockMvc.perform(get("/api/users/me/likes").param("bookId", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.opinions[0].bookId").value(10));
+    }
+
+    @Test
+    @DisplayName("좋아요 도서 필터 목록을 조회한다")
+    void getFilterBooksForLike() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(opinionService.getLikedBookOptions(1L)).willReturn(
+                List.of(new BookOptionProjection(10L, "책 제목")));
+
+        mockMvc.perform(get("/api/users/me/filter-books").param("type", "LIKE"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.books[0].bookId").value(10))
+                .andExpect(jsonPath("$.data.books[0].title").value("책 제목"));
+    }
+
+    @Test
+    @DisplayName("스포일러 도서 필터 목록을 조회한다")
+    void getFilterBooksForSpoiler() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(passageService.getSpoilerBookOptions(1L)).willReturn(
+                List.of(new BookOptionProjection(20L, "다른 책")));
+
+        mockMvc.perform(get("/api/users/me/filter-books").param("type", "SPOILER"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.books[0].bookId").value(20));
+    }
+
+    @Test
+    @DisplayName("type 파라미터가 없으면 400을 반환한다")
+    void getFilterBooksFailsWhenTypeMissing() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+
+        mockMvc.perform(get("/api/users/me/filter-books"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

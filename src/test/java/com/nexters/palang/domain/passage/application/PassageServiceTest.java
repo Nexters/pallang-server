@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
+import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.decoration.application.DecorationMergeCandidate;
@@ -101,5 +102,16 @@ class PassageServiceTest {
                 passageService.getMergedDecorationsByPassageId(List.of(passage));
 
         assertThat(result.get(1L)).containsExactly(candidate);
+    }
+
+    @Test
+    @DisplayName("스포일러 도서 필터 목록을 조회하면 QueryRepository 결과를 그대로 반환한다")
+    void getSpoilerBookOptionsReturnsResultFromQueryRepository() {
+        List<BookOptionProjection> expected = List.of(new BookOptionProjection(10L, "책 제목"));
+        given(passageQueryRepository.findSpoilerBookOptions(1L)).willReturn(expected);
+
+        List<BookOptionProjection> result = passageService.getSpoilerBookOptions(1L);
+
+        assertThat(result).isEqualTo(expected);
     }
 }

@@ -3,6 +3,7 @@ package com.nexters.palang.domain.opinion.infrastructure;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nexters.palang.domain.block.domain.UserBlock;
+import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.comment.domain.Comment;
 import com.nexters.palang.domain.opinion.application.LikedOpinionProjection;
@@ -17,6 +18,7 @@ import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.global.config.JpaAuditingConfig;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -211,7 +213,7 @@ class OpinionQueryRepositoryTest {
         deleted.delete();
         opinion(other, passage(4), "다른 사람 흔적");
 
-        Page<MyOpinionProjection> results = opinionQueryRepository.findMyOpinions(me.getId(), PageRequest.of(0, 20));
+        Page<MyOpinionProjection> results = opinionQueryRepository.findMyOpinions(me.getId(), null, PageRequest.of(0, 20));
 
         assertThat(results.getContent()).extracting(MyOpinionProjection::opinionId)
                 .containsExactly(newer.getId(), older.getId());
@@ -221,7 +223,20 @@ class OpinionQueryRepositoryTest {
     }
 
     @Test
-    @DisplayName("좋아요 누른 흔적을 좋아요 순서(최신순)로 조회하고 삭제된 흔적의 좋아요는 제외한다")
+    @DisplayName("bookId를 지정하면 해당 책의 흔적만 조회한다")
+    void findMyOpinionsFiltersByBookId() {
+        Opinion inOtherBook = opinion(me, passage(other), "다른 책 흔적");
+        Opinion inTargetBook = opinion(me, passage(1), "대상 책 흔적");
+
+        Page<MyOpinionProjection> results = opinionQueryRepository.findMyOpinions(me.getId(), book.getId(), PageRequest.of(0, 20));
+
+        assertThat(results.getContent()).extracting(MyOpinionProjection::opinionId)
+                .containsExactly(inTargetBook.getId());
+        assertThat(results.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("좋아요 누른 흔적을 좋아요 순서(최신순)로 조회하고 삭제된 흔적의 좋아요는 제외하며, 흔적 작성자 닉네임/책 저자를 함께 반환한다")
     void findLikedOpinionsOrdersByLikedAtDescendingAndExcludesDeleted() {
         Opinion opinion1 = opinion(other, passage(1), "흔적1");
         Opinion opinion2 = opinion(other, passage(2), "흔적2");
@@ -233,19 +248,56 @@ class OpinionQueryRepositoryTest {
         deletedOpinion.delete();
         entityManager.persistAndFlush(deletedOpinion);
 
-        Page<LikedOpinionProjection> results = opinionQueryRepository.findLikedOpinions(me.getId(), PageRequest.of(0, 20));
+        Page<LikedOpinionProjection> results = opinionQueryRepository.findLikedOpinions(me.getId(), null, PageRequest.of(0, 20));
 
         assertThat(results.getContent()).extracting(LikedOpinionProjection::opinionId)
                 .containsExactly(opinion2.getId(), opinion1.getId());
+        assertThat(results.getContent()).extracting(LikedOpinionProjection::nickname)
+                .containsOnly(other.getNickname());
+        assertThat(results.getContent()).extracting(LikedOpinionProjection::author)
+                .containsOnly(book.getAuthor());
         assertThat(results.getTotalElements()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("bookId를 지정하면 해당 책의 좋아요만 조회한다")
+    void findLikedOpinionsFiltersByBookId() {
+        Opinion inOtherBook = opinion(other, passage(other), "다른 책 흔적");
+        Opinion inTargetBook = opinion(other, passage(1), "대상 책 흔적");
+        entityManager.persistAndFlush(OpinionLike.builder().user(me).opinion(inOtherBook).build());
+        entityManager.persistAndFlush(OpinionLike.builder().user(me).opinion(inTargetBook).build());
+
+        Page<LikedOpinionProjection> results =
+                opinionQueryRepository.findLikedOpinions(me.getId(), book.getId(), PageRequest.of(0, 20));
+
+        assertThat(results.getContent()).extracting(LikedOpinionProjection::opinionId)
+                .containsExactly(inTargetBook.getId());
+        assertThat(results.getTotalElements()).isEqualTo(1);
     }
 
     @Test
     @DisplayName("좋아요가 없으면 빈 목록을 반환한다")
     void findLikedOpinionsReturnsEmptyWhenNoLikes() {
-        Page<LikedOpinionProjection> results = opinionQueryRepository.findLikedOpinions(me.getId(), PageRequest.of(0, 20));
+        Page<LikedOpinionProjection> results = opinionQueryRepository.findLikedOpinions(me.getId(), null, PageRequest.of(0, 20));
 
         assertThat(results.getContent()).isEmpty();
         assertThat(results.getTotalElements()).isZero();
+    }
+
+    @Test
+    @DisplayName("좋아요를 누른 도서 목록을 최근 좋아요순으로 중복 없이 반환한다")
+    void findLikedBookOptionsReturnsDistinctBooksOrderedByLatestLike() {
+        Opinion inTargetBook1 = opinion(other, passage(1), "흔적1");
+        Opinion inTargetBook2 = opinion(other, passage(2), "흔적2");
+        Opinion inOtherBook = opinion(other, passage(other), "다른 책 흔적");
+
+        entityManager.persistAndFlush(OpinionLike.builder().user(me).opinion(inOtherBook).build());
+        entityManager.persistAndFlush(OpinionLike.builder().user(me).opinion(inTargetBook1).build());
+        entityManager.persistAndFlush(OpinionLike.builder().user(me).opinion(inTargetBook2).build());
+
+        List<BookOptionProjection> results = opinionQueryRepository.findLikedBookOptions(me.getId());
+
+        assertThat(results).extracting(BookOptionProjection::bookId)
+                .containsExactly(book.getId(), inOtherBook.getPassage().getBook().getId());
     }
 }

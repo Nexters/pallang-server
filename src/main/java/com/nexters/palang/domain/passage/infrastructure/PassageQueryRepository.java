@@ -1,5 +1,7 @@
 package com.nexters.palang.domain.passage.infrastructure;
 
+import com.nexters.palang.domain.book.application.BookOptionProjection;
+import com.nexters.palang.domain.book.domain.QBook;
 import com.nexters.palang.domain.opinion.domain.QOpinion;
 import com.nexters.palang.domain.passage.application.MyPassageProjection;
 import com.nexters.palang.domain.passage.application.SimilarPassageProjection;
@@ -109,5 +111,24 @@ public class PassageQueryRepository {
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
+    }
+
+    // 좋아요·스포일러 관리 화면 공용 "전체 책 보기" 드롭다운: 내가 스포일러로 남긴 대목이 있는 도서 목록.
+    // 소유 기준은 findMyPassages와 동일하게 흔적을 남긴 사용자(opinion.user) 기준.
+    public List<BookOptionProjection> findSpoilerBookOptions(Long userId) {
+        QOpinion opinion = QOpinion.opinion;
+        QPassage passage = QPassage.passage;
+        QBook book = QBook.book;
+
+        return queryFactory
+                .select(Projections.constructor(BookOptionProjection.class, book.id, book.title))
+                .from(opinion)
+                .join(opinion.passage, passage)
+                .join(passage.book, book)
+                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(), passage.deletedAt.isNull(),
+                        passage.isSpoiler.isTrue())
+                .groupBy(book.id, book.title)
+                .orderBy(opinion.createdAt.max().desc())
+                .fetch();
     }
 }

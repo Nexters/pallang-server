@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
+import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
@@ -277,9 +278,9 @@ class OpinionServiceTest {
         Page<MyOpinionProjection> expected = new PageImpl<>(
                 List.of(new MyOpinionProjection(1L, 10L, "제목", "작가", "cover", 100L, "발췌", 5, "흔적", 0, LocalDateTime.now())),
                 pageable, 1);
-        given(opinionQueryRepository.findMyOpinions(1L, pageable)).willReturn(expected);
+        given(opinionQueryRepository.findMyOpinions(1L, null, pageable)).willReturn(expected);
 
-        Page<MyOpinionProjection> results = opinionService.getMyOpinions(1L, pageable);
+        Page<MyOpinionProjection> results = opinionService.getMyOpinions(1L, null, pageable);
 
         assertThat(results).isEqualTo(expected);
     }
@@ -289,10 +290,20 @@ class OpinionServiceTest {
     void getMyOpinionsReturnsSampleWhenGuest() {
         Pageable pageable = PageRequest.of(0, 20);
 
-        Page<MyOpinionProjection> results = opinionService.getMyOpinions(null, pageable);
+        Page<MyOpinionProjection> results = opinionService.getMyOpinions(null, null, pageable);
 
         assertThat(results.getTotalElements()).isEqualTo(3);
         assertThat(results.getContent()).allMatch(o -> o.bookId().equals(18L) && o.pageNumber() == 33);
+    }
+
+    @Test
+    @DisplayName("비로그인 사용자가 다른 책 bookId로 조회하면 샘플이 아닌 빈 목록을 반환한다")
+    void getMyOpinionsReturnsEmptyWhenGuestFiltersOtherBook() {
+        Pageable pageable = PageRequest.of(0, 20);
+
+        Page<MyOpinionProjection> results = opinionService.getMyOpinions(null, 999L, pageable);
+
+        assertThat(results.getTotalElements()).isZero();
     }
 
     @Test
@@ -300,12 +311,23 @@ class OpinionServiceTest {
     void getLikedOpinionsReturnsPageFromQueryRepository() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<LikedOpinionProjection> expected = new PageImpl<>(
-                List.of(new LikedOpinionProjection(1L, 10L, "제목", "cover", 100L, "발췌", 5, "흔적", 0,
+                List.of(new LikedOpinionProjection(1L, 10L, "제목", "작가", "cover", 100L, "발췌", 5, "흔적", "닉네임", 0,
                         LocalDateTime.now(), LocalDateTime.now())),
                 pageable, 1);
-        given(opinionQueryRepository.findLikedOpinions(1L, pageable)).willReturn(expected);
+        given(opinionQueryRepository.findLikedOpinions(1L, null, pageable)).willReturn(expected);
 
-        Page<LikedOpinionProjection> results = opinionService.getLikedOpinions(1L, pageable);
+        Page<LikedOpinionProjection> results = opinionService.getLikedOpinions(1L, null, pageable);
+
+        assertThat(results).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("좋아요 도서 필터 목록을 조회하면 QueryRepository 결과를 그대로 반환한다")
+    void getLikedBookOptionsReturnsResultFromQueryRepository() {
+        List<BookOptionProjection> expected = List.of(new BookOptionProjection(10L, "제목"));
+        given(opinionQueryRepository.findLikedBookOptions(1L)).willReturn(expected);
+
+        List<BookOptionProjection> results = opinionService.getLikedBookOptions(1L);
 
         assertThat(results).isEqualTo(expected);
     }
