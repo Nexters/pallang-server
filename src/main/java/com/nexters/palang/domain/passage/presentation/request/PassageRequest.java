@@ -9,6 +9,13 @@ import jakarta.validation.constraints.Size;
 
 public class PassageRequest {
 
+    public record UpdateSpoiler(
+            @NotNull(message = "isSpoiler는 필수입니다.")
+            @Schema(example = "false")
+            Boolean isSpoiler
+    ) {
+    }
+
     public record SimilarCheck(
             @NotNull(message = "도서 ID는 필수입니다.")
             @Schema(example = "1")
