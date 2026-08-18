@@ -18,15 +18,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cache.CacheManager;
 import org.springframework.context.annotation.Bean;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.ExchangeFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-// AladinBookApiClient#search()에 걸린 @Cacheable이 실제로 동작하는지 검증한다. @Cacheable은
+// AladinBookApiClient#searchAll()에 걸린 @Cacheable이 실제로 동작하는지 검증한다. @Cacheable은
 // Spring AOP 프록시를 거쳐야 동작해서(클래스 안에서 self-invocation하면 적용되지 않음) Mockito로
 // AladinBookApiClient를 직접 new하는 방식(AladinBookApiClientTest)으로는 검증할 수 없고, 스프링
 // 컨텍스트 + 실제 Redis(로컬 docker-compose 또는 CI redis 서비스)가 필요하다.
@@ -100,19 +98,18 @@ class AladinBookApiClientCacheTest {
                   ]
                 }
                 """)));
-        Pageable pageable = PageRequest.of(0, 8);
 
-        AladinSearchResult first = aladinBookApiClient.search("채식주의자캐시테스트", pageable);
+        AladinSearchResult first = aladinBookApiClient.searchAll("채식주의자캐시테스트");
         assertThat(first.items()).as("첫 호출 결과가 비어있으면 unless 조건 때문에 애초에 캐싱되지 않는다").isNotEmpty();
 
         // @Cacheable의 캐시 put은 원래 메서드가 결과를 반환하기 "전에" 같은 스레드에서 동기적으로
         // 일어나지만, 전체 테스트 스위트를 함께 돌려 스프링 컨텍스트가 많이 떠 있는 상황에서는 Redis
         // write가 반영되는 데 짧은 지연이 생기는 걸 관찰했다. 캐시가 실제로 없는 버그와 "아직 반영
         // 안 됐을 뿐"인 경우를 구분하기 위해 짧게 재시도하며 기다린다.
-        String cacheKey = "채식주의자캐시테스트:0:8";
+        String cacheKey = "채식주의자캐시테스트";
         awaitCacheEntry(cacheKey);
 
-        AladinSearchResult second = aladinBookApiClient.search("채식주의자캐시테스트", pageable);
+        AladinSearchResult second = aladinBookApiClient.searchAll("채식주의자캐시테스트");
 
         assertThat(second).isEqualTo(first);
         verify(exchangeFunction, times(1)).exchange(any());
@@ -124,11 +121,10 @@ class AladinBookApiClientCacheTest {
         given(exchangeFunction.exchange(any()))
                 .willReturn(Mono.just(ClientResponse.create(HttpStatus.INTERNAL_SERVER_ERROR).body("error").build()))
                 .willReturn(Mono.just(jsonResponse("{}")));
-        Pageable pageable = PageRequest.of(0, 8);
 
-        assertThatThrownBy(() -> aladinBookApiClient.search("실패캐시테스트", pageable))
+        assertThatThrownBy(() -> aladinBookApiClient.searchAll("실패캐시테스트"))
                 .isInstanceOf(BookException.class);
-        AladinSearchResult second = aladinBookApiClient.search("실패캐시테스트", pageable);
+        AladinSearchResult second = aladinBookApiClient.searchAll("실패캐시테스트");
 
         assertThat(second.items()).isEmpty();
         verify(exchangeFunction, times(2)).exchange(any());
@@ -138,10 +134,9 @@ class AladinBookApiClientCacheTest {
     @DisplayName("빈 결과는 캐싱되지 않아 다음 호출에서 알라딘을 다시 호출한다")
     void searchDoesNotCacheEmptyResult() {
         given(exchangeFunction.exchange(any())).willReturn(Mono.just(jsonResponse("{}")));
-        Pageable pageable = PageRequest.of(0, 8);
 
-        aladinBookApiClient.search("빈결과캐시테스트", pageable);
-        aladinBookApiClient.search("빈결과캐시테스트", pageable);
+        aladinBookApiClient.searchAll("빈결과캐시테스트");
+        aladinBookApiClient.searchAll("빈결과캐시테스트");
 
         verify(exchangeFunction, times(2)).exchange(any());
     }

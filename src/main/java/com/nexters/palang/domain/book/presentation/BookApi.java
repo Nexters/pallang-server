@@ -9,7 +9,6 @@ import com.nexters.palang.domain.book.presentation.dto.BookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookSearchListResponse;
 import com.nexters.palang.domain.book.presentation.dto.CreateBookRequest;
-import com.nexters.palang.domain.book.presentation.dto.ExternalBookListResponse;
 import com.nexters.palang.global.common.error.ErrorResponse;
 import com.nexters.palang.global.common.response.DataResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,18 +28,28 @@ import org.springframework.web.multipart.MultipartFile;
 @Tag(name = "Book", description = "도서 API")
 public interface BookApi {
 
-    @Operation(summary = "도서 외부 검색",
-            description = "알라딘 Open API로 도서를 검색합니다. 응답 속도를 위해 pageCount는 내려주지 않으며, "
-                    + "등록 시 사용자가 직접 입력합니다. 타이핑 중 자동완성 미리보기 용도로도 재사용되므로, "
-                    + "keyword가 공백 제거 후 2글자 미만이면 알라딘을 호출하지 않고 빈 목록을 반환합니다. "
-                    + "동일 keyword+size 조합은 최대 12시간 캐싱되어 결과가 즉시 반영되지 않을 수 있습니다.")
+    @Operation(summary = "도서 검색",
+            description = "알라딘 Open API 검색 결과와 서비스 DB에 등록된 도서(수동 등록 포함)를 함께 검색합니다. "
+                    + "이미 등록된 도서는 bookId/source가 채워져 내려가고, 알라딘에만 있고 아직 등록되지 않은 도서는 "
+                    + "bookId/source가 null이며 pageCount/passageCount/opinionCount는 0입니다. "
+                    + "같은 책이 알라딘과 DB 양쪽에 모두 있으면(ISBN 동일) 이미 등록된 DB 쪽만 남기고 알라딘 쪽은 "
+                    + "페이지와 무관하게 항상 제외합니다(ISBN이 없는 알라딘 결과는 비교할 수 없어 그대로 둡니다). "
+                    + "DB 도서(흔적 많은 순 정렬)와 알라딘 결과를 하나로 이어붙인 목록으로 취급해 페이지네이션하므로, "
+                    + "DB 매칭이 페이지 크기보다 많아도 페이지를 넘기면 빠짐없이 노출되며 같은 도서가 중복 노출되지 "
+                    + "않습니다(DB 매칭을 다 지나간 뒤부터 알라딘 결과가 이어서 채워집니다). totalElements는 "
+                    + "DB 전체 매칭 수 + 알라딘 전체 매칭 수입니다. 단, 알라딘은 키워드당 최대 200건까지만 "
+                    + "결과를 제공하므로, 알라딘 쪽 매칭이 200건을 넘는 키워드는 200건을 넘어가는 페이지부터 "
+                    + "알라딘 항목이 더 채워지지 않을 수 있습니다. "
+                    + "타이핑 중 자동완성 미리보기 용도로도 재사용되므로, keyword가 공백 제거 후 2글자 미만이면 "
+                    + "알라딘을 호출하지 않고 빈 목록을 반환합니다. 알라딘 쪽 결과는 동일 keyword로 최대 12시간 "
+                    + "캐싱되어 즉시 반영되지 않을 수 있습니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "검색 성공"),
             @ApiResponse(responseCode = "400", description = "keyword 누락, page/size 형식 오류(COMMON_400_1) "
                     + "또는 알라딘 검색 실패(BOOK_400_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    ResponseEntity<DataResponse<ExternalBookListResponse>> searchExternalBooks(
+    ResponseEntity<DataResponse<BookSearchListResponse>> searchBooks(
             @Parameter(description = "검색 키워드", required = true) String keyword,
             @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,
             @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size

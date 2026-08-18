@@ -79,22 +79,28 @@ class BookControllerTest {
     }
 
     @Test
-    @DisplayName("키워드로 도서 외부 검색을 요청하면 결과 목록을 반환한다")
-    void searchExternalBooks() throws Exception {
-        given(bookService.searchExternalBooks(eq("제목"), any(Pageable.class))).willReturn(
-                new PageImpl<>(List.of(new ExternalBookResult("제목", "작가", "출판사", "isbn", "cover")),
-                        DEFAULT_PAGEABLE, 1));
+    @DisplayName("키워드로 도서 검색을 요청하면 등록된 도서와 미등록 도서를 함께 반환한다")
+    void searchBooks() throws Exception {
+        given(bookService.searchBooks(eq("제목"), any(Pageable.class))).willReturn(new PageImpl<>(
+                List.of(
+                        new BookSearchProjection(
+                                1L, "제목", "작가", "출판사", 300, "isbn-db", "cover-db", BookSource.MANUAL, 3, 5),
+                        BookSearchProjection.from(
+                                new ExternalBookResult("제목", "작가", "다른 출판사", "isbn-aladin", "cover-aladin"))),
+                DEFAULT_PAGEABLE, 2));
 
         mockMvc.perform(get("/api/books/search").param("keyword", "제목"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.books[0].bookId").value(1))
                 .andExpect(jsonPath("$.data.books[0].title").value("제목"))
-                .andExpect(jsonPath("$.data.books[0].pageCount").doesNotExist())
-                .andExpect(jsonPath("$.data.pageInfo.totalElements").value(1));
+                .andExpect(jsonPath("$.data.books[1].bookId").doesNotExist())
+                .andExpect(jsonPath("$.data.books[1].pageCount").value(0))
+                .andExpect(jsonPath("$.data.pageInfo.totalElements").value(2));
     }
 
     @Test
-    @DisplayName("keyword 없이 도서 외부 검색을 요청하면 400 에러가 발생한다")
-    void searchExternalBooksFailsWhenKeywordIsMissing() throws Exception {
+    @DisplayName("keyword 없이 도서 검색을 요청하면 400 에러가 발생한다")
+    void searchBooksFailsWhenKeywordIsMissing() throws Exception {
         mockMvc.perform(get("/api/books/search"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("COMMON_400_1"));
@@ -102,7 +108,7 @@ class BookControllerTest {
 
     @Test
     @DisplayName("size에 숫자가 아닌 값을 주면 400 에러가 발생한다")
-    void searchExternalBooksFailsWhenSizeIsNotNumber() throws Exception {
+    void searchBooksFailsWhenSizeIsNotNumber() throws Exception {
         mockMvc.perform(get("/api/books/search").param("keyword", "제목").param("size", "abc"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("COMMON_400_1"));

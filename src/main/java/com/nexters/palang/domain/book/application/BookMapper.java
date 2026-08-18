@@ -9,8 +9,6 @@ import com.nexters.palang.domain.book.presentation.dto.BookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookSearchListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookSearchResponse;
-import com.nexters.palang.domain.book.presentation.dto.ExternalBookListResponse;
-import com.nexters.palang.domain.book.presentation.dto.ExternalBookResponse;
 import com.nexters.palang.global.common.response.CarouselPageInfo;
 import com.nexters.palang.global.common.response.PageInfo;
 import java.util.List;
@@ -41,16 +39,6 @@ public final class BookMapper {
     public static BookSearchListResponse toSearchListResponse(Page<BookSearchProjection> projections) {
         return new BookSearchListResponse(
                 projections.map(BookMapper::toSearchResponse).getContent(), PageInfo.from(projections));
-    }
-
-    public static ExternalBookResponse toExternalResponse(ExternalBookResult result) {
-        return new ExternalBookResponse(
-                result.title(), result.author(), result.publisher(), result.isbn(), result.coverImageUrl());
-    }
-
-    public static ExternalBookListResponse toExternalListResponse(Page<ExternalBookResult> results) {
-        return new ExternalBookListResponse(
-                results.map(BookMapper::toExternalResponse).getContent(), PageInfo.from(results));
     }
 
     public static BookActivityResponse toActivityResponse(BookActivityProjection projection) {
