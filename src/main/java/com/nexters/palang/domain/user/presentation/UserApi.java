@@ -142,17 +142,14 @@ public interface UserApi {
     ResponseEntity<DataResponse<OnboardingCompleteResponse>> completeOnboarding();
 
     @Operation(summary = "내가 남긴 흔적 목록", description = "내가 작성한 흔적을 최신순으로 조회합니다. "
-            + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+            + "인증 불필요. Authorization: Bearer {accessToken} 헤더가 없으면(비로그인) 샘플 흔적 목록을 "
+            + "고정 응답으로 반환합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/users/me/opinions\",\"title\":\"COMMON_400_1\","
-                                    + "\"status\":400,\"detail\":\"'size' 파라미터의 값이 올바르지 않습니다.\"}"))),
-            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
-                            value = "{\"type\":\"/api/users/me/opinions\",\"title\":\"AUTH_401_1\","
-                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}")))
+                                    + "\"status\":400,\"detail\":\"'size' 파라미터의 값이 올바르지 않습니다.\"}")))
     })
     ResponseEntity<DataResponse<MyOpinionListResponse>> getMyOpinions(
             @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,

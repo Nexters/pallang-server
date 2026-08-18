@@ -22,9 +22,11 @@ import com.nexters.palang.domain.user.common.error.UserErrorCode;
 import com.nexters.palang.domain.user.common.error.UserException;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
+import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -126,7 +128,30 @@ public class OpinionService {
         return existing;
     }
 
+    // 비로그인 사용자는 마이페이지 미리보기로 고정 샘플 흔적 3건을 본다 (기획 확정, 이슈 #120).
+    private static final String GUEST_SAMPLE_BOOK_TITLE = "빵충 사육 준수 사항";
+    private static final String GUEST_SAMPLE_AUTHOR = "김혜영 (지은이)";
+    private static final String GUEST_SAMPLE_COVER_IMAGE_URL =
+            "https://image.aladin.co.kr/product/39872/66/cover200/k242130313_1.jpg";
+    private static final String GUEST_SAMPLE_QUOTED_TEXT = "이 모든 건 챗지피티 덕분이었다. 담당자가 준 자료를 복사해서 "
+            + "이 녀석에게 붙여넣기를 반복하니 한눈에 봐도 괜찮은 서류를 달칵 토해냈다. 세상에, AI가 사람을 구했어요.";
+    private static final LocalDateTime GUEST_SAMPLE_CREATED_AT = LocalDateTime.of(2026, 8, 1, 12, 0, 0);
+    private static final List<MyOpinionProjection> GUEST_SAMPLE_OPINIONS = List.of(
+            new MyOpinionProjection(1L, 18L, GUEST_SAMPLE_BOOK_TITLE, GUEST_SAMPLE_AUTHOR,
+                    GUEST_SAMPLE_COVER_IMAGE_URL, 1L, GUEST_SAMPLE_QUOTED_TEXT, 33,
+                    "애증의 관계", 5, GUEST_SAMPLE_CREATED_AT),
+            new MyOpinionProjection(2L, 18L, GUEST_SAMPLE_BOOK_TITLE, GUEST_SAMPLE_AUTHOR,
+                    GUEST_SAMPLE_COVER_IMAGE_URL, 1L, GUEST_SAMPLE_QUOTED_TEXT, 33,
+                    "정말… 사람 구했다", 3, GUEST_SAMPLE_CREATED_AT),
+            new MyOpinionProjection(3L, 18L, GUEST_SAMPLE_BOOK_TITLE, GUEST_SAMPLE_AUTHOR,
+                    GUEST_SAMPLE_COVER_IMAGE_URL, 1L, GUEST_SAMPLE_QUOTED_TEXT, 33,
+                    "지피티야 나랑 영원히 함께하자", 8, GUEST_SAMPLE_CREATED_AT)
+    );
+
     public Page<MyOpinionProjection> getMyOpinions(Long userId, Pageable pageable) {
+        if (userId == null) {
+            return new PageImpl<>(GUEST_SAMPLE_OPINIONS, pageable, GUEST_SAMPLE_OPINIONS.size());
+        }
         return opinionQueryRepository.findMyOpinions(userId, pageable);
     }
 

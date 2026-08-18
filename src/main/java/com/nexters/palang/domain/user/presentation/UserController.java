@@ -96,7 +96,7 @@ public class UserController implements UserApi {
     public ResponseEntity<DataResponse<MyOpinionListResponse>> getMyOpinions(
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
-        Long currentUserId = currentUserProvider.getCurrentUserId();
+        Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
         return ResponseEntity.ok(DataResponse.from(UserMapper.toMyOpinionListResponse(
                 opinionService.getMyOpinions(currentUserId, pageable(page, size)))));
     }

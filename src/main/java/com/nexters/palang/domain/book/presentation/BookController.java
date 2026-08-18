@@ -86,7 +86,7 @@ public class BookController implements BookApi {
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size,
             @RequestParam(defaultValue = "ALL") OpinionCountScope opinionCountScope) {
-        Long currentUserId = currentUserProvider.getCurrentUserId();
+        Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
         return ResponseEntity.ok(DataResponse.from(BookMapper.toActivityListResponse(
                 bookService.getMyLibraryBooks(currentUserId, pageable(page, size), opinionCountScope))));
     }
