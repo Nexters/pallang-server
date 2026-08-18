@@ -2,6 +2,7 @@ package com.nexters.palang.domain.passage.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.passage.application.MyPassageProjection;
@@ -282,5 +283,21 @@ class PassageQueryRepositoryTest {
 
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("스포일러로 흔적을 남긴 도서 목록을 최근 활동순으로 중복 없이 반환한다")
+    void findSpoilerBookOptionsReturnsDistinctBooksWithSpoilerOpinion() {
+        User writer = user("writer-12");
+        Book targetBook = book("대상 책");
+        Book noSpoilerBook = book("스포일러 없는 책");
+        Passage spoiler = passage(targetBook, writer, 1, true);
+        Passage notSpoiler = passage(noSpoilerBook, writer, 1, false);
+        entityManager.persistAndFlush(Opinion.builder().passage(spoiler).user(writer).content("흔적1").build());
+        entityManager.persistAndFlush(Opinion.builder().passage(notSpoiler).user(writer).content("흔적2").build());
+
+        List<BookOptionProjection> results = passageQueryRepository.findSpoilerBookOptions(writer.getId());
+
+        assertThat(results).extracting(BookOptionProjection::bookId).containsExactly(targetBook.getId());
     }
 }

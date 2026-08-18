@@ -1,11 +1,14 @@
 package com.nexters.palang.domain.user.presentation;
 
 import com.nexters.palang.domain.auth.application.AuthService;
+import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.opinion.application.OpinionService;
 import com.nexters.palang.domain.passage.application.PassageService;
 import com.nexters.palang.domain.user.application.UserMapper;
 import com.nexters.palang.domain.user.application.UserService;
+import com.nexters.palang.domain.user.domain.BookFilterType;
 import com.nexters.palang.domain.user.domain.User;
+import com.nexters.palang.domain.user.presentation.dto.FilterBooksResponse;
 import com.nexters.palang.domain.user.presentation.dto.LikedOpinionListResponse;
 import com.nexters.palang.domain.user.presentation.dto.MeResponse;
 import com.nexters.palang.domain.user.presentation.dto.MyOpinionListResponse;
@@ -16,6 +19,7 @@ import com.nexters.palang.domain.user.presentation.dto.UpdateNicknameRequest;
 import com.nexters.palang.global.common.response.DataResponse;
 import com.nexters.palang.global.security.CurrentUserProvider;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -97,21 +101,33 @@ public class UserController implements UserApi {
     @Override
     @GetMapping("/api/users/me/opinions")
     public ResponseEntity<DataResponse<MyOpinionListResponse>> getMyOpinions(
+            @RequestParam(required = false) Long bookId,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
         return ResponseEntity.ok(DataResponse.from(UserMapper.toMyOpinionListResponse(
-                opinionService.getMyOpinions(currentUserId, pageable(page, size)))));
+                opinionService.getMyOpinions(currentUserId, bookId, pageable(page, size)))));
     }
 
     @Override
     @GetMapping("/api/users/me/likes")
     public ResponseEntity<DataResponse<LikedOpinionListResponse>> getLikedOpinions(
+            @RequestParam(required = false) Long bookId,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         return ResponseEntity.ok(DataResponse.from(UserMapper.toLikedOpinionListResponse(
-                opinionService.getLikedOpinions(currentUserId, pageable(page, size)))));
+                opinionService.getLikedOpinions(currentUserId, bookId, pageable(page, size)))));
+    }
+
+    @Override
+    @GetMapping("/api/users/me/filter-books")
+    public ResponseEntity<DataResponse<FilterBooksResponse>> getFilterBooks(@RequestParam BookFilterType type) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        List<BookOptionProjection> books = type == BookFilterType.SPOILER
+                ? passageService.getSpoilerBookOptions(currentUserId)
+                : opinionService.getLikedBookOptions(currentUserId);
+        return ResponseEntity.ok(DataResponse.from(UserMapper.toFilterBooksResponse(books)));
     }
 
     @Override

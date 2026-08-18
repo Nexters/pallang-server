@@ -1,5 +1,6 @@
 package com.nexters.palang.domain.opinion.application;
 
+import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.book.common.error.BookErrorCode;
 import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.domain.Book;
@@ -148,15 +149,23 @@ public class OpinionService {
                     "지피티야 나랑 영원히 함께하자", 8, GUEST_SAMPLE_CREATED_AT)
     );
 
-    public Page<MyOpinionProjection> getMyOpinions(Long userId, Pageable pageable) {
+    public Page<MyOpinionProjection> getMyOpinions(Long userId, Long bookId, Pageable pageable) {
         if (userId == null) {
-            return new PageImpl<>(GUEST_SAMPLE_OPINIONS, pageable, GUEST_SAMPLE_OPINIONS.size());
+            List<MyOpinionProjection> guestSample = bookId == null || bookId.equals(18L)
+                    ? GUEST_SAMPLE_OPINIONS
+                    : List.of();
+            return new PageImpl<>(guestSample, pageable, guestSample.size());
         }
-        return opinionQueryRepository.findMyOpinions(userId, pageable);
+        return opinionQueryRepository.findMyOpinions(userId, bookId, pageable);
     }
 
-    public Page<LikedOpinionProjection> getLikedOpinions(Long userId, Pageable pageable) {
-        return opinionQueryRepository.findLikedOpinions(userId, pageable);
+    public Page<LikedOpinionProjection> getLikedOpinions(Long userId, Long bookId, Pageable pageable) {
+        return opinionQueryRepository.findLikedOpinions(userId, bookId, pageable);
+    }
+
+    // 좋아요 관리 화면의 "전체 책 보기" 드롭다운: 내가 좋아요를 누른 흔적이 있는 도서 목록.
+    public List<BookOptionProjection> getLikedBookOptions(Long userId) {
+        return opinionQueryRepository.findLikedBookOptions(userId);
     }
 
     public long getMyOpinionCount(Long userId) {

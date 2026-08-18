@@ -1,9 +1,12 @@
 package com.nexters.palang.domain.user.application;
 
+import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.opinion.application.LikedOpinionProjection;
 import com.nexters.palang.domain.opinion.application.MyOpinionProjection;
 import com.nexters.palang.domain.passage.application.MyPassageProjection;
 import com.nexters.palang.domain.user.domain.User;
+import com.nexters.palang.domain.user.presentation.dto.BookOptionResponse;
+import com.nexters.palang.domain.user.presentation.dto.FilterBooksResponse;
 import com.nexters.palang.domain.user.presentation.dto.LikedOpinionListResponse;
 import com.nexters.palang.domain.user.presentation.dto.LikedOpinionResponse;
 import com.nexters.palang.domain.user.presentation.dto.MeResponse;
@@ -12,6 +15,7 @@ import com.nexters.palang.domain.user.presentation.dto.MyOpinionResponse;
 import com.nexters.palang.domain.user.presentation.dto.MyPassageListResponse;
 import com.nexters.palang.domain.user.presentation.dto.MyPassageResponse;
 import com.nexters.palang.global.common.response.PageInfo;
+import java.util.List;
 import org.springframework.data.domain.Page;
 
 public final class UserMapper {
@@ -39,14 +43,23 @@ public final class UserMapper {
 
     public static LikedOpinionResponse toLikedOpinionResponse(LikedOpinionProjection projection) {
         return new LikedOpinionResponse(
-                projection.opinionId(), projection.bookId(), projection.bookTitle(), projection.bookCoverImageUrl(),
-                projection.passageId(), projection.quotedText(), projection.pageNumber(),
-                projection.content(), projection.likeCount(), projection.createdAt(), projection.likedAt());
+                projection.opinionId(), projection.bookId(), projection.bookTitle(), projection.author(),
+                projection.bookCoverImageUrl(), projection.passageId(), projection.quotedText(), projection.pageNumber(),
+                projection.content(), projection.nickname(), projection.likeCount(), projection.createdAt(),
+                projection.likedAt());
     }
 
     public static LikedOpinionListResponse toLikedOpinionListResponse(Page<LikedOpinionProjection> projections) {
         return new LikedOpinionListResponse(
                 projections.map(UserMapper::toLikedOpinionResponse).getContent(), PageInfo.from(projections));
+    }
+
+    public static BookOptionResponse toBookOptionResponse(BookOptionProjection projection) {
+        return new BookOptionResponse(projection.bookId(), projection.title());
+    }
+
+    public static FilterBooksResponse toFilterBooksResponse(List<BookOptionProjection> projections) {
+        return new FilterBooksResponse(projections.stream().map(UserMapper::toBookOptionResponse).toList());
     }
 
     public static MyPassageResponse toMyPassageResponse(MyPassageProjection projection) {

@@ -1,5 +1,6 @@
 package com.nexters.palang.domain.passage.application;
 
+import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.book.common.error.BookErrorCode;
 import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.domain.Book;
@@ -44,6 +45,11 @@ public class PassageService {
     // 내가 남긴 대목 목록: bookId 미지정 시 전체 도서, spoilerOnly=true 시 스포일러 대목만.
     public Page<MyPassageProjection> getMyPassages(Long userId, Long bookId, boolean spoilerOnly, Pageable pageable) {
         return passageQueryRepository.findMyPassages(userId, bookId, spoilerOnly, pageable);
+    }
+
+    // 스포일러 관리 화면의 "전체 책 보기" 드롭다운: 내가 스포일러로 남긴 대목이 있는 도서 목록.
+    public List<BookOptionProjection> getSpoilerBookOptions(Long userId) {
+        return passageQueryRepository.findSpoilerBookOptions(userId);
     }
 
     public Map<Long, List<DecorationMergeCandidate>> getMergedDecorationsByPassageId(List<Passage> passages) {
