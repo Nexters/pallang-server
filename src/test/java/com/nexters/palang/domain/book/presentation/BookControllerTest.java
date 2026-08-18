@@ -198,7 +198,7 @@ class BookControllerTest {
     @Test
     @DisplayName("내 서재 도서 목록을 요청하면 현재 사용자 기준, opinionCountScope 기본값 ALL로 조회한다")
     void getMyLibraryBooks() throws Exception {
-        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(currentUserProvider.findCurrentUserId()).willReturn(java.util.Optional.of(1L));
         given(bookService.getMyLibraryBooks(eq(1L), any(Pageable.class), eq(OpinionCountScope.ALL))).willReturn(
                 new PageImpl<>(List.of(new BookActivityProjection(1L, "제목", "작가", "출판사", "cover", 3, 7)),
                         DEFAULT_PAGEABLE, 1));
@@ -213,7 +213,7 @@ class BookControllerTest {
     @Test
     @DisplayName("내 서재 도서 목록 조회 시 opinionCountScope=MINE을 지정하면 그대로 서비스에 전달한다")
     void getMyLibraryBooksWithMineScope() throws Exception {
-        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(currentUserProvider.findCurrentUserId()).willReturn(java.util.Optional.of(1L));
         given(bookService.getMyLibraryBooks(eq(1L), any(Pageable.class), eq(OpinionCountScope.MINE))).willReturn(
                 new PageImpl<>(List.of(new BookActivityProjection(1L, "제목", "작가", "출판사", "cover", 3, 2)),
                         DEFAULT_PAGEABLE, 1));
@@ -224,13 +224,16 @@ class BookControllerTest {
     }
 
     @Test
-    @DisplayName("인증 없이 내 서재 도서 목록을 요청하면 401 에러가 발생한다")
-    void getMyLibraryBooksFailsWhenUnauthenticated() throws Exception {
-        given(currentUserProvider.getCurrentUserId()).willThrow(new LoginRequiredException());
+    @DisplayName("인증 없이 내 서재 도서 목록을 요청하면 샘플 도서 목록을 반환한다")
+    void getMyLibraryBooksReturnsSampleWhenUnauthenticated() throws Exception {
+        given(currentUserProvider.findCurrentUserId()).willReturn(java.util.Optional.empty());
+        given(bookService.getMyLibraryBooks(isNull(), any(Pageable.class), eq(OpinionCountScope.ALL))).willReturn(
+                new PageImpl<>(List.of(new BookActivityProjection(18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "안전가옥",
+                        "cover", 13, 17)), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/my-library"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.title").value("AUTH_401_1"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.books[0].bookId").value(18));
     }
 
     @Test

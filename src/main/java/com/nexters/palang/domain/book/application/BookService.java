@@ -132,8 +132,16 @@ public class BookService {
         return Math.max(0, (total - size) / 2);
     }
 
+    // 비로그인 사용자는 홈에서 실제 서재 대신 고정 샘플 도서 1건을 본다 (기획 확정, 이슈 #119).
+    private static final BookActivityProjection GUEST_SAMPLE_LIBRARY_BOOK = new BookActivityProjection(
+            18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "안전가옥",
+            "https://image.aladin.co.kr/product/39872/66/cover200/k242130313_1.jpg", 13L, 17L);
+
     // 내 서재는 홈 캐러셀과 달리 가운데 기준 없이 최근 흔적 순으로 나열하며, 표준 page/size 페이지네이션을 사용한다.
     public Page<BookActivityProjection> getMyLibraryBooks(Long userId, Pageable pageable, OpinionCountScope opinionCountScope) {
+        if (userId == null) {
+            return new PageImpl<>(List.of(GUEST_SAMPLE_LIBRARY_BOOK), pageable, 1);
+        }
         return bookQueryRepository.findMyLibraryBooks(userId, pageable, opinionCountScope);
     }
 

@@ -399,6 +399,18 @@ class BookServiceTest {
     }
 
     @Test
+    @DisplayName("비로그인 사용자가 내 서재를 조회하면 리포지토리 대신 고정 샘플 도서 1건을 반환한다")
+    void getMyLibraryBooksReturnsSampleWhenGuest() {
+        Pageable pageable = PageRequest.of(0, 20);
+
+        Page<BookActivityProjection> results = bookService.getMyLibraryBooks(null, pageable, OpinionCountScope.ALL);
+
+        assertThat(results.getTotalElements()).isEqualTo(1);
+        assertThat(results.getContent().get(0).bookId()).isEqualTo(18L);
+        assertThat(results.getContent().get(0).title()).isEqualTo("빵충 사육 준수 사항");
+    }
+
+    @Test
     @DisplayName("로그인한 사용자가 도서 상세를 조회하면 myStatus/myCurrentPage를 함께 반환한다")
     void getBookDetailIncludesMyStatusWhenLoggedIn() {
         BookDetailProjection projection = new BookDetailProjection(1L, "책1", "작가", "출판사", 300, "cover", 5, 10);

@@ -93,8 +93,10 @@ public interface BookApi {
             @Parameter(description = "책 표지 이미지 파일 (jpeg/png, 선택)") MultipartFile coverImage
     );
 
-    @Operation(summary = "홈 캐러셀 도서 목록",
-            description = "흔적이 남은 도서를 대목/흔적 수와 함께 조회합니다. offset을 생략하면 전체 목록 중 "
+    @Operation(summary = "홈 캐러셀 도서 목록", deprecated = true,
+            description = "(사용 중단) 더 이상 홈 화면에서 사용하지 않습니다. 홈 화면 도서 목록은 "
+                    + "GET /api/books/my-library(opinionCountScope=ALL)를 사용하세요. "
+                    + "흔적이 남은 도서를 대목/흔적 수와 함께 조회합니다. offset을 생략하면 전체 목록 중 "
                     + "정가운데 책들을 기준으로 조회하며, 좌우 스크롤 시에는 응답으로 받은 pageInfo를 참고해 "
                     + "offset - size(이전) 또는 offset + size(다음)로 다시 요청하면 됩니다.")
     @ApiResponses({
@@ -112,12 +114,11 @@ public interface BookApi {
                     + "가장 최근에 흔적을 남긴 도서부터 내림차순으로 정렬됩니다. opinionCountScope로 흔적 수 집계 "
                     + "기준을 선택할 수 있습니다: ALL(기본값, 도서 전체 흔적 수 - 홈 화면 노출용) 또는 "
                     + "MINE(로그인 사용자 본인이 남긴 흔적 수 - 마이페이지 노출용). "
-                    + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+                    + "인증 불필요. Authorization: Bearer {accessToken} 헤더가 없으면(비로그인) 샘플 도서 1건을 "
+                    + "고정 응답으로 반환합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
-            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     ResponseEntity<DataResponse<BookActivityListResponse>> getMyLibraryBooks(

@@ -285,6 +285,17 @@ class OpinionServiceTest {
     }
 
     @Test
+    @DisplayName("비로그인 사용자가 내가 남긴 흔적 목록을 조회하면 QueryRepository 대신 고정 샘플 3건을 반환한다")
+    void getMyOpinionsReturnsSampleWhenGuest() {
+        Pageable pageable = PageRequest.of(0, 20);
+
+        Page<MyOpinionProjection> results = opinionService.getMyOpinions(null, pageable);
+
+        assertThat(results.getTotalElements()).isEqualTo(3);
+        assertThat(results.getContent()).allMatch(o -> o.bookId().equals(18L) && o.pageNumber() == 33);
+    }
+
+    @Test
     @DisplayName("좋아요 누른 흔적 목록을 조회하면 QueryRepository 결과를 그대로 반환한다")
     void getLikedOpinionsReturnsPageFromQueryRepository() {
         Pageable pageable = PageRequest.of(0, 20);
