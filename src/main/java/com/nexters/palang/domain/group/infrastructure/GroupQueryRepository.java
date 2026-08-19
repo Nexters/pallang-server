@@ -39,8 +39,10 @@ public class GroupQueryRepository {
                 .limit(pageable.getPageSize())
                 .fetch();
 
+        // 마지막 페이지를 넘어가는 page를 요청하면 groupIds는 비지만, totalElements는 여전히 실제
+        // 전체 건수를 내려줘야 pageInfo(totalPages/hasNext)가 올바르다.
         if (groupIds.isEmpty()) {
-            return new PageImpl<>(List.of(), pageable, 0);
+            return new PageImpl<>(List.of(), pageable, countMyGroups(userId));
         }
 
         Map<Long, Long> memberCountsByGroupId = queryFactory
