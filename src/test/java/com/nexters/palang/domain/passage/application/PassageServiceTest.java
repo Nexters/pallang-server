@@ -30,7 +30,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -147,10 +150,11 @@ class PassageServiceTest {
     @Test
     @DisplayName("스포일러 도서 필터 목록을 조회하면 QueryRepository 결과를 그대로 반환한다")
     void getSpoilerBookOptionsReturnsResultFromQueryRepository() {
-        List<BookOptionProjection> expected = List.of(new BookOptionProjection(10L, "책 제목"));
-        given(passageQueryRepository.findSpoilerBookOptions(1L)).willReturn(expected);
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<BookOptionProjection> expected = new PageImpl<>(List.of(new BookOptionProjection(10L, "책 제목")));
+        given(passageQueryRepository.findSpoilerBookOptions(1L, pageable)).willReturn(expected);
 
-        List<BookOptionProjection> result = passageService.getSpoilerBookOptions(1L);
+        Page<BookOptionProjection> result = passageService.getSpoilerBookOptions(1L, pageable);
 
         assertThat(result).isEqualTo(expected);
     }

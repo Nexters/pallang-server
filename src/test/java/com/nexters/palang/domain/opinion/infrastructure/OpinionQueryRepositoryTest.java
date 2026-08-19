@@ -295,9 +295,11 @@ class OpinionQueryRepositoryTest {
         entityManager.persistAndFlush(OpinionLike.builder().user(me).opinion(inTargetBook1).build());
         entityManager.persistAndFlush(OpinionLike.builder().user(me).opinion(inTargetBook2).build());
 
-        List<BookOptionProjection> results = opinionQueryRepository.findLikedBookOptions(me.getId());
+        Page<BookOptionProjection> results = opinionQueryRepository.findLikedBookOptions(
+                me.getId(), PageRequest.of(0, 20));
 
-        assertThat(results).extracting(BookOptionProjection::bookId)
+        assertThat(results.getContent()).extracting(BookOptionProjection::bookId)
                 .containsExactly(book.getId(), inOtherBook.getPassage().getBook().getId());
+        assertThat(results.getTotalElements()).isEqualTo(2);
     }
 }

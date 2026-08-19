@@ -343,13 +343,15 @@ class PassageQueryRepositoryTest {
         Book book = book("책");
         Passage passage = passage(book, writer, 5, "발췌 문장", "hash-1");
         entityManager.persistAndFlush(Opinion.builder().passage(passage).user(writer).content("흔적1").build());
-        entityManager.persistAndFlush(Opinion.builder().passage(passage).user(writer).content("흔적2").build());
+        Opinion latest = entityManager.persistAndFlush(
+                Opinion.builder().passage(passage).user(writer).content("흔적2").build());
 
         Page<MyPassageProjection> result = passageQueryRepository.findMyPassages(
                 writer.getId(), null, false, PageRequest.of(0, 10));
 
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getTotalElements()).isEqualTo(1);
+        assertThat(result.getContent().get(0).opinionId()).isEqualTo(latest.getId());
     }
 
     @Test
@@ -363,8 +365,9 @@ class PassageQueryRepositoryTest {
         entityManager.persistAndFlush(Opinion.builder().passage(spoiler).user(writer).content("흔적1").build());
         entityManager.persistAndFlush(Opinion.builder().passage(notSpoiler).user(writer).content("흔적2").build());
 
-        List<BookOptionProjection> results = passageQueryRepository.findSpoilerBookOptions(writer.getId());
+        Page<BookOptionProjection> results = passageQueryRepository.findSpoilerBookOptions(
+                writer.getId(), PageRequest.of(0, 20));
 
-        assertThat(results).extracting(BookOptionProjection::bookId).containsExactly(targetBook.getId());
+        assertThat(results.getContent()).extracting(BookOptionProjection::bookId).containsExactly(targetBook.getId());
     }
 }
