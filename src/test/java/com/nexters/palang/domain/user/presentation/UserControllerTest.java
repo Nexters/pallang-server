@@ -353,8 +353,8 @@ class UserControllerTest {
     @DisplayName("좋아요 도서 필터 목록을 조회한다")
     void getFilterBooksForLike() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(opinionService.getLikedBookOptions(1L)).willReturn(
-                List.of(new BookOptionProjection(10L, "책 제목")));
+        given(opinionService.getLikedBookOptions(eq(1L), any())).willReturn(
+                new PageImpl<>(List.of(new BookOptionProjection(10L, "책 제목")), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/users/me/filter-books").param("type", "LIKE"))
                 .andExpect(status().isOk())
@@ -366,8 +366,8 @@ class UserControllerTest {
     @DisplayName("스포일러 도서 필터 목록을 조회한다")
     void getFilterBooksForSpoiler() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(passageService.getSpoilerBookOptions(1L)).willReturn(
-                List.of(new BookOptionProjection(20L, "다른 책")));
+        given(passageService.getSpoilerBookOptions(eq(1L), any())).willReturn(
+                new PageImpl<>(List.of(new BookOptionProjection(20L, "다른 책")), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/users/me/filter-books").param("type", "SPOILER"))
                 .andExpect(status().isOk())
@@ -388,7 +388,7 @@ class UserControllerTest {
     void getMyPassages() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         MyPassageProjection projection = new MyPassageProjection(
-                1L, 10L, 5, "발췌 문장", true, LocalDateTime.now());
+                1L, 10L, 100L, 5, "발췌 문장", true, LocalDateTime.now());
         given(passageService.getMyPassages(eq(1L), eq(10L), eq(true), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
@@ -398,6 +398,7 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.passages[0].passageId").value(1))
                 .andExpect(jsonPath("$.data.passages[0].bookId").value(10))
+                .andExpect(jsonPath("$.data.passages[0].opinionId").value(100))
                 .andExpect(jsonPath("$.data.passages[0].isSpoiler").value(true));
     }
 

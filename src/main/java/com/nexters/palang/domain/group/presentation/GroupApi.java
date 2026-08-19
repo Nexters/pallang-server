@@ -1,0 +1,246 @@
+package com.nexters.palang.domain.group.presentation;
+
+import com.nexters.palang.domain.group.presentation.dto.CreateGroupRequest;
+import com.nexters.palang.domain.group.presentation.dto.GroupDetailResponse;
+import com.nexters.palang.domain.group.presentation.dto.GroupInvitationPreviewResponse;
+import com.nexters.palang.domain.group.presentation.dto.GroupInviteLinkResponse;
+import com.nexters.palang.domain.group.presentation.dto.GroupListResponse;
+import com.nexters.palang.domain.group.presentation.dto.GroupMemberListResponse;
+import com.nexters.palang.domain.group.presentation.dto.UpdateGroupRequest;
+import com.nexters.palang.global.common.error.ErrorResponse;
+import com.nexters.palang.global.common.response.DataResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+
+@Tag(name = "Group", description = "모임 API")
+public interface GroupApi {
+
+    @Operation(summary = "모임 생성", description = "책 1권을 고정해 모임을 만듭니다. 생성한 사용자는 모임장(HOST)으로 자동 가입됩니다. "
+            + "책은 생성 이후 변경할 수 없습니다. Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "생성 성공"),
+            @ApiResponse(responseCode = "400", description = "필수값 누락, 인원이 2~10명 범위를 벗어남(COMMON_400_1) "
+                    + "또는 시작일이 종료일보다 늦음 (GROUP_400_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = {
+                            @ExampleObject(name = "COMMON_400_1: 필수값 누락/인원 범위 초과",
+                                    value = "{\"type\":\"/api/groups\",\"title\":\"COMMON_400_1\","
+                                            + "\"status\":400,\"detail\":\"인원은 최소 2명 이상이어야 합니다.\"}"),
+                            @ExampleObject(name = "GROUP_400_1: 시작일이 종료일보다 늦음",
+                                    value = "{\"type\":\"/api/groups\",\"title\":\"GROUP_400_1\","
+                                            + "\"status\":400,\"detail\":\"시작일은 종료일보다 늦을 수 없습니다.\"}")
+                    })),
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups\",\"title\":\"AUTH_401_1\","
+                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "해당 도서를 찾을 수 없음 (BOOK_404_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups\",\"title\":\"BOOK_404_1\","
+                                    + "\"status\":404,\"detail\":\"해당 도서를 찾을 수 없습니다.\"}")))
+    })
+    ResponseEntity<DataResponse<GroupDetailResponse>> createGroup(@Valid CreateGroupRequest request);
+
+    @Operation(summary = "내 모임 목록", description = "현재 로그인한 사용자가 속한 모임을 최근 생성 순으로 조회합니다. "
+            + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups\",\"title\":\"AUTH_401_1\","
+                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}")))
+    })
+    ResponseEntity<DataResponse<GroupListResponse>> getMyGroups(
+            @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,
+            @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
+    );
+
+    @Operation(summary = "모임 상세 조회", description = "모임원만 조회할 수 있습니다. "
+            + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1\",\"title\":\"AUTH_401_1\","
+                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "모임원이 아님 (GROUP_403_2)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_403_2\","
+                                    + "\"status\":403,\"detail\":\"모임원만 조회할 수 있습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "해당 모임을 찾을 수 없음 (GROUP_404_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_404_1\","
+                                    + "\"status\":404,\"detail\":\"해당 모임을 찾을 수 없습니다.\"}")))
+    })
+    ResponseEntity<DataResponse<GroupDetailResponse>> getGroupDetail(
+            @Parameter(description = "모임 ID", required = true) Long groupId
+    );
+
+    @Operation(summary = "방 설정 변경", description = "모임장만 이름/인원/기간을 수정할 수 있습니다. 책은 대상이 아닙니다. "
+            + "인원은 현재 참여 인원보다 적게 줄일 수 없습니다. Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "수정 성공"),
+            @ApiResponse(responseCode = "400", description = "필수값 누락, 인원이 2~10명 범위를 벗어남(COMMON_400_1) "
+                    + "또는 시작일이 종료일보다 늦음 (GROUP_400_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = {
+                            @ExampleObject(name = "COMMON_400_1: 필수값 누락/인원 범위 초과",
+                                    value = "{\"type\":\"/api/groups/1\",\"title\":\"COMMON_400_1\","
+                                            + "\"status\":400,\"detail\":\"인원은 최대 10명까지 가능합니다.\"}"),
+                            @ExampleObject(name = "GROUP_400_1: 시작일이 종료일보다 늦음",
+                                    value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_400_1\","
+                                            + "\"status\":400,\"detail\":\"시작일은 종료일보다 늦을 수 없습니다.\"}")
+                    })),
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1\",\"title\":\"AUTH_401_1\","
+                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "모임장이 아님 (GROUP_403_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_403_1\","
+                                    + "\"status\":403,\"detail\":\"모임장만 가능한 작업입니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "해당 모임을 찾을 수 없음 (GROUP_404_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_404_1\","
+                                    + "\"status\":404,\"detail\":\"해당 모임을 찾을 수 없습니다.\"}"))),
+            @ApiResponse(responseCode = "409", description = "인원을 현재 참여 인원보다 적게 설정 (GROUP_409_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_409_1\","
+                                    + "\"status\":409,\"detail\":\"인원을 현재 참여 인원보다 적게 설정할 수 없습니다.\"}")))
+    })
+    ResponseEntity<DataResponse<GroupDetailResponse>> updateGroup(
+            @Parameter(description = "모임 ID", required = true) Long groupId,
+            @Valid UpdateGroupRequest request
+    );
+
+    @Operation(summary = "모임 삭제", description = "모임장만 모임을 삭제할 수 있습니다. "
+            + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "삭제 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1\",\"title\":\"AUTH_401_1\","
+                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "모임장이 아님 (GROUP_403_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_403_1\","
+                                    + "\"status\":403,\"detail\":\"모임장만 가능한 작업입니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "해당 모임을 찾을 수 없음 (GROUP_404_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_404_1\","
+                                    + "\"status\":404,\"detail\":\"해당 모임을 찾을 수 없습니다.\"}")))
+    })
+    ResponseEntity<DataResponse<Void>> deleteGroup(
+            @Parameter(description = "모임 ID", required = true) Long groupId
+    );
+
+    @Operation(summary = "모임 멤버 목록", description = "모임원만 조회할 수 있습니다. 모임장이 먼저, 그다음 가입 순으로 정렬됩니다. "
+            + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1/members\",\"title\":\"AUTH_401_1\","
+                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "모임원이 아님 (GROUP_403_2)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1/members\",\"title\":\"GROUP_403_2\","
+                                    + "\"status\":403,\"detail\":\"모임원만 조회할 수 있습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "해당 모임을 찾을 수 없음 (GROUP_404_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1/members\",\"title\":\"GROUP_404_1\","
+                                    + "\"status\":404,\"detail\":\"해당 모임을 찾을 수 없습니다.\"}")))
+    })
+    ResponseEntity<DataResponse<GroupMemberListResponse>> getGroupMembers(
+            @Parameter(description = "모임 ID", required = true) Long groupId,
+            @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,
+            @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
+    );
+
+    @Operation(summary = "초대 링크 조회", description = "모임장만 조회할 수 있습니다. 초대 코드는 별도 만료 시각이 없고 "
+            + "모임 기간과도 무관하게 계속 유효합니다. Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1/invite-link\",\"title\":\"AUTH_401_1\","
+                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "모임장이 아님 (GROUP_403_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1/invite-link\",\"title\":\"GROUP_403_1\","
+                                    + "\"status\":403,\"detail\":\"모임장만 가능한 작업입니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "해당 모임을 찾을 수 없음 (GROUP_404_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1/invite-link\",\"title\":\"GROUP_404_1\","
+                                    + "\"status\":404,\"detail\":\"해당 모임을 찾을 수 없습니다.\"}")))
+    })
+    ResponseEntity<DataResponse<GroupInviteLinkResponse>> getInviteLink(
+            @Parameter(description = "모임 ID", required = true) Long groupId
+    );
+
+    @Operation(summary = "초대 링크 재발급", description = "모임장만 재발급할 수 있습니다. 재발급하면 기존 초대 코드는 즉시 무효화됩니다. "
+            + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "재발급 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1/invite-link/regenerate\",\"title\":\"AUTH_401_1\","
+                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "모임장이 아님 (GROUP_403_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1/invite-link/regenerate\",\"title\":\"GROUP_403_1\","
+                                    + "\"status\":403,\"detail\":\"모임장만 가능한 작업입니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "해당 모임을 찾을 수 없음 (GROUP_404_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/1/invite-link/regenerate\",\"title\":\"GROUP_404_1\","
+                                    + "\"status\":404,\"detail\":\"해당 모임을 찾을 수 없습니다.\"}")))
+    })
+    ResponseEntity<DataResponse<GroupInviteLinkResponse>> regenerateInviteLink(
+            @Parameter(description = "모임 ID", required = true) Long groupId
+    );
+
+    @Operation(summary = "초대 링크 미리보기", description = "초대 링크를 열었을 때 가입 전 모임 정보를 보여줍니다. 인증 불필요. "
+            + "Authorization: Bearer {accessToken} 헤더를 보내면 alreadyJoined(이미 가입 여부)도 함께 내려줍니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "404", description = "유효하지 않은 초대 코드 (GROUP_404_2)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/invitations/abc123\",\"title\":\"GROUP_404_2\","
+                                    + "\"status\":404,\"detail\":\"유효하지 않은 초대 코드입니다.\"}")))
+    })
+    ResponseEntity<DataResponse<GroupInvitationPreviewResponse>> previewInvitation(
+            @Parameter(description = "초대 코드", required = true) String inviteCode
+    );
+
+    @Operation(summary = "초대 링크로 모임 가입", description = "정원이 가득 찼거나 이미 가입한 모임이면 가입할 수 없습니다. "
+            + "모임 기간이 지났어도 가입할 수 있습니다. Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "가입 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/invitations/abc123/join\",\"title\":\"AUTH_401_1\","
+                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "유효하지 않은 초대 코드 (GROUP_404_2)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/groups/invitations/abc123/join\",\"title\":\"GROUP_404_2\","
+                                    + "\"status\":404,\"detail\":\"유효하지 않은 초대 코드입니다.\"}"))),
+            @ApiResponse(responseCode = "409", description = "이미 가입된 모임 (GROUP_409_2) 또는 정원이 가득 참 (GROUP_409_3)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = {
+                            @ExampleObject(name = "GROUP_409_2: 이미 가입된 모임",
+                                    value = "{\"type\":\"/api/groups/invitations/abc123/join\",\"title\":\"GROUP_409_2\","
+                                            + "\"status\":409,\"detail\":\"이미 가입된 모임입니다.\"}"),
+                            @ExampleObject(name = "GROUP_409_3: 정원 초과",
+                                    value = "{\"type\":\"/api/groups/invitations/abc123/join\",\"title\":\"GROUP_409_3\","
+                                            + "\"status\":409,\"detail\":\"모임 정원이 가득 찼습니다.\"}")
+                    }))
+    })
+    ResponseEntity<DataResponse<GroupDetailResponse>> joinGroup(
+            @Parameter(description = "초대 코드", required = true) String inviteCode
+    );
+}

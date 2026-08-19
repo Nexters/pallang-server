@@ -21,6 +21,8 @@ import com.nexters.palang.domain.comment.common.NestedReplyNotAllowedException;
 import com.nexters.palang.domain.comment.domain.Comment;
 import com.nexters.palang.domain.comment.presentation.dto.CreateCommentRequest;
 import com.nexters.palang.domain.comment.presentation.dto.UpdateCommentRequest;
+import com.nexters.palang.domain.group.common.error.GroupErrorCode;
+import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.opinion.common.error.OpinionErrorCode;
 import com.nexters.palang.domain.opinion.common.error.OpinionException;
 import com.nexters.palang.domain.opinion.domain.Opinion;
@@ -185,6 +187,20 @@ class CommentControllerTest {
                         .content(objectMapper.writeValueAsString(new CreateCommentRequest(null, " "))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("COMMON_400_1"));
+    }
+
+    @Test
+    @DisplayName("모임원이 아닌 사용자가 모임 전용 흔적에 댓글을 작성하려 하면 403 에러가 발생한다")
+    void createCommentFailsWhenNotGroupMember() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(commentService.createComment(eq(1L), eq(1L), any(CreateCommentRequest.class)))
+                .willThrow(new GroupException(GroupErrorCode.NOT_MEMBER));
+
+        mockMvc.perform(post("/api/opinions/1/comments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new CreateCommentRequest(null, "댓글 내용"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("GROUP_403_2"));
     }
 
     @Test

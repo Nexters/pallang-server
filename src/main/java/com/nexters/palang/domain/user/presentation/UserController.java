@@ -19,8 +19,8 @@ import com.nexters.palang.domain.user.presentation.dto.UpdateNicknameRequest;
 import com.nexters.palang.global.common.response.DataResponse;
 import com.nexters.palang.global.security.CurrentUserProvider;
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
@@ -122,11 +122,14 @@ public class UserController implements UserApi {
 
     @Override
     @GetMapping("/api/users/me/filter-books")
-    public ResponseEntity<DataResponse<FilterBooksResponse>> getFilterBooks(@RequestParam BookFilterType type) {
+    public ResponseEntity<DataResponse<FilterBooksResponse>> getFilterBooks(
+            @RequestParam BookFilterType type,
+            @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        List<BookOptionProjection> books = type == BookFilterType.SPOILER
-                ? passageService.getSpoilerBookOptions(currentUserId)
-                : opinionService.getLikedBookOptions(currentUserId);
+        Page<BookOptionProjection> books = type == BookFilterType.SPOILER
+                ? passageService.getSpoilerBookOptions(currentUserId, pageable(page, size))
+                : opinionService.getLikedBookOptions(currentUserId, pageable(page, size));
         return ResponseEntity.ok(DataResponse.from(UserMapper.toFilterBooksResponse(books)));
     }
 

@@ -3,19 +3,25 @@ package com.nexters.palang.domain.passage.presentation;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexters.palang.domain.book.domain.Book;
+import com.nexters.palang.domain.group.common.error.GroupErrorCode;
+import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.passage.application.PageNumbersResult;
 import com.nexters.palang.domain.passage.application.PassageOcrService;
 import com.nexters.palang.domain.passage.application.PassageService;
 import com.nexters.palang.domain.passage.application.SimilarPassageFinder;
 import com.nexters.palang.domain.passage.application.SimilarPassageProjection;
+import com.nexters.palang.domain.passage.common.error.PassageErrorCode;
+import com.nexters.palang.domain.passage.common.error.PassageException;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.presentation.request.PassageRequest;
 import com.nexters.palang.global.security.CurrentUserProvider;
@@ -65,10 +71,10 @@ class PassageControllerTest {
     @DisplayName("유사 문장 후보를 조회하면 대목 목록을 반환한다")
     void checkSimilarPassages() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(similarPassageFinder.find(any(), anyInt(), anyString()))
+        given(similarPassageFinder.find(any(), anyInt(), anyString(), any(), any()))
                 .willReturn(List.of(new SimilarPassageProjection(10L, "발췌 문장", 5, 2L)));
 
-        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "발췌 문장");
+        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "발췌 문장", null);
 
         mockMvc.perform(post("/api/passages/similar-check")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -82,9 +88,9 @@ class PassageControllerTest {
     @DisplayName("유사 문장 후보가 없으면 빈 배열을 반환한다")
     void checkSimilarPassagesReturnsEmptyArrayWhenNoCandidates() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(similarPassageFinder.find(any(), anyInt(), anyString())).willReturn(List.of());
+        given(similarPassageFinder.find(any(), anyInt(), anyString(), any(), any())).willReturn(List.of());
 
-        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "발췌 문장");
+        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "발췌 문장", null);
 
         mockMvc.perform(post("/api/passages/similar-check")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -98,7 +104,7 @@ class PassageControllerTest {
     void checkSimilarPassagesFailsWhenUnauthenticated() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willThrow(new LoginRequiredException());
 
-        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "발췌 문장");
+        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "발췌 문장", null);
 
         mockMvc.perform(post("/api/passages/similar-check")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -110,7 +116,7 @@ class PassageControllerTest {
     @Test
     @DisplayName("인용 문구 없이 유사 문장 후보를 조회하면 400 에러가 발생한다")
     void checkSimilarPassagesFailsWhenQuotedTextIsBlank() throws Exception {
-        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "");
+        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "", null);
 
         mockMvc.perform(post("/api/passages/similar-check")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -128,7 +134,7 @@ class PassageControllerTest {
     @Test
     @DisplayName("페이지 번호 목록을 조회하면 오름차순으로, 책 정보와 함께 반환한다")
     void getPageNumbers() throws Exception {
-        given(passageService.getPageNumbers(any(), any())).willReturn(new PageNumbersResult(
+        given(passageService.getPageNumbers(any(), any(), any(), any())).willReturn(new PageNumbersResult(
                 book(), new PageImpl<>(List.of(2, 5), PageRequest.of(0, 20), 2)));
 
         mockMvc.perform(get("/api/books/1/passages"))
@@ -142,7 +148,7 @@ class PassageControllerTest {
     @Test
     @DisplayName("비로그인 사용자로 페이지 번호를 조회해도 401 없이 조회된다 (soft auth)")
     void getPageNumbersDoesNotRequireAuthentication() throws Exception {
-        given(passageService.getPageNumbers(any(), any())).willReturn(new PageNumbersResult(
+        given(passageService.getPageNumbers(any(), any(), any(), any())).willReturn(new PageNumbersResult(
                 book(), new PageImpl<>(List.of(), PageRequest.of(0, 20), 0)));
 
         mockMvc.perform(get("/api/books/1/passages"))
@@ -153,7 +159,7 @@ class PassageControllerTest {
     @DisplayName("특정 페이지의 대목과 병합된 꾸밈을 함께 반환한다")
     void getPassagesByPage() throws Exception {
         Passage passage = passage(10L, 3);
-        given(passageService.getPassagesByPage(any(), anyInt())).willReturn(List.of(passage));
+        given(passageService.getPassagesByPage(any(), any(), any(), anyInt())).willReturn(List.of(passage));
         given(passageService.getMergedDecorationsByPassageId(any())).willReturn(Map.of(10L, List.of()));
 
         mockMvc.perform(get("/api/books/1/pages/3/passages"))
@@ -166,11 +172,90 @@ class PassageControllerTest {
     @DisplayName("비로그인 사용자도 아무 페이지나 조회할 수 있다 (soft auth)")
     void getPassagesByPageDoesNotRequireAuthentication() throws Exception {
         Passage passage = passage(10L, 5);
-        given(passageService.getPassagesByPage(any(), anyInt())).willReturn(List.of(passage));
+        given(passageService.getPassagesByPage(any(), any(), any(), anyInt())).willReturn(List.of(passage));
         given(passageService.getMergedDecorationsByPassageId(any())).willReturn(Map.of(10L, List.of()));
 
         mockMvc.perform(get("/api/books/1/pages/5/passages"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.passages[0].passageId").value(10));
+    }
+
+    @Test
+    @DisplayName("groupId를 지정해 페이지 번호를 조회할 때 모임원이 아니면 403 에러가 발생한다")
+    void getPageNumbersFailsWhenNotGroupMember() throws Exception {
+        given(passageService.getPageNumbers(any(), any(), any(), any()))
+                .willThrow(new GroupException(GroupErrorCode.NOT_MEMBER));
+
+        mockMvc.perform(get("/api/books/1/passages").param("groupId", "9"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("GROUP_403_2"));
+    }
+
+    @Test
+    @DisplayName("대목 소유자가 스포일러 설정을 변경한다")
+    void updateSpoiler() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        Passage passage = passage(10L, 5);
+        ReflectionTestUtils.setField(passage, "isSpoiler", true);
+        given(passageService.updateSpoiler(eq(10L), eq(1L), eq(true))).willReturn(passage);
+
+        mockMvc.perform(patch("/api/passages/10/spoiler")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PassageRequest.UpdateSpoiler(true))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.passageId").value(10))
+                .andExpect(jsonPath("$.data.isSpoiler").value(true));
+    }
+
+    @Test
+    @DisplayName("isSpoiler 없이 스포일러 설정을 변경하면 400 에러가 발생한다")
+    void updateSpoilerFailsWhenIsSpoilerMissing() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+
+        mockMvc.perform(patch("/api/passages/10/spoiler")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("COMMON_400_1"));
+    }
+
+    @Test
+    @DisplayName("인증 없이 스포일러 설정을 변경하면 401 에러가 발생한다")
+    void updateSpoilerFailsWhenUnauthenticated() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willThrow(new LoginRequiredException());
+
+        mockMvc.perform(patch("/api/passages/10/spoiler")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PassageRequest.UpdateSpoiler(false))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("AUTH_401_1"));
+    }
+
+    @Test
+    @DisplayName("이 대목에 흔적을 남긴 적 없는 사용자가 변경을 시도하면 403 에러가 발생한다")
+    void updateSpoilerFailsWhenNotOwner() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(passageService.updateSpoiler(eq(10L), eq(1L), eq(true)))
+                .willThrow(new PassageException(PassageErrorCode.PASSAGE_FORBIDDEN));
+
+        mockMvc.perform(patch("/api/passages/10/spoiler")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PassageRequest.UpdateSpoiler(true))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("PASSAGE_403_1"));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 대목의 스포일러 설정을 변경하면 404 에러가 발생한다")
+    void updateSpoilerFailsWhenPassageNotFound() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(passageService.updateSpoiler(eq(999L), eq(1L), eq(true)))
+                .willThrow(new PassageException(PassageErrorCode.PASSAGE_NOT_FOUND));
+
+        mockMvc.perform(patch("/api/passages/999/spoiler")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PassageRequest.UpdateSpoiler(true))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("PASSAGE_404_1"));
     }
 }

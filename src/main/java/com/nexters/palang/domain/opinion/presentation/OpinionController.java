@@ -63,7 +63,8 @@ public class OpinionController implements OpinionApi {
     @Override
     @GetMapping("/api/opinions/{opinionId}")
     public ResponseEntity<DataResponse<OpinionDetailResponse>> getOpinion(@PathVariable Long opinionId) {
-        Opinion opinion = opinionService.getOpinion(opinionId);
+        Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
+        Opinion opinion = opinionService.getOpinion(opinionId, currentUserId);
         return ResponseEntity.ok(DataResponse.from(OpinionDetailResponse.from(opinion)));
     }
 

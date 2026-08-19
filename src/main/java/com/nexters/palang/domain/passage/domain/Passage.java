@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.passage.domain;
 
 import com.nexters.palang.domain.book.domain.Book;
+import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.global.common.entity.BaseEntity;
 import com.nexters.palang.domain.user.domain.User;
 import jakarta.persistence.Column;
@@ -26,7 +27,10 @@ import org.hibernate.annotations.Check;
         name = "passages",
         indexes = {
                 @Index(name = "idx_passages_book_page", columnList = "book_id, page_number"),
-                @Index(name = "idx_passages_book_hash", columnList = "book_id, normalized_hash")
+                // group_id를 포함하도록 확장(구 idx_passages_book_hash 대체): 유사 문장 판정(FR-WRITE-07)이
+                // 이제 책 전체가 아니라 (책, 모임) 단위로 이루어진다 — group_id가 NULL인 전역 공개 대목과
+                // 특정 모임 전용 대목은 서로의 중복 판정에 관여하지 않는다.
+                @Index(name = "idx_passages_book_group_hash", columnList = "book_id, group_id, normalized_hash")
         }
 )
 @Check(constraints = "page_number > 0")
@@ -48,6 +52,12 @@ public class Passage extends BaseEntity {
     @JoinColumn(name = "created_by", nullable = false)
     private User creator;
 
+    // 이 대목이 특정 모임 전용인지 표시한다. NULL이면 기존처럼 도서를 읽는 모든 사용자에게 전역 공개되고,
+    // 값이 있으면 그 모임의 멤버만 조회/작성할 수 있다(OpinionService/PassageService의 GroupAccessValidator 참고).
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "group_id")
+    private Group group;
+
     @Column(name = "page_number", nullable = false)
     private int pageNumber;
 
@@ -66,9 +76,11 @@ public class Passage extends BaseEntity {
     private LocalDateTime deletedAt;
 
     @Builder
-    private Passage(Book book, User creator, int pageNumber, String quotedText, boolean isSpoiler, String normalizedHash) {
+    private Passage(
+            Book book, User creator, Group group, int pageNumber, String quotedText, boolean isSpoiler, String normalizedHash) {
         this.book = book;
         this.creator = creator;
+        this.group = group;
         this.pageNumber = pageNumber;
         this.quotedText = quotedText;
         this.isSpoiler = isSpoiler;
@@ -77,6 +89,10 @@ public class Passage extends BaseEntity {
 
     public void delete() {
         this.deletedAt = LocalDateTime.now();
+    }
+
+    public void changeSpoiler(boolean isSpoiler) {
+        this.isSpoiler = isSpoiler;
     }
 
     public boolean isDeleted() {

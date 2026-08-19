@@ -21,6 +21,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -53,10 +54,10 @@ public class PassageController implements PassageControllerDocs {
     @PostMapping("/api/passages/similar-check")
     public DataResponse<PassageResponse.SimilarCandidates> checkSimilarPassages(
             @Valid @RequestBody PassageRequest.SimilarCheck request) {
-        // 조회 결과는 유저 무관하게 동일하지만, 인증 필요 엔드포인트이므로 로그인 여부만 확인한다.
-        currentUserProvider.getCurrentUserId();
+        // 로그인 필요 엔드포인트: groupId가 있으면 그 모임 멤버인지까지 함께 확인한다(SimilarPassageFinder).
+        Long currentUserId = currentUserProvider.getCurrentUserId();
         List<SimilarPassageProjection> candidates = similarPassageFinder.find(
-                request.bookId(), request.pageNumber(), request.quotedText());
+                request.bookId(), request.pageNumber(), request.quotedText(), request.groupId(), currentUserId);
         return DataResponse.from(PassageResponse.SimilarCandidates.from(candidates));
     }
 
@@ -64,18 +65,32 @@ public class PassageController implements PassageControllerDocs {
     @GetMapping("/api/books/{bookId}/passages")
     public DataResponse<PassageResponse.PageNumbers> getPageNumbers(
             @PathVariable Long bookId,
+            @RequestParam(required = false) Long groupId,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
-        PageNumbersResult result = passageService.getPageNumbers(bookId, pageable(page, size));
+        Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
+        PageNumbersResult result = passageService.getPageNumbers(bookId, groupId, currentUserId, pageable(page, size));
         return DataResponse.from(PassageResponse.PageNumbers.from(result));
+    }
+
+    @Override
+    @PatchMapping("/api/passages/{passageId}/spoiler")
+    public DataResponse<PassageResponse.SpoilerUpdate> updateSpoiler(
+            @PathVariable Long passageId,
+            @Valid @RequestBody PassageRequest.UpdateSpoiler request) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        Passage passage = passageService.updateSpoiler(passageId, currentUserId, request.isSpoiler());
+        return DataResponse.from(PassageResponse.SpoilerUpdate.from(passage));
     }
 
     @Override
     @GetMapping("/api/books/{bookId}/pages/{page}/passages")
     public DataResponse<PassageResponse.PassagesByPage> getPassagesByPage(
             @PathVariable Long bookId,
-            @PathVariable("page") int pageNumber) {
-        List<Passage> passages = passageService.getPassagesByPage(bookId, pageNumber);
+            @PathVariable("page") int pageNumber,
+            @RequestParam(required = false) Long groupId) {
+        Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
+        List<Passage> passages = passageService.getPassagesByPage(bookId, groupId, currentUserId, pageNumber);
         Map<Long, List<DecorationMergeCandidate>> merged = passageService.getMergedDecorationsByPassageId(passages);
         return DataResponse.from(PassageResponse.PassagesByPage.from(passages, merged));
     }
