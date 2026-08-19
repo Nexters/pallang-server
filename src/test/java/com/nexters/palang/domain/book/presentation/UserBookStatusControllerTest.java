@@ -3,12 +3,17 @@ package com.nexters.palang.domain.book.presentation;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexters.palang.domain.book.application.UserBookStatusService;
+import com.nexters.palang.domain.book.common.error.BookErrorCode;
+import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.ReadingStatus;
 import com.nexters.palang.domain.book.domain.UserBookStatus;
@@ -94,5 +99,38 @@ class UserBookStatusControllerTest {
                         .content(requestBody))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.title").value("COMMON_400_1"));
+    }
+
+    @Test
+    @DisplayName("읽기상태를 해제하면 성공 응답을 반환한다")
+    void deleteBookStatus() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+
+        mockMvc.perform(delete("/api/users/me/book-status").param("bookId", "10"))
+                .andExpect(status().isOk());
+
+        verify(userBookStatusService).removeBookStatus(1L, 10L);
+    }
+
+    @Test
+    @DisplayName("인증 없이 읽기상태를 해제하면 401 에러가 발생한다")
+    void deleteBookStatusFailsWhenUnauthenticated() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willThrow(new LoginRequiredException());
+
+        mockMvc.perform(delete("/api/users/me/book-status").param("bookId", "10"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("AUTH_401_1"));
+    }
+
+    @Test
+    @DisplayName("설정된 읽기상태가 없으면 해제 시 404 에러가 발생한다")
+    void deleteBookStatusFailsWhenStatusDoesNotExist() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        willThrow(new BookException(BookErrorCode.USER_BOOK_STATUS_NOT_FOUND))
+                .given(userBookStatusService).removeBookStatus(1L, 10L);
+
+        mockMvc.perform(delete("/api/users/me/book-status").param("bookId", "10"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("BOOK_404_2"));
     }
 }

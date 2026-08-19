@@ -9,8 +9,10 @@ import com.nexters.palang.global.security.CurrentUserProvider;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -27,5 +29,13 @@ public class UserBookStatusController implements UserBookStatusApi {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         UserBookStatus userBookStatus = userBookStatusService.updateBookStatus(currentUserId, request);
         return ResponseEntity.ok(DataResponse.from(UserBookStatusResponse.from(userBookStatus)));
+    }
+
+    @Override
+    @DeleteMapping("/api/users/me/book-status")
+    public ResponseEntity<DataResponse<Void>> deleteBookStatus(@RequestParam Long bookId) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        userBookStatusService.removeBookStatus(currentUserId, bookId);
+        return ResponseEntity.ok(DataResponse.from(null));
     }
 }

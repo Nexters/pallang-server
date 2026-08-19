@@ -45,6 +45,33 @@ public interface PassageControllerDocs {
             @RequestPart("image") MultipartFile image
     );
 
+    @Operation(summary = "대목 스포일러 설정 변경", description = "대목의 스포일러 표기를 변경합니다(해제 뿐 아니라 재설정도 허용). "
+            + "권한은 이 대목에 흔적을 남긴 사용자만 가집니다(최초 생성자가 아니어도 병합된 대목에 흔적을 남겼으면 가능). "
+            + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "변경 성공"),
+            @ApiResponse(responseCode = "400", description = "isSpoiler 누락 (COMMON_400_1)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/passages/1/spoiler\",\"title\":\"COMMON_400_1\","
+                                    + "\"status\":400,\"detail\":\"isSpoiler는 필수입니다.\"}"))),
+            @ApiResponse(responseCode = "401", description = "AUTH_401_1: 로그인이 필요합니다.",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/passages/1/spoiler\",\"title\":\"AUTH_401_1\","
+                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "PASSAGE_403_1: 본인이 흔적을 남긴 대목만 스포일러 설정을 변경할 수 있습니다.",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/passages/1/spoiler\",\"title\":\"PASSAGE_403_1\","
+                                    + "\"status\":403,\"detail\":\"본인이 흔적을 남긴 대목만 스포일러 설정을 변경할 수 있습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "PASSAGE_404_1: 해당 대목을 찾을 수 없습니다.",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/passages/1/spoiler\",\"title\":\"PASSAGE_404_1\","
+                                    + "\"status\":404,\"detail\":\"해당 대목을 찾을 수 없습니다.\"}")))
+    })
+    DataResponse<PassageResponse.SpoilerUpdate> updateSpoiler(
+            @Parameter(description = "대목 ID", required = true) Long passageId,
+            @Valid @RequestBody PassageRequest.UpdateSpoiler request
+    );
+
     @Operation(summary = "유사 문장 후보 조회", description = "저장 전 같은 도서의 인접 페이지(±1)에서 정규화 해시가 같은 대목 후보를 조회합니다. "
             + "groupId를 지정하면 그 모임 전용 대목만(요청자는 모임원이어야 함), 생략하면 전역 공개 대목만 비교합니다. "
             + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")

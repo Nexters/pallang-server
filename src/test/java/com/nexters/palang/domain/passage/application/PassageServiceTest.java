@@ -15,8 +15,11 @@ import com.nexters.palang.domain.decoration.infrastructure.DecorationQueryReposi
 import com.nexters.palang.domain.group.application.GroupAccessValidator;
 import com.nexters.palang.domain.group.common.error.GroupErrorCode;
 import com.nexters.palang.domain.group.common.error.GroupException;
+import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
+import com.nexters.palang.domain.passage.common.error.PassageException;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.infrastructure.PassageQueryRepository;
+import com.nexters.palang.domain.passage.infrastructure.PassageRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -45,11 +48,19 @@ class PassageServiceTest {
     @Mock
     private GroupAccessValidator groupAccessValidator;
 
+    @Mock
+    private PassageRepository passageRepository;
+
+    @Mock
+    private OpinionRepository opinionRepository;
+
     private PassageService passageService;
 
     @BeforeEach
     void setUp() {
-        passageService = new PassageService(passageQueryRepository, decorationQueryRepository, bookRepository, groupAccessValidator);
+        passageService = new PassageService(
+                passageQueryRepository, decorationQueryRepository, bookRepository,
+                groupAccessValidator, passageRepository, opinionRepository);
     }
 
     private Passage passage(Long id) {
@@ -142,5 +153,61 @@ class PassageServiceTest {
         List<BookOptionProjection> result = passageService.getSpoilerBookOptions(1L);
 
         assertThat(result).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("이 대목에 흔적을 남긴 사용자는 스포일러 설정을 변경할 수 있다")
+    void updateSpoilerChangesFlagWhenUserHasOpinionOnPassage() {
+        Passage passage = passage(1L);
+        given(passageRepository.findById(1L)).willReturn(Optional.of(passage));
+        given(opinionRepository.existsByPassageIdAndUserIdAndDeletedAtIsNull(1L, 10L)).willReturn(true);
+
+        Passage result = passageService.updateSpoiler(1L, 10L, true);
+
+        assertThat(result.isSpoiler()).isTrue();
+    }
+
+    @Test
+    @DisplayName("스포일러 해제 후 다시 켜는 재설정도 허용한다")
+    void updateSpoilerAllowsResettingFalseToTrue() {
+        Passage passage = passage(1L);
+        ReflectionTestUtils.setField(passage, "isSpoiler", false);
+        given(passageRepository.findById(1L)).willReturn(Optional.of(passage));
+        given(opinionRepository.existsByPassageIdAndUserIdAndDeletedAtIsNull(1L, 10L)).willReturn(true);
+
+        Passage result = passageService.updateSpoiler(1L, 10L, true);
+
+        assertThat(result.isSpoiler()).isTrue();
+    }
+
+    @Test
+    @DisplayName("이 대목에 흔적을 남긴 적 없는 사용자가 변경을 시도하면 예외가 발생한다")
+    void updateSpoilerThrowsExceptionWhenUserHasNoOpinionOnPassage() {
+        Passage passage = passage(1L);
+        given(passageRepository.findById(1L)).willReturn(Optional.of(passage));
+        given(opinionRepository.existsByPassageIdAndUserIdAndDeletedAtIsNull(1L, 999L)).willReturn(false);
+
+        assertThatThrownBy(() -> passageService.updateSpoiler(1L, 999L, true))
+                .isInstanceOf(PassageException.class);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 대목의 스포일러 설정을 변경하면 예외가 발생한다")
+    void updateSpoilerThrowsExceptionWhenPassageDoesNotExist() {
+        given(passageRepository.findById(1L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> passageService.updateSpoiler(1L, 10L, true))
+                .isInstanceOf(PassageException.class);
+    }
+
+    @Test
+    @DisplayName("삭제된 대목의 스포일러 설정을 변경하면 예외가 발생한다")
+    void updateSpoilerThrowsExceptionWhenPassageDeleted() {
+        Passage passage = passage(1L);
+        passage.delete();
+        given(passageRepository.findById(1L)).willReturn(Optional.of(passage));
+
+        assertThatThrownBy(() -> passageService.updateSpoiler(1L, 10L, true))
+                .isInstanceOf(PassageException.class);
     }
 }

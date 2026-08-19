@@ -3,8 +3,10 @@ package com.nexters.palang.domain.passage.presentation;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -18,6 +20,8 @@ import com.nexters.palang.domain.passage.application.PassageOcrService;
 import com.nexters.palang.domain.passage.application.PassageService;
 import com.nexters.palang.domain.passage.application.SimilarPassageFinder;
 import com.nexters.palang.domain.passage.application.SimilarPassageProjection;
+import com.nexters.palang.domain.passage.common.error.PassageErrorCode;
+import com.nexters.palang.domain.passage.common.error.PassageException;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.presentation.request.PassageRequest;
 import com.nexters.palang.global.security.CurrentUserProvider;
@@ -185,5 +189,73 @@ class PassageControllerTest {
         mockMvc.perform(get("/api/books/1/passages").param("groupId", "9"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.title").value("GROUP_403_2"));
+    }
+
+    @Test
+    @DisplayName("대목 소유자가 스포일러 설정을 변경한다")
+    void updateSpoiler() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        Passage passage = passage(10L, 5);
+        ReflectionTestUtils.setField(passage, "isSpoiler", true);
+        given(passageService.updateSpoiler(eq(10L), eq(1L), eq(true))).willReturn(passage);
+
+        mockMvc.perform(patch("/api/passages/10/spoiler")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PassageRequest.UpdateSpoiler(true))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.passageId").value(10))
+                .andExpect(jsonPath("$.data.isSpoiler").value(true));
+    }
+
+    @Test
+    @DisplayName("isSpoiler 없이 스포일러 설정을 변경하면 400 에러가 발생한다")
+    void updateSpoilerFailsWhenIsSpoilerMissing() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+
+        mockMvc.perform(patch("/api/passages/10/spoiler")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("COMMON_400_1"));
+    }
+
+    @Test
+    @DisplayName("인증 없이 스포일러 설정을 변경하면 401 에러가 발생한다")
+    void updateSpoilerFailsWhenUnauthenticated() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willThrow(new LoginRequiredException());
+
+        mockMvc.perform(patch("/api/passages/10/spoiler")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PassageRequest.UpdateSpoiler(false))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("AUTH_401_1"));
+    }
+
+    @Test
+    @DisplayName("이 대목에 흔적을 남긴 적 없는 사용자가 변경을 시도하면 403 에러가 발생한다")
+    void updateSpoilerFailsWhenNotOwner() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(passageService.updateSpoiler(eq(10L), eq(1L), eq(true)))
+                .willThrow(new PassageException(PassageErrorCode.PASSAGE_FORBIDDEN));
+
+        mockMvc.perform(patch("/api/passages/10/spoiler")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PassageRequest.UpdateSpoiler(true))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("PASSAGE_403_1"));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 대목의 스포일러 설정을 변경하면 404 에러가 발생한다")
+    void updateSpoilerFailsWhenPassageNotFound() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(passageService.updateSpoiler(eq(999L), eq(1L), eq(true)))
+                .willThrow(new PassageException(PassageErrorCode.PASSAGE_NOT_FOUND));
+
+        mockMvc.perform(patch("/api/passages/999/spoiler")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new PassageRequest.UpdateSpoiler(true))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("PASSAGE_404_1"));
     }
 }

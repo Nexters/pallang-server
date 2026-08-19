@@ -9,8 +9,12 @@ import com.nexters.palang.domain.decoration.application.DecorationMergeCandidate
 import com.nexters.palang.domain.decoration.application.DecorationMergeSelector;
 import com.nexters.palang.domain.decoration.infrastructure.DecorationQueryRepository;
 import com.nexters.palang.domain.group.application.GroupAccessValidator;
+import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
+import com.nexters.palang.domain.passage.common.error.PassageErrorCode;
+import com.nexters.palang.domain.passage.common.error.PassageException;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.infrastructure.PassageQueryRepository;
+import com.nexters.palang.domain.passage.infrastructure.PassageRepository;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +33,8 @@ public class PassageService {
     private final DecorationQueryRepository decorationQueryRepository;
     private final BookRepository bookRepository;
     private final GroupAccessValidator groupAccessValidator;
+    private final PassageRepository passageRepository;
+    private final OpinionRepository opinionRepository;
 
     // 대목/흔적 보기 페이지 네비게이션: 발췌된 페이지 번호 목록 (스포일러 포함) + 헤더용 책 정보.
     // groupId가 있으면 그 모임 전용 대목만 대상으로 하며, 이때 userId는 모임원이어야 한다(비로그인이면 거절).
@@ -59,6 +65,22 @@ public class PassageService {
     // 스포일러 관리 화면의 "전체 책 보기" 드롭다운: 내가 스포일러로 남긴 대목이 있는 도서 목록.
     public List<BookOptionProjection> getSpoilerBookOptions(Long userId) {
         return passageQueryRepository.findSpoilerBookOptions(userId);
+    }
+
+    // 대목 스포일러 설정 변경: 소유 기준은 findMyPassages와 동일하게 이 대목에 흔적을 남긴 사용자.
+    // false→true 재설정도 허용한다(양방향 전환).
+    @Transactional
+    public Passage updateSpoiler(Long passageId, Long userId, boolean isSpoiler) {
+        Passage passage = passageRepository.findById(passageId)
+                .orElseThrow(() -> new PassageException(PassageErrorCode.PASSAGE_NOT_FOUND));
+        if (passage.isDeleted()) {
+            throw new PassageException(PassageErrorCode.PASSAGE_NOT_FOUND);
+        }
+        if (!opinionRepository.existsByPassageIdAndUserIdAndDeletedAtIsNull(passageId, userId)) {
+            throw new PassageException(PassageErrorCode.PASSAGE_FORBIDDEN);
+        }
+        passage.changeSpoiler(isSpoiler);
+        return passage;
     }
 
     public Map<Long, List<DecorationMergeCandidate>> getMergedDecorationsByPassageId(List<Passage> passages) {

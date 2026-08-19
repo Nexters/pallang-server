@@ -91,6 +91,10 @@ public class Passage extends BaseEntity {
         this.deletedAt = LocalDateTime.now();
     }
 
+    public void changeSpoiler(boolean isSpoiler) {
+        this.isSpoiler = isSpoiler;
+    }
+
     public boolean isDeleted() {
         return this.deletedAt != null;
     }
