@@ -15,7 +15,6 @@ import com.nexters.palang.domain.user.presentation.dto.MyOpinionResponse;
 import com.nexters.palang.domain.user.presentation.dto.MyPassageListResponse;
 import com.nexters.palang.domain.user.presentation.dto.MyPassageResponse;
 import com.nexters.palang.global.common.response.PageInfo;
-import java.util.List;
 import org.springframework.data.domain.Page;
 
 public final class UserMapper {
@@ -58,14 +57,15 @@ public final class UserMapper {
         return new BookOptionResponse(projection.bookId(), projection.title());
     }
 
-    public static FilterBooksResponse toFilterBooksResponse(List<BookOptionProjection> projections) {
-        return new FilterBooksResponse(projections.stream().map(UserMapper::toBookOptionResponse).toList());
+    public static FilterBooksResponse toFilterBooksResponse(Page<BookOptionProjection> projections) {
+        return new FilterBooksResponse(
+                projections.map(UserMapper::toBookOptionResponse).getContent(), PageInfo.from(projections));
     }
 
     public static MyPassageResponse toMyPassageResponse(MyPassageProjection projection) {
         return new MyPassageResponse(
-                projection.passageId(), projection.bookId(), projection.pageNumber(), projection.quotedText(),
-                projection.isSpoiler(), projection.createdAt());
+                projection.passageId(), projection.bookId(), projection.opinionId(), projection.pageNumber(),
+                projection.quotedText(), projection.isSpoiler(), projection.createdAt());
     }
 
     public static MyPassageListResponse toMyPassageListResponse(Page<MyPassageProjection> projections) {

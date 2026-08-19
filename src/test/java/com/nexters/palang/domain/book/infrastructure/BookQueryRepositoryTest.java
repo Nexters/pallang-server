@@ -9,6 +9,8 @@ import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.application.BookSearchSort;
 import com.nexters.palang.domain.book.application.OpinionCountScope;
 import com.nexters.palang.domain.book.domain.Book;
+import com.nexters.palang.domain.book.domain.ReadingStatus;
+import com.nexters.palang.domain.book.domain.UserBookStatus;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.user.domain.SnsProvider;
@@ -76,6 +78,14 @@ class BookQueryRepositoryTest {
                 .passage(passage)
                 .user(user)
                 .content("흔적 내용")
+                .build());
+    }
+
+    private UserBookStatus userBookStatus(User user, Book book, ReadingStatus status) {
+        return entityManager.persistAndFlush(UserBookStatus.builder()
+                .user(user)
+                .book(book)
+                .status(status)
                 .build());
     }
 
@@ -449,6 +459,38 @@ class BookQueryRepositoryTest {
 
         assertThat(results.getContent()).extracting(BookActivityProjection::bookId)
                 .containsExactly(newerBook.getId(), olderBook.getId());
+    }
+
+    @Test
+    @DisplayName("흔적은 없지만 읽기 상태만 설정한 도서도 내 서재에 포함한다")
+    void findMyLibraryBooksIncludesBookWithStatusOnly() {
+        User me = user("me-status1");
+        Book statusOnlyBook = book("읽기 상태만 설정한 책");
+        userBookStatus(me, statusOnlyBook, ReadingStatus.READING);
+
+        Page<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(
+                me.getId(), PageRequest.of(0, 20), OpinionCountScope.ALL);
+
+        assertThat(results.getContent()).extracting(BookActivityProjection::bookId)
+                .containsExactly(statusOnlyBook.getId());
+        assertThat(results.getContent().get(0).passageCount()).isEqualTo(0);
+        assertThat(results.getContent().get(0).opinionCount()).isEqualTo(0);
+        assertThat(results.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("같은 도서에 흔적과 읽기 상태가 모두 있어도 한 번만 포함한다")
+    void findMyLibraryBooksDeduplicatesBookWithBothOpinionAndStatus() {
+        User me = user("me-both");
+        Book book = book("흔적과 읽기 상태가 모두 있는 책");
+        opinion(passage(book, me, 1), me);
+        userBookStatus(me, book, ReadingStatus.FINISHED);
+
+        Page<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(
+                me.getId(), PageRequest.of(0, 20), OpinionCountScope.ALL);
+
+        assertThat(results.getContent()).extracting(BookActivityProjection::bookId).containsExactly(book.getId());
+        assertThat(results.getTotalElements()).isEqualTo(1);
     }
 
     @Test

@@ -198,8 +198,8 @@ public class OpinionService {
     }
 
     // 좋아요 관리 화면의 "전체 책 보기" 드롭다운: 내가 좋아요를 누른 흔적이 있는 도서 목록.
-    public List<BookOptionProjection> getLikedBookOptions(Long userId) {
-        return opinionQueryRepository.findLikedBookOptions(userId);
+    public Page<BookOptionProjection> getLikedBookOptions(Long userId, Pageable pageable) {
+        return opinionQueryRepository.findLikedBookOptions(userId, pageable);
     }
 
     public long getMyOpinionCount(Long userId) {

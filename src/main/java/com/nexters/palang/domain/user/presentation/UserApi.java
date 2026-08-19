@@ -185,7 +185,8 @@ public interface UserApi {
 
     @Operation(summary = "도서 필터 목록", description = "좋아요 관리·스포일러 관리 화면의 \"전체 책 보기\" 드롭다운에 쓸 도서 목록입니다. "
             + "type=LIKE면 내가 좋아요를 누른 흔적이 있는 도서를, type=SPOILER면 내가 스포일러로 남긴 대목이 있는 도서를 "
-            + "최근 활동순으로 중복 없이 반환합니다. 여기서 고른 bookId를 흔적/좋아요/대목 목록 API의 bookId 파라미터로 전달합니다. "
+            + "최근 활동순으로 중복 없이 반환합니다. 다른 목록 API와 동일하게 page/size로 페이지네이션됩니다. "
+            + "여기서 고른 bookId를 흔적/좋아요/대목 목록 API의 bookId 파라미터로 전달합니다. "
             + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
@@ -199,7 +200,9 @@ public interface UserApi {
                                     + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}")))
     })
     ResponseEntity<DataResponse<FilterBooksResponse>> getFilterBooks(
-            @Parameter(description = "필터 종류 (LIKE: 좋아요 관리, SPOILER: 스포일러 대목 관리)", required = true) BookFilterType type
+            @Parameter(description = "필터 종류 (LIKE: 좋아요 관리, SPOILER: 스포일러 대목 관리)", required = true) BookFilterType type,
+            @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,
+            @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
     );
 
     @Operation(summary = "내 대목 목록", description = "내가 흔적을 남긴 대목을 최신순으로 조회합니다. "

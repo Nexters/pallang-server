@@ -467,10 +467,11 @@ class OpinionServiceTest {
     @Test
     @DisplayName("좋아요 도서 필터 목록을 조회하면 QueryRepository 결과를 그대로 반환한다")
     void getLikedBookOptionsReturnsResultFromQueryRepository() {
-        List<BookOptionProjection> expected = List.of(new BookOptionProjection(10L, "제목"));
-        given(opinionQueryRepository.findLikedBookOptions(1L)).willReturn(expected);
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<BookOptionProjection> expected = new PageImpl<>(List.of(new BookOptionProjection(10L, "제목")));
+        given(opinionQueryRepository.findLikedBookOptions(1L, pageable)).willReturn(expected);
 
-        List<BookOptionProjection> results = opinionService.getLikedBookOptions(1L);
+        Page<BookOptionProjection> results = opinionService.getLikedBookOptions(1L, pageable);
 
         assertThat(results).isEqualTo(expected);
     }

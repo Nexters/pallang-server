@@ -161,13 +161,13 @@ public class OpinionQueryRepository {
     }
 
     // 좋아요·스포일러 관리 화면 공용 "전체 책 보기" 드롭다운: 활동(좋아요/스포일러) 최신순으로 중복 없이 책만 나열.
-    public List<BookOptionProjection> findLikedBookOptions(Long userId) {
+    public Page<BookOptionProjection> findLikedBookOptions(Long userId, Pageable pageable) {
         QOpinionLike opinionLike = QOpinionLike.opinionLike;
         QOpinion opinion = QOpinion.opinion;
         QPassage passage = QPassage.passage;
         QBook book = QBook.book;
 
-        return queryFactory
+        List<BookOptionProjection> content = queryFactory
                 .select(Projections.constructor(BookOptionProjection.class, book.id, book.title))
                 .from(opinionLike)
                 .join(opinionLike.opinion, opinion)
@@ -176,6 +176,19 @@ public class OpinionQueryRepository {
                 .where(opinionLike.user.id.eq(userId), opinion.deletedAt.isNull())
                 .groupBy(book.id, book.title)
                 .orderBy(opinionLike.createdAt.max().desc())
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
                 .fetch();
+
+        Long total = queryFactory
+                .select(book.countDistinct())
+                .from(opinionLike)
+                .join(opinionLike.opinion, opinion)
+                .join(opinion.passage, passage)
+                .join(passage.book, book)
+                .where(opinionLike.user.id.eq(userId), opinion.deletedAt.isNull())
+                .fetchOne();
+
+        return new PageImpl<>(content, pageable, total != null ? total : 0L);
     }
 }

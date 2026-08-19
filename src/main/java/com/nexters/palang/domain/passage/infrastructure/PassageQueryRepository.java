@@ -9,6 +9,7 @@ import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.domain.QPassage;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -88,25 +89,35 @@ public class PassageQueryRepository {
     }
 
     // 내가 남긴 대목(FR-...): 소유 기준은 흔적을 남긴 사용자다(최초 생성자가 아니어도 병합된 대목에 흔적을 남겼으면 포함).
-    // createdAt/정렬 기준은 대목 자체가 아니라 "내가 그 대목에 흔적을 남긴 시점"이어야 사용자 관점에서 의미가 있으므로
-    // opinion.createdAt의 최댓값을 쓴다(같은 대목에 흔적을 여러 번 남긴 경우 가장 최근 흔적 기준, 대목 단위 중복 제거).
+    // 정렬 기준은 대목 자체가 아니라 "내가 그 대목에 흔적을 남긴 시점"이어야 사용자 관점에서 의미가 있다.
+    // 같은 대목에 흔적을 여러 번 남긴 경우 카드가 이동해야 할 흔적(opinionId)이 하나로 정해져야 하므로,
+    // GROUP BY 집계 대신 "이 사용자가 이 대목에 남긴 흔적 중 더 나중 것이 없다"는 NOT EXISTS로 대목당
+    // 정확히 한 행(가장 최근 흔적)만 남긴다.
     public Page<MyPassageProjection> findMyPassages(Long userId, Long bookId, boolean spoilerOnly, Pageable pageable) {
         QOpinion opinion = QOpinion.opinion;
+        QOpinion laterOpinion = new QOpinion("laterOpinion");
         QPassage passage = QPassage.passage;
 
         BooleanExpression bookFilter = bookId != null ? passage.book.id.eq(bookId) : null;
         BooleanExpression spoilerFilter = spoilerOnly ? passage.isSpoiler.isTrue() : null;
+        BooleanExpression isLatestOpinionForPassage = JPAExpressions.selectOne()
+                .from(laterOpinion)
+                .where(laterOpinion.passage.eq(opinion.passage),
+                        laterOpinion.user.eq(opinion.user),
+                        laterOpinion.deletedAt.isNull(),
+                        laterOpinion.createdAt.gt(opinion.createdAt)
+                                .or(laterOpinion.createdAt.eq(opinion.createdAt).and(laterOpinion.id.gt(opinion.id))))
+                .notExists();
 
         List<MyPassageProjection> content = queryFactory
                 .select(Projections.constructor(MyPassageProjection.class,
-                        passage.id, passage.book.id, passage.pageNumber, passage.quotedText,
-                        passage.isSpoiler, opinion.createdAt.max()))
+                        passage.id, passage.book.id, opinion.id, passage.pageNumber, passage.quotedText,
+                        passage.isSpoiler, opinion.createdAt))
                 .from(opinion)
                 .join(opinion.passage, passage)
                 .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(), passage.deletedAt.isNull(),
-                        bookFilter, spoilerFilter)
-                .groupBy(passage.id, passage.book.id, passage.pageNumber, passage.quotedText, passage.isSpoiler)
-                .orderBy(opinion.createdAt.max().desc(), passage.id.desc())
+                        bookFilter, spoilerFilter, isLatestOpinionForPassage)
+                .orderBy(opinion.createdAt.desc(), passage.id.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .fetch();
@@ -124,12 +135,12 @@ public class PassageQueryRepository {
 
     // 좋아요·스포일러 관리 화면 공용 "전체 책 보기" 드롭다운: 내가 스포일러로 남긴 대목이 있는 도서 목록.
     // 소유 기준은 findMyPassages와 동일하게 흔적을 남긴 사용자(opinion.user) 기준.
-    public List<BookOptionProjection> findSpoilerBookOptions(Long userId) {
+    public Page<BookOptionProjection> findSpoilerBookOptions(Long userId, Pageable pageable) {
         QOpinion opinion = QOpinion.opinion;
         QPassage passage = QPassage.passage;
         QBook book = QBook.book;
 
-        return queryFactory
+        List<BookOptionProjection> content = queryFactory
                 .select(Projections.constructor(BookOptionProjection.class, book.id, book.title))
                 .from(opinion)
                 .join(opinion.passage, passage)
@@ -138,6 +149,19 @@ public class PassageQueryRepository {
                         passage.isSpoiler.isTrue())
                 .groupBy(book.id, book.title)
                 .orderBy(opinion.createdAt.max().desc())
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
                 .fetch();
+
+        Long total = queryFactory
+                .select(book.countDistinct())
+                .from(opinion)
+                .join(opinion.passage, passage)
+                .join(passage.book, book)
+                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(), passage.deletedAt.isNull(),
+                        passage.isSpoiler.isTrue())
+                .fetchOne();
+
+        return new PageImpl<>(content, pageable, total != null ? total : 0L);
     }
 }

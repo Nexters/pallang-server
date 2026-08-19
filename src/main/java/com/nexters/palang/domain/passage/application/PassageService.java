@@ -63,8 +63,8 @@ public class PassageService {
     }
 
     // 스포일러 관리 화면의 "전체 책 보기" 드롭다운: 내가 스포일러로 남긴 대목이 있는 도서 목록.
-    public List<BookOptionProjection> getSpoilerBookOptions(Long userId) {
-        return passageQueryRepository.findSpoilerBookOptions(userId);
+    public Page<BookOptionProjection> getSpoilerBookOptions(Long userId, Pageable pageable) {
+        return passageQueryRepository.findSpoilerBookOptions(userId, pageable);
     }
 
     // 대목 스포일러 설정 변경: 소유 기준은 findMyPassages와 동일하게 이 대목에 흔적을 남긴 사용자.
