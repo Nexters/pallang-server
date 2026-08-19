@@ -24,7 +24,8 @@ public class PassageQueryRepository {
     private final JPAQueryFactory queryFactory;
 
     // 같은 책의 인접 페이지(±1) 안에서 정규화 해시가 같은 Passage 후보를 연결된 흔적 수와 함께 조회한다. (FR-WRITE-07)
-    public List<SimilarPassageProjection> findSimilarCandidates(Long bookId, int pageNumber, String normalizedHash) {
+    // groupId가 null이면 전역 공개 대목만, 값이 있으면 그 모임 전용 대목만 후보로 삼는다(서로 섞이지 않는다).
+    public List<SimilarPassageProjection> findSimilarCandidates(Long bookId, int pageNumber, String normalizedHash, Long groupId) {
         QPassage passage = QPassage.passage;
         QOpinion opinion = QOpinion.opinion;
 
@@ -37,7 +38,8 @@ public class PassageQueryRepository {
                         passage.book.id.eq(bookId),
                         passage.deletedAt.isNull(),
                         passage.pageNumber.between(pageNumber - 1, pageNumber + 1),
-                        passage.normalizedHash.eq(normalizedHash)
+                        passage.normalizedHash.eq(normalizedHash),
+                        groupFilter(passage, groupId)
                 )
                 .groupBy(passage.id, passage.quotedText, passage.pageNumber)
                 .orderBy(passage.pageNumber.asc(), passage.id.asc())
@@ -45,13 +47,14 @@ public class PassageQueryRepository {
     }
 
     // 대목/흔적 조회용 페이지 번호 목록: 대목이 걸쳐 있는 서로 다른 페이지 번호를 오름차순으로.
-    public Page<Integer> findPageNumbers(Long bookId, Pageable pageable) {
+    public Page<Integer> findPageNumbers(Long bookId, Long groupId, Pageable pageable) {
         QPassage passage = QPassage.passage;
+        BooleanExpression groupFilter = groupFilter(passage, groupId);
 
         List<Integer> content = queryFactory
                 .select(passage.pageNumber)
                 .from(passage)
-                .where(passage.book.id.eq(bookId), passage.deletedAt.isNull())
+                .where(passage.book.id.eq(bookId), passage.deletedAt.isNull(), groupFilter)
                 .groupBy(passage.pageNumber)
                 .orderBy(passage.pageNumber.asc())
                 .offset(pageable.getOffset())
@@ -61,21 +64,27 @@ public class PassageQueryRepository {
         Long total = queryFactory
                 .select(passage.pageNumber.countDistinct())
                 .from(passage)
-                .where(passage.book.id.eq(bookId), passage.deletedAt.isNull())
+                .where(passage.book.id.eq(bookId), passage.deletedAt.isNull(), groupFilter)
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
     }
 
     // 대목 전환용: 특정 페이지에 걸친 대목들을 등록 순으로.
-    public List<Passage> findPassagesByPage(Long bookId, int pageNumber) {
+    public List<Passage> findPassagesByPage(Long bookId, Long groupId, int pageNumber) {
         QPassage passage = QPassage.passage;
 
         return queryFactory
                 .selectFrom(passage)
-                .where(passage.book.id.eq(bookId), passage.pageNumber.eq(pageNumber), passage.deletedAt.isNull())
+                .where(passage.book.id.eq(bookId), passage.pageNumber.eq(pageNumber), passage.deletedAt.isNull(),
+                        groupFilter(passage, groupId))
                 .orderBy(passage.id.asc())
                 .fetch();
+    }
+
+    // groupId가 없으면(null) 전역 공개 대목(group_id IS NULL)만, 있으면 그 모임 소속 대목만 대상으로 한다.
+    private BooleanExpression groupFilter(QPassage passage, Long groupId) {
+        return groupId != null ? passage.group.id.eq(groupId) : passage.group.isNull();
     }
 
     // 내가 남긴 대목(FR-...): 소유 기준은 흔적을 남긴 사용자다(최초 생성자가 아니어도 병합된 대목에 흔적을 남겼으면 포함).
