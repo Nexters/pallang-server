@@ -4,7 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
+import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.comment.common.CommentException;
 import com.nexters.palang.domain.comment.common.NestedReplyNotAllowedException;
 import com.nexters.palang.domain.comment.domain.Comment;
@@ -12,11 +16,17 @@ import com.nexters.palang.domain.comment.infrastructure.CommentQueryRepository;
 import com.nexters.palang.domain.comment.infrastructure.CommentRepository;
 import com.nexters.palang.domain.comment.presentation.dto.CreateCommentRequest;
 import com.nexters.palang.domain.comment.presentation.dto.UpdateCommentRequest;
+import com.nexters.palang.domain.group.application.GroupAccessValidator;
+import com.nexters.palang.domain.group.common.error.GroupErrorCode;
+import com.nexters.palang.domain.group.common.error.GroupException;
+import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.domain.opinion.common.error.OpinionException;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
+import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -47,6 +57,9 @@ class CommentServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private GroupAccessValidator groupAccessValidator;
+
     private CommentService commentService;
 
     private Opinion opinion;
@@ -55,14 +68,27 @@ class CommentServiceTest {
 
     @BeforeEach
     void setUp() {
-        commentService = new CommentService(commentRepository, commentQueryRepository, opinionRepository, userRepository);
+        commentService = new CommentService(
+                commentRepository, commentQueryRepository, opinionRepository, userRepository, groupAccessValidator);
         writer = user(10L);
         opinion = opinion(1L);
         otherUser = user(20L);
     }
 
     private Opinion opinion(Long id) {
-        Opinion built = Opinion.builder().user(writer).content("흔적 내용").build();
+        return opinion(id, null);
+    }
+
+    private Opinion opinion(Long id, Group group) {
+        Passage passage = Passage.builder().group(group).build();
+        Opinion built = Opinion.builder().user(writer).passage(passage).content("흔적 내용").build();
+        ReflectionTestUtils.setField(built, "id", id);
+        return built;
+    }
+
+    private Group group(Long id) {
+        Book book = Book.builder().title("제목").author("작가").publisher("출판사").pageCount(300).build();
+        Group built = Group.create("모임", book, writer, 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20));
         ReflectionTestUtils.setField(built, "id", id);
         return built;
     }
@@ -334,5 +360,60 @@ class CommentServiceTest {
         commentService.removeComment(1L, 10L);
 
         assertThat(comment.isDeleted()).isTrue();
+    }
+
+    @Test
+    @DisplayName("모임 전용 흔적의 댓글 목록을 모임원이 아닌 사용자가 조회하면 예외가 발생한다")
+    void getRootCommentsFailsWhenNotGroupMember() {
+        Group group = group(9L);
+        Opinion groupOpinion = opinion(1L, group);
+        given(opinionRepository.findById(1L)).willReturn(Optional.of(groupOpinion));
+        doThrow(new GroupException(GroupErrorCode.NOT_MEMBER)).when(groupAccessValidator).validateMember(9L, 20L);
+
+        assertThatThrownBy(() -> commentService.getRootComments(1L, PageRequest.of(0, 20), 20L))
+                .isInstanceOf(GroupException.class);
+        verify(commentQueryRepository, never()).findRootComments(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("모임 전용 흔적의 답글을 모임원이 아닌 사용자가 조회하면 예외가 발생한다")
+    void getRepliesFailsWhenNotGroupMember() {
+        Group group = group(9L);
+        Opinion groupOpinion = opinion(1L, group);
+        Comment root = rootComment(1L, groupOpinion, writer);
+        given(commentRepository.findByIdWithUser(1L)).willReturn(Optional.of(root));
+        given(opinionRepository.findById(1L)).willReturn(Optional.of(groupOpinion));
+        doThrow(new GroupException(GroupErrorCode.NOT_MEMBER)).when(groupAccessValidator).validateMember(9L, 20L);
+
+        assertThatThrownBy(() -> commentService.getReplies(1L, PageRequest.of(0, 20), 20L))
+                .isInstanceOf(GroupException.class);
+    }
+
+    @Test
+    @DisplayName("모임원이 아닌 사용자가 모임 전용 흔적에 댓글을 작성하려 하면 예외가 발생한다")
+    void createCommentFailsWhenNotGroupMember() {
+        Group group = group(9L);
+        Opinion groupOpinion = opinion(1L, group);
+        given(opinionRepository.findById(1L)).willReturn(Optional.of(groupOpinion));
+        doThrow(new GroupException(GroupErrorCode.NOT_MEMBER)).when(groupAccessValidator).validateMember(9L, 20L);
+
+        assertThatThrownBy(() -> commentService.createComment(1L, 20L, new CreateCommentRequest(null, "내용")))
+                .isInstanceOf(GroupException.class);
+        verify(commentRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("모임원이 모임 전용 흔적에 댓글을 작성하면 정상적으로 저장된다")
+    void createCommentSucceedsWhenGroupMember() {
+        Group group = group(9L);
+        Opinion groupOpinion = opinion(1L, group);
+        given(opinionRepository.findById(1L)).willReturn(Optional.of(groupOpinion));
+        given(userRepository.findById(10L)).willReturn(Optional.of(writer));
+        given(commentRepository.save(any(Comment.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        Comment created = commentService.createComment(1L, 10L, new CreateCommentRequest(null, "내용"));
+
+        assertThat(created.getContent()).isEqualTo("내용");
+        verify(groupAccessValidator).validateMember(9L, 10L);
     }
 }

@@ -8,6 +8,7 @@ import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.decoration.application.DecorationMergeCandidate;
 import com.nexters.palang.domain.decoration.application.DecorationMergeSelector;
 import com.nexters.palang.domain.decoration.infrastructure.DecorationQueryRepository;
+import com.nexters.palang.domain.group.application.GroupAccessValidator;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
 import com.nexters.palang.domain.passage.common.error.PassageErrorCode;
 import com.nexters.palang.domain.passage.common.error.PassageException;
@@ -31,21 +32,29 @@ public class PassageService {
     private final PassageQueryRepository passageQueryRepository;
     private final DecorationQueryRepository decorationQueryRepository;
     private final BookRepository bookRepository;
+    private final GroupAccessValidator groupAccessValidator;
     private final PassageRepository passageRepository;
     private final OpinionRepository opinionRepository;
 
     // 대목/흔적 보기 페이지 네비게이션: 발췌된 페이지 번호 목록 (스포일러 포함) + 헤더용 책 정보.
-    public PageNumbersResult getPageNumbers(Long bookId, Pageable pageable) {
+    // groupId가 있으면 그 모임 전용 대목만 대상으로 하며, 이때 userId는 모임원이어야 한다(비로그인이면 거절).
+    public PageNumbersResult getPageNumbers(Long bookId, Long groupId, Long userId, Pageable pageable) {
         Book book = bookRepository.findById(bookId)
                 .orElseThrow(() -> new BookException(BookErrorCode.BOOK_NOT_FOUND));
-        Page<Integer> pageNumbers = passageQueryRepository.findPageNumbers(bookId, pageable);
+        if (groupId != null) {
+            groupAccessValidator.validateMember(groupId, userId);
+        }
+        Page<Integer> pageNumbers = passageQueryRepository.findPageNumbers(bookId, groupId, pageable);
         return new PageNumbersResult(book, pageNumbers);
     }
 
     // 대목 전환: 특정 페이지의 대목들과 각 대목의 꾸밈 병합 결과.
-    public List<Passage> getPassagesByPage(Long bookId, int pageNumber) {
+    public List<Passage> getPassagesByPage(Long bookId, Long groupId, Long userId, int pageNumber) {
         validateBookExists(bookId);
-        return passageQueryRepository.findPassagesByPage(bookId, pageNumber);
+        if (groupId != null) {
+            groupAccessValidator.validateMember(groupId, userId);
+        }
+        return passageQueryRepository.findPassagesByPage(bookId, groupId, pageNumber);
     }
 
     // 내가 남긴 대목 목록: bookId 미지정 시 전체 도서, spoilerOnly=true 시 스포일러 대목만.

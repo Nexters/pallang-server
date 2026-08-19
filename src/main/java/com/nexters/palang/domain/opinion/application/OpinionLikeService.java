@@ -1,5 +1,7 @@
 package com.nexters.palang.domain.opinion.application;
 
+import com.nexters.palang.domain.group.application.GroupAccessValidator;
+import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.domain.opinion.common.error.OpinionErrorCode;
 import com.nexters.palang.domain.opinion.common.error.OpinionException;
 import com.nexters.palang.domain.opinion.domain.Opinion;
@@ -21,10 +23,12 @@ public class OpinionLikeService {
     private final OpinionRepository opinionRepository;
     private final OpinionLikeRepository opinionLikeRepository;
     private final UserRepository userRepository;
+    private final GroupAccessValidator groupAccessValidator;
 
     @Transactional
     public OpinionLikeResult toggleLike(Long userId, Long opinionId) {
         Opinion opinion = getExistingOpinion(opinionId);
+        validateGroupAccess(opinion, userId);
         if (opinionLikeRepository.existsByUserIdAndOpinionId(userId, opinionId)) {
             return unlike(userId, opinion);
         }
@@ -51,5 +55,13 @@ public class OpinionLikeService {
             throw new OpinionException(OpinionErrorCode.OPINION_NOT_FOUND);
         }
         return opinion;
+    }
+
+    // 흔적이 모임 전용이면(passage.group != null) 모임원만 좋아요를 남기거나 취소할 수 있다.
+    private void validateGroupAccess(Opinion opinion, Long userId) {
+        Group group = opinion.getPassage().getGroup();
+        if (group != null) {
+            groupAccessValidator.validateMember(group.getId(), userId);
+        }
     }
 }

@@ -3,13 +3,18 @@ package com.nexters.palang.domain.passage.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doThrow;
 
 import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.book.common.error.BookException;
+import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.decoration.application.DecorationMergeCandidate;
 import com.nexters.palang.domain.decoration.domain.EffectType;
 import com.nexters.palang.domain.decoration.infrastructure.DecorationQueryRepository;
+import com.nexters.palang.domain.group.application.GroupAccessValidator;
+import com.nexters.palang.domain.group.common.error.GroupErrorCode;
+import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
 import com.nexters.palang.domain.passage.common.error.PassageException;
 import com.nexters.palang.domain.passage.domain.Passage;
@@ -41,6 +46,9 @@ class PassageServiceTest {
     private BookRepository bookRepository;
 
     @Mock
+    private GroupAccessValidator groupAccessValidator;
+
+    @Mock
     private PassageRepository passageRepository;
 
     @Mock
@@ -51,7 +59,8 @@ class PassageServiceTest {
     @BeforeEach
     void setUp() {
         passageService = new PassageService(
-                passageQueryRepository, decorationQueryRepository, bookRepository, passageRepository, opinionRepository);
+                passageQueryRepository, decorationQueryRepository, bookRepository,
+                groupAccessValidator, passageRepository, opinionRepository);
     }
 
     private Passage passage(Long id) {
@@ -65,7 +74,7 @@ class PassageServiceTest {
     void getPageNumbersThrowsExceptionWhenBookDoesNotExist() {
         given(bookRepository.findById(1L)).willReturn(Optional.empty());
 
-        assertThatThrownBy(() -> passageService.getPageNumbers(1L, PageRequest.of(0, 20)))
+        assertThatThrownBy(() -> passageService.getPageNumbers(1L, null, 1L, PageRequest.of(0, 20)))
                 .isInstanceOf(BookException.class);
     }
 
@@ -74,7 +83,7 @@ class PassageServiceTest {
     void getPassagesByPageThrowsExceptionWhenBookDoesNotExist() {
         given(bookRepository.existsById(1L)).willReturn(false);
 
-        assertThatThrownBy(() -> passageService.getPassagesByPage(1L, 3))
+        assertThatThrownBy(() -> passageService.getPassagesByPage(1L, null, 1L, 3))
                 .isInstanceOf(BookException.class);
     }
 
@@ -82,9 +91,9 @@ class PassageServiceTest {
     @DisplayName("페이지에 대목이 없으면 예외 없이 빈 결과가 조회된다")
     void getPassagesByPageReturnsEmptyWhenNoPassagesExist() {
         given(bookRepository.existsById(1L)).willReturn(true);
-        given(passageQueryRepository.findPassagesByPage(1L, 3)).willReturn(List.of());
+        given(passageQueryRepository.findPassagesByPage(1L, null, 3)).willReturn(List.of());
 
-        List<Passage> result = passageService.getPassagesByPage(1L, 3);
+        List<Passage> result = passageService.getPassagesByPage(1L, null, 1L, 3);
 
         assertThat(result).isEmpty();
     }
@@ -93,11 +102,32 @@ class PassageServiceTest {
     @DisplayName("스포일러 대목을 포함해 해당 페이지의 모든 대목을 조회한다")
     void getPassagesByPageReturnsAllPassagesIncludingSpoilers() {
         given(bookRepository.existsById(1L)).willReturn(true);
-        given(passageQueryRepository.findPassagesByPage(1L, 3)).willReturn(List.of(passage(100L)));
+        given(passageQueryRepository.findPassagesByPage(1L, null, 3)).willReturn(List.of(passage(100L)));
 
-        List<Passage> result = passageService.getPassagesByPage(1L, 3);
+        List<Passage> result = passageService.getPassagesByPage(1L, null, 1L, 3);
 
         assertThat(result).extracting(Passage::getId).containsExactly(100L);
+    }
+
+    @Test
+    @DisplayName("groupId를 지정해 페이지 번호를 조회할 때 모임원이 아니면 예외가 발생한다")
+    void getPageNumbersFailsWhenNotGroupMember() {
+        given(bookRepository.findById(1L)).willReturn(Optional.of(
+                Book.builder().title("제목").author("작가").publisher("출판사").pageCount(300).build()));
+        doThrow(new GroupException(GroupErrorCode.NOT_MEMBER)).when(groupAccessValidator).validateMember(9L, 1L);
+
+        assertThatThrownBy(() -> passageService.getPageNumbers(1L, 9L, 1L, PageRequest.of(0, 20)))
+                .isInstanceOf(GroupException.class);
+    }
+
+    @Test
+    @DisplayName("groupId를 지정해 페이지의 대목을 조회할 때 모임원이 아니면 예외가 발생한다")
+    void getPassagesByPageFailsWhenNotGroupMember() {
+        given(bookRepository.existsById(1L)).willReturn(true);
+        doThrow(new GroupException(GroupErrorCode.NOT_MEMBER)).when(groupAccessValidator).validateMember(9L, 1L);
+
+        assertThatThrownBy(() -> passageService.getPassagesByPage(1L, 9L, 1L, 3))
+                .isInstanceOf(GroupException.class);
     }
 
     @Test

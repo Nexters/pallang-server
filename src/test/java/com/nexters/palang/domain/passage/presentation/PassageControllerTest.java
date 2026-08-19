@@ -13,6 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexters.palang.domain.book.domain.Book;
+import com.nexters.palang.domain.group.common.error.GroupErrorCode;
+import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.passage.application.PageNumbersResult;
 import com.nexters.palang.domain.passage.application.PassageOcrService;
 import com.nexters.palang.domain.passage.application.PassageService;
@@ -69,10 +71,10 @@ class PassageControllerTest {
     @DisplayName("유사 문장 후보를 조회하면 대목 목록을 반환한다")
     void checkSimilarPassages() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(similarPassageFinder.find(any(), anyInt(), anyString()))
+        given(similarPassageFinder.find(any(), anyInt(), anyString(), any(), any()))
                 .willReturn(List.of(new SimilarPassageProjection(10L, "발췌 문장", 5, 2L)));
 
-        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "발췌 문장");
+        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "발췌 문장", null);
 
         mockMvc.perform(post("/api/passages/similar-check")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -86,9 +88,9 @@ class PassageControllerTest {
     @DisplayName("유사 문장 후보가 없으면 빈 배열을 반환한다")
     void checkSimilarPassagesReturnsEmptyArrayWhenNoCandidates() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(similarPassageFinder.find(any(), anyInt(), anyString())).willReturn(List.of());
+        given(similarPassageFinder.find(any(), anyInt(), anyString(), any(), any())).willReturn(List.of());
 
-        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "발췌 문장");
+        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "발췌 문장", null);
 
         mockMvc.perform(post("/api/passages/similar-check")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -102,7 +104,7 @@ class PassageControllerTest {
     void checkSimilarPassagesFailsWhenUnauthenticated() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willThrow(new LoginRequiredException());
 
-        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "발췌 문장");
+        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "발췌 문장", null);
 
         mockMvc.perform(post("/api/passages/similar-check")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -114,7 +116,7 @@ class PassageControllerTest {
     @Test
     @DisplayName("인용 문구 없이 유사 문장 후보를 조회하면 400 에러가 발생한다")
     void checkSimilarPassagesFailsWhenQuotedTextIsBlank() throws Exception {
-        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "");
+        PassageRequest.SimilarCheck request = new PassageRequest.SimilarCheck(1L, 5, "", null);
 
         mockMvc.perform(post("/api/passages/similar-check")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -132,7 +134,7 @@ class PassageControllerTest {
     @Test
     @DisplayName("페이지 번호 목록을 조회하면 오름차순으로, 책 정보와 함께 반환한다")
     void getPageNumbers() throws Exception {
-        given(passageService.getPageNumbers(any(), any())).willReturn(new PageNumbersResult(
+        given(passageService.getPageNumbers(any(), any(), any(), any())).willReturn(new PageNumbersResult(
                 book(), new PageImpl<>(List.of(2, 5), PageRequest.of(0, 20), 2)));
 
         mockMvc.perform(get("/api/books/1/passages"))
@@ -146,7 +148,7 @@ class PassageControllerTest {
     @Test
     @DisplayName("비로그인 사용자로 페이지 번호를 조회해도 401 없이 조회된다 (soft auth)")
     void getPageNumbersDoesNotRequireAuthentication() throws Exception {
-        given(passageService.getPageNumbers(any(), any())).willReturn(new PageNumbersResult(
+        given(passageService.getPageNumbers(any(), any(), any(), any())).willReturn(new PageNumbersResult(
                 book(), new PageImpl<>(List.of(), PageRequest.of(0, 20), 0)));
 
         mockMvc.perform(get("/api/books/1/passages"))
@@ -157,7 +159,7 @@ class PassageControllerTest {
     @DisplayName("특정 페이지의 대목과 병합된 꾸밈을 함께 반환한다")
     void getPassagesByPage() throws Exception {
         Passage passage = passage(10L, 3);
-        given(passageService.getPassagesByPage(any(), anyInt())).willReturn(List.of(passage));
+        given(passageService.getPassagesByPage(any(), any(), any(), anyInt())).willReturn(List.of(passage));
         given(passageService.getMergedDecorationsByPassageId(any())).willReturn(Map.of(10L, List.of()));
 
         mockMvc.perform(get("/api/books/1/pages/3/passages"))
@@ -170,12 +172,23 @@ class PassageControllerTest {
     @DisplayName("비로그인 사용자도 아무 페이지나 조회할 수 있다 (soft auth)")
     void getPassagesByPageDoesNotRequireAuthentication() throws Exception {
         Passage passage = passage(10L, 5);
-        given(passageService.getPassagesByPage(any(), anyInt())).willReturn(List.of(passage));
+        given(passageService.getPassagesByPage(any(), any(), any(), anyInt())).willReturn(List.of(passage));
         given(passageService.getMergedDecorationsByPassageId(any())).willReturn(Map.of(10L, List.of()));
 
         mockMvc.perform(get("/api/books/1/pages/5/passages"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.passages[0].passageId").value(10));
+    }
+
+    @Test
+    @DisplayName("groupId를 지정해 페이지 번호를 조회할 때 모임원이 아니면 403 에러가 발생한다")
+    void getPageNumbersFailsWhenNotGroupMember() throws Exception {
+        given(passageService.getPageNumbers(any(), any(), any(), any()))
+                .willThrow(new GroupException(GroupErrorCode.NOT_MEMBER));
+
+        mockMvc.perform(get("/api/books/1/passages").param("groupId", "9"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("GROUP_403_2"));
     }
 
     @Test
