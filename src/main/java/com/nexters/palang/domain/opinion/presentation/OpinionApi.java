@@ -152,6 +152,7 @@ public interface OpinionApi {
 
     @Operation(summary = "흔적 좋아요 토글",
             description = "좋아요를 누르지 않은 상태면 좋아요를 남기고, 이미 눌렀다면 취소합니다. "
+                    + "흔적이 모임 전용이면 모임원만 좋아요를 남기거나 취소할 수 있습니다. "
                     + "X-Debug-User-Id 헤더로 인증합니다(임시 스탠드인).")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "좋아요 토글 성공"),
@@ -159,6 +160,11 @@ public interface OpinionApi {
                     content = @Content(
                             schema = @Schema(implementation = ErrorResponse.class),
                             examples = @ExampleObject(value = "{\"type\":\"/api/opinions/1/like\",\"title\":\"AUTH_401_1\",\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))
+            ),
+            @ApiResponse(responseCode = "403", description = "GROUP_403_2: 모임 전용 흔적인데 모임원이 아님",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"type\":\"/api/opinions/1/like\",\"title\":\"GROUP_403_2\",\"status\":403,\"detail\":\"모임원만 조회할 수 있습니다.\"}"))
             ),
             @ApiResponse(responseCode = "404", description = "해당 흔적을 찾을 수 없음 (OPINION_404_1)",
                     content = @Content(
