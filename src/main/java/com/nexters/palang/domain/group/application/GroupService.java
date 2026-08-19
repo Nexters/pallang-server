@@ -83,9 +83,56 @@ public class GroupService {
         return groupQueryRepository.findMembers(groupId, pageable);
     }
 
+    public String getInviteLink(Long groupId, Long userId) {
+        Group group = getExistingGroup(groupId);
+        validateHost(group, userId);
+        return group.getInviteCode();
+    }
+
+    @Transactional
+    public String regenerateInviteLink(Long groupId, Long userId) {
+        Group group = getExistingGroup(groupId);
+        validateHost(group, userId);
+        group.regenerateInviteCode();
+        return group.getInviteCode();
+    }
+
+    // 초대 링크 미리보기: 비로그인 요청도 허용해야 하므로 userId는 nullable이다(Soft Authentication).
+    public GroupInvitationPreview previewInvitation(String inviteCode, Long userId) {
+        Group group = getExistingGroupByInviteCode(inviteCode);
+        long memberCount = groupMemberRepository.countByGroupId(group.getId());
+        boolean alreadyJoined = userId != null && groupMemberRepository.existsByGroupIdAndUserId(group.getId(), userId);
+        return new GroupInvitationPreview(group, memberCount, alreadyJoined);
+    }
+
+    // 초대 링크로 가입. 정원 초과(TOCTOU)를 막기 위해 Group row에 비관적 락을 건 채로 인원 수를
+    // 확인하고 GroupMember를 추가한다 (GroupRepository#findByInviteCodeForUpdate 참고).
+    @Transactional
+    public GroupDetail joinGroup(String inviteCode, Long userId) {
+        Group group = groupRepository.findByInviteCodeForUpdate(inviteCode)
+                .orElseThrow(() -> new GroupException(GroupErrorCode.INVALID_INVITE_CODE));
+
+        if (groupMemberRepository.existsByGroupIdAndUserId(group.getId(), userId)) {
+            throw new GroupException(GroupErrorCode.ALREADY_JOINED);
+        }
+        long memberCount = groupMemberRepository.countByGroupId(group.getId());
+        if (memberCount >= group.getCapacity()) {
+            throw new GroupException(GroupErrorCode.GROUP_FULL);
+        }
+
+        User user = userRepository.getReferenceById(userId);
+        groupMemberRepository.save(GroupMember.of(group, user, GroupMemberRole.MEMBER));
+        return new GroupDetail(group, memberCount + 1);
+    }
+
     private Group getExistingGroup(Long groupId) {
         return groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupException(GroupErrorCode.GROUP_NOT_FOUND));
+    }
+
+    private Group getExistingGroupByInviteCode(String inviteCode) {
+        return groupRepository.findByInviteCode(inviteCode)
+                .orElseThrow(() -> new GroupException(GroupErrorCode.INVALID_INVITE_CODE));
     }
 
     private void validateHost(Group group, Long userId) {
