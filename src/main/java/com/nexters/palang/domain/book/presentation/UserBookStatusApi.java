@@ -5,6 +5,7 @@ import com.nexters.palang.domain.book.presentation.dto.UserBookStatusResponse;
 import com.nexters.palang.global.common.error.ErrorResponse;
 import com.nexters.palang.global.common.response.DataResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -42,5 +43,24 @@ public interface UserBookStatusApi {
     })
     ResponseEntity<DataResponse<UserBookStatusResponse>> updateBookStatus(
             @Valid UpdateUserBookStatusRequest request
+    );
+
+    @Operation(summary = "읽기상태 해제", description = "로그인한 사용자의 특정 도서에 설정된 읽기상태를 삭제합니다. "
+            + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "해제 성공"),
+            @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"type\":\"/api/users/me/book-status\",\"title\":\"AUTH_401_1\",\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))
+            ),
+            @ApiResponse(responseCode = "404", description = "설정된 읽기 상태를 찾을 수 없음 (BOOK_404_2)",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"type\":\"/api/users/me/book-status\",\"title\":\"BOOK_404_2\",\"status\":404,\"detail\":\"설정된 읽기 상태를 찾을 수 없습니다.\"}"))
+            )
+    })
+    ResponseEntity<DataResponse<Void>> deleteBookStatus(
+            @Parameter(description = "읽기상태를 해제할 도서 ID", required = true) Long bookId
     );
 }
