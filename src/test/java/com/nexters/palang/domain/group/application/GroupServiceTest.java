@@ -212,4 +212,124 @@ class GroupServiceTest {
 
         assertThatThrownBy(() -> groupService.getGroupMembers(1L, other.getId(), null)).isInstanceOf(GroupException.class);
     }
+
+    @Test
+    @DisplayName("모임장이 아니면 초대 링크를 조회할 수 없다")
+    void getInviteLinkFailsWhenNotHost() {
+        Group group = group(1L, host);
+        given(groupRepository.findById(1L)).willReturn(Optional.of(group));
+
+        assertThatThrownBy(() -> groupService.getInviteLink(1L, other.getId())).isInstanceOf(GroupException.class);
+    }
+
+    @Test
+    @DisplayName("모임장은 초대 링크를 조회할 수 있다")
+    void getInviteLinkSucceeds() {
+        Group group = group(1L, host);
+        given(groupRepository.findById(1L)).willReturn(Optional.of(group));
+
+        String inviteCode = groupService.getInviteLink(1L, host.getId());
+
+        assertThat(inviteCode).isEqualTo(group.getInviteCode());
+    }
+
+    @Test
+    @DisplayName("모임장이 아니면 초대 링크를 재발급할 수 없다")
+    void regenerateInviteLinkFailsWhenNotHost() {
+        Group group = group(1L, host);
+        given(groupRepository.findById(1L)).willReturn(Optional.of(group));
+
+        assertThatThrownBy(() -> groupService.regenerateInviteLink(1L, other.getId())).isInstanceOf(GroupException.class);
+    }
+
+    @Test
+    @DisplayName("모임장은 초대 링크를 재발급할 수 있고, 코드가 바뀐다")
+    void regenerateInviteLinkSucceeds() {
+        Group group = group(1L, host);
+        given(groupRepository.findById(1L)).willReturn(Optional.of(group));
+        String originalInviteCode = group.getInviteCode();
+
+        String newInviteCode = groupService.regenerateInviteLink(1L, host.getId());
+
+        assertThat(newInviteCode).isNotEqualTo(originalInviteCode);
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 초대 코드로 미리보기를 조회하면 예외가 발생한다")
+    void previewInvitationFailsWhenInvalidCode() {
+        given(groupRepository.findByInviteCode("invalid")).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> groupService.previewInvitation("invalid", null)).isInstanceOf(GroupException.class);
+    }
+
+    @Test
+    @DisplayName("비로그인 상태로 초대 미리보기를 조회하면 alreadyJoined는 항상 false다")
+    void previewInvitationForGuest() {
+        Group group = group(1L, host);
+        given(groupRepository.findByInviteCode(group.getInviteCode())).willReturn(Optional.of(group));
+        given(groupMemberRepository.countByGroupId(1L)).willReturn(2L);
+
+        GroupInvitationPreview preview = groupService.previewInvitation(group.getInviteCode(), null);
+
+        assertThat(preview.memberCount()).isEqualTo(2L);
+        assertThat(preview.alreadyJoined()).isFalse();
+    }
+
+    @Test
+    @DisplayName("이미 가입한 사용자가 초대 미리보기를 조회하면 alreadyJoined가 true다")
+    void previewInvitationForExistingMember() {
+        Group group = group(1L, host);
+        given(groupRepository.findByInviteCode(group.getInviteCode())).willReturn(Optional.of(group));
+        given(groupMemberRepository.countByGroupId(1L)).willReturn(2L);
+        given(groupMemberRepository.existsByGroupIdAndUserId(1L, host.getId())).willReturn(true);
+
+        GroupInvitationPreview preview = groupService.previewInvitation(group.getInviteCode(), host.getId());
+
+        assertThat(preview.alreadyJoined()).isTrue();
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 초대 코드로 가입하면 예외가 발생한다")
+    void joinGroupFailsWhenInvalidCode() {
+        given(groupRepository.findByInviteCodeForUpdate("invalid")).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> groupService.joinGroup("invalid", other.getId())).isInstanceOf(GroupException.class);
+    }
+
+    @Test
+    @DisplayName("이미 가입한 모임에 다시 가입하면 예외가 발생한다")
+    void joinGroupFailsWhenAlreadyJoined() {
+        Group group = group(1L, host);
+        given(groupRepository.findByInviteCodeForUpdate(group.getInviteCode())).willReturn(Optional.of(group));
+        given(groupMemberRepository.existsByGroupIdAndUserId(1L, host.getId())).willReturn(true);
+
+        assertThatThrownBy(() -> groupService.joinGroup(group.getInviteCode(), host.getId())).isInstanceOf(GroupException.class);
+    }
+
+    @Test
+    @DisplayName("정원이 가득 찬 모임에 가입하면 예외가 발생한다")
+    void joinGroupFailsWhenFull() {
+        Group group = group(1L, host);
+        given(groupRepository.findByInviteCodeForUpdate(group.getInviteCode())).willReturn(Optional.of(group));
+        given(groupMemberRepository.existsByGroupIdAndUserId(1L, other.getId())).willReturn(false);
+        given(groupMemberRepository.countByGroupId(1L)).willReturn(4L);
+
+        assertThatThrownBy(() -> groupService.joinGroup(group.getInviteCode(), other.getId())).isInstanceOf(GroupException.class);
+        verify(groupMemberRepository, never()).save(any(GroupMember.class));
+    }
+
+    @Test
+    @DisplayName("정원이 남아있으면 초대 링크로 모임에 가입할 수 있다")
+    void joinGroupSucceeds() {
+        Group group = group(1L, host);
+        given(groupRepository.findByInviteCodeForUpdate(group.getInviteCode())).willReturn(Optional.of(group));
+        given(groupMemberRepository.existsByGroupIdAndUserId(1L, other.getId())).willReturn(false);
+        given(groupMemberRepository.countByGroupId(1L)).willReturn(1L);
+        given(userRepository.getReferenceById(other.getId())).willReturn(other);
+
+        GroupDetail detail = groupService.joinGroup(group.getInviteCode(), other.getId());
+
+        assertThat(detail.memberCount()).isEqualTo(2L);
+        verify(groupMemberRepository).save(any(GroupMember.class));
+    }
 }
