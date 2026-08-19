@@ -21,6 +21,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -68,6 +69,16 @@ public class PassageController implements PassageControllerDocs {
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         PageNumbersResult result = passageService.getPageNumbers(bookId, pageable(page, size));
         return DataResponse.from(PassageResponse.PageNumbers.from(result));
+    }
+
+    @Override
+    @PatchMapping("/api/passages/{passageId}/spoiler")
+    public DataResponse<PassageResponse.SpoilerUpdate> updateSpoiler(
+            @PathVariable Long passageId,
+            @Valid @RequestBody PassageRequest.UpdateSpoiler request) {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        Passage passage = passageService.updateSpoiler(passageId, currentUserId, request.isSpoiler());
+        return DataResponse.from(PassageResponse.SpoilerUpdate.from(passage));
     }
 
     @Override
