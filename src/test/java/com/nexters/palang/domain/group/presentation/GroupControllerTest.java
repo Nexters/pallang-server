@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.group.application.GroupDetail;
+import com.nexters.palang.domain.group.application.GroupInvitationPreview;
 import com.nexters.palang.domain.group.application.GroupService;
 import com.nexters.palang.domain.group.common.error.GroupErrorCode;
 import com.nexters.palang.domain.group.common.error.GroupException;
@@ -241,5 +242,97 @@ class GroupControllerTest {
         mockMvc.perform(get("/api/groups/1/members"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.members[0].role").value("HOST"));
+    }
+
+    @Test
+    @DisplayName("모임장은 초대 링크를 조회할 수 있다")
+    void getInviteLink() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(groupService.getInviteLink(1L, 1L)).willReturn("invitecode123");
+
+        mockMvc.perform(get("/api/groups/1/invite-link"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.groupId").value(1))
+                .andExpect(jsonPath("$.data.inviteCode").value("invitecode123"));
+    }
+
+    @Test
+    @DisplayName("모임장이 아니면 초대 링크 조회 시 403 에러가 발생한다")
+    void getInviteLinkFailsWhenNotHost() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(2L);
+        given(groupService.getInviteLink(1L, 2L)).willThrow(new GroupException(GroupErrorCode.NOT_HOST));
+
+        mockMvc.perform(get("/api/groups/1/invite-link"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("GROUP_403_1"));
+    }
+
+    @Test
+    @DisplayName("모임장은 초대 링크를 재발급할 수 있다")
+    void regenerateInviteLink() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(groupService.regenerateInviteLink(1L, 1L)).willReturn("newinvitecode456");
+
+        mockMvc.perform(post("/api/groups/1/invite-link/regenerate"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.inviteCode").value("newinvitecode456"));
+    }
+
+    @Test
+    @DisplayName("초대 링크를 미리보기하면 모임 정보를 반환한다")
+    void previewInvitation() throws Exception {
+        Group group = group(1L, user(1L));
+        given(groupService.previewInvitation(group.getInviteCode(), null))
+                .willReturn(new GroupInvitationPreview(group, 2L, false));
+
+        mockMvc.perform(get("/api/groups/invitations/" + group.getInviteCode()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.memberCount").value(2))
+                .andExpect(jsonPath("$.data.full").value(false))
+                .andExpect(jsonPath("$.data.alreadyJoined").value(false));
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 초대 코드를 미리보기하면 404 에러가 발생한다")
+    void previewInvitationFailsWhenInvalidCode() throws Exception {
+        given(groupService.previewInvitation("invalid", null))
+                .willThrow(new GroupException(GroupErrorCode.INVALID_INVITE_CODE));
+
+        mockMvc.perform(get("/api/groups/invitations/invalid"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("GROUP_404_2"));
+    }
+
+    @Test
+    @DisplayName("초대 코드로 모임에 가입하면 가입된 모임 정보를 반환한다")
+    void joinGroup() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(2L);
+        Group group = group(1L, user(1L));
+        given(groupService.joinGroup(group.getInviteCode(), 2L)).willReturn(new GroupDetail(group, 2L));
+
+        mockMvc.perform(post("/api/groups/invitations/" + group.getInviteCode() + "/join"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.memberCount").value(2));
+    }
+
+    @Test
+    @DisplayName("인증 없이 모임에 가입하면 401 에러가 발생한다")
+    void joinGroupFailsWhenUnauthenticated() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willThrow(new LoginRequiredException());
+
+        mockMvc.perform(post("/api/groups/invitations/somecode/join"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("AUTH_401_1"));
+    }
+
+    @Test
+    @DisplayName("정원이 가득 찬 모임에 가입하면 409 에러가 발생한다")
+    void joinGroupFailsWhenFull() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(2L);
+        given(groupService.joinGroup("somecode", 2L)).willThrow(new GroupException(GroupErrorCode.GROUP_FULL));
+
+        mockMvc.perform(post("/api/groups/invitations/somecode/join"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("GROUP_409_3"));
     }
 }

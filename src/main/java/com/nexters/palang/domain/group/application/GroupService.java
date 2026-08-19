@@ -60,9 +60,12 @@ public class GroupService {
         return new GroupDetail(group, groupMemberRepository.countByGroupId(groupId));
     }
 
+    // joinGroup(초대 가입)과 같은 Group row 잠금을 사용한다 — 정원을 줄이는 것과 동시 가입이 겹치면
+    // "참여 인원 > 정원"이 될 수 있어(TOCTOU), 두 경로 모두 같은 락으로 직렬화해야 한다.
     @Transactional
     public GroupDetail updateGroup(Long groupId, Long userId, UpdateGroupRequest request) {
-        Group group = getExistingGroup(groupId);
+        Group group = groupRepository.findByIdForUpdate(groupId)
+                .orElseThrow(() -> new GroupException(GroupErrorCode.GROUP_NOT_FOUND));
         validateHost(group, userId);
         long memberCount = groupMemberRepository.countByGroupId(groupId);
         group.updateSettings(request.name(), request.capacity(), request.startDate(), request.endDate(), memberCount);
@@ -83,9 +86,56 @@ public class GroupService {
         return groupQueryRepository.findMembers(groupId, pageable);
     }
 
+    public String getInviteLink(Long groupId, Long userId) {
+        Group group = getExistingGroup(groupId);
+        validateHost(group, userId);
+        return group.getInviteCode();
+    }
+
+    @Transactional
+    public String regenerateInviteLink(Long groupId, Long userId) {
+        Group group = getExistingGroup(groupId);
+        validateHost(group, userId);
+        group.regenerateInviteCode();
+        return group.getInviteCode();
+    }
+
+    // 초대 링크 미리보기: 비로그인 요청도 허용해야 하므로 userId는 nullable이다(Soft Authentication).
+    public GroupInvitationPreview previewInvitation(String inviteCode, Long userId) {
+        Group group = getExistingGroupByInviteCode(inviteCode);
+        long memberCount = groupMemberRepository.countByGroupId(group.getId());
+        boolean alreadyJoined = userId != null && groupMemberRepository.existsByGroupIdAndUserId(group.getId(), userId);
+        return new GroupInvitationPreview(group, memberCount, alreadyJoined);
+    }
+
+    // 초대 링크로 가입. 정원 초과(TOCTOU)를 막기 위해 Group row에 비관적 락을 건 채로 인원 수를
+    // 확인하고 GroupMember를 추가한다 (GroupRepository#findByInviteCodeForUpdate 참고).
+    @Transactional
+    public GroupDetail joinGroup(String inviteCode, Long userId) {
+        Group group = groupRepository.findByInviteCodeForUpdate(inviteCode)
+                .orElseThrow(() -> new GroupException(GroupErrorCode.INVALID_INVITE_CODE));
+
+        if (groupMemberRepository.existsByGroupIdAndUserId(group.getId(), userId)) {
+            throw new GroupException(GroupErrorCode.ALREADY_JOINED);
+        }
+        long memberCount = groupMemberRepository.countByGroupId(group.getId());
+        if (memberCount >= group.getCapacity()) {
+            throw new GroupException(GroupErrorCode.GROUP_FULL);
+        }
+
+        User user = userRepository.getReferenceById(userId);
+        groupMemberRepository.save(GroupMember.of(group, user, GroupMemberRole.MEMBER));
+        return new GroupDetail(group, memberCount + 1);
+    }
+
     private Group getExistingGroup(Long groupId) {
         return groupRepository.findById(groupId)
                 .orElseThrow(() -> new GroupException(GroupErrorCode.GROUP_NOT_FOUND));
+    }
+
+    private Group getExistingGroupByInviteCode(String inviteCode) {
+        return groupRepository.findByInviteCode(inviteCode)
+                .orElseThrow(() -> new GroupException(GroupErrorCode.INVALID_INVITE_CODE));
     }
 
     private void validateHost(Group group, Long userId) {

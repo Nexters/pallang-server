@@ -4,6 +4,8 @@ import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.domain.group.domain.GroupMember;
 import com.nexters.palang.domain.group.presentation.dto.GroupDetailResponse;
+import com.nexters.palang.domain.group.presentation.dto.GroupInvitationPreviewResponse;
+import com.nexters.palang.domain.group.presentation.dto.GroupInviteLinkResponse;
 import com.nexters.palang.domain.group.presentation.dto.GroupListResponse;
 import com.nexters.palang.domain.group.presentation.dto.GroupMemberListResponse;
 import com.nexters.palang.domain.group.presentation.dto.GroupMemberResponse;
@@ -48,5 +50,18 @@ public final class GroupMapper {
 
     public static GroupMemberListResponse toMemberListResponse(Page<GroupMember> page) {
         return new GroupMemberListResponse(page.map(GroupMapper::toMemberResponse).getContent(), PageInfo.from(page));
+    }
+
+    public static GroupInviteLinkResponse toInviteLinkResponse(Long groupId, String inviteCode) {
+        return new GroupInviteLinkResponse(groupId, inviteCode);
+    }
+
+    public static GroupInvitationPreviewResponse toInvitationPreviewResponse(GroupInvitationPreview preview) {
+        Group group = preview.group();
+        Book book = group.getBook();
+        boolean full = preview.memberCount() >= group.getCapacity();
+        return new GroupInvitationPreviewResponse(
+                group.getId(), group.getName(), book.getTitle(), book.getAuthor(), book.getCoverImageUrl(),
+                group.getCapacity(), preview.memberCount(), full, preview.alreadyJoined());
     }
 }
