@@ -1,9 +1,11 @@
 package com.nexters.palang.domain.notification.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -91,5 +93,24 @@ class NotificationCreationServiceTest {
 
         verify(notificationRepository).save(any(Notification.class));
         verify(pushDispatcher).dispatch(3L, NotificationType.BOOK_NEW_OPINIONS, "새 의견", "내용", 200L);
+    }
+
+    @Test
+    @DisplayName("푸시 발송이 실패해도 예외를 전파하지 않는다 (방금 저장한 알림이 롤백되면 안 된다)")
+    void doesNotPropagateExceptionWhenPushDispatchFails() {
+        given(userRepository.getReferenceById(1L)).willReturn(user(1L));
+        given(notificationRepository.save(any(Notification.class))).willAnswer(invocation -> {
+            Notification notification = invocation.getArgument(0);
+            ReflectionTestUtils.setField(notification, "id", 100L);
+            return notification;
+        });
+        willThrow(new RuntimeException("FCM 초기화 실패"))
+                .given(pushDispatcher).dispatch(anyLong(), any(), any(), any(), anyLong());
+
+        assertThatCode(() -> notificationCreationService.create(
+                1L, 2L, NotificationType.OPINION_LIKED, "제목", "내용", 10L, null, null, null))
+                .doesNotThrowAnyException();
+
+        verify(notificationRepository).save(any(Notification.class));
     }
 }
