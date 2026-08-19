@@ -3,6 +3,7 @@ package com.nexters.palang.domain.comment.application;
 import com.nexters.palang.domain.comment.common.CommentErrorCode;
 import com.nexters.palang.domain.comment.common.CommentException;
 import com.nexters.palang.domain.comment.domain.Comment;
+import com.nexters.palang.domain.comment.domain.event.CommentCreatedEvent;
 import com.nexters.palang.domain.comment.infrastructure.CommentQueryRepository;
 import com.nexters.palang.domain.comment.infrastructure.CommentRepository;
 import com.nexters.palang.domain.comment.presentation.dto.CreateCommentRequest;
@@ -18,6 +19,7 @@ import com.nexters.palang.domain.user.infrastructure.UserRepository;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ public class CommentService {
     private final CommentQueryRepository commentQueryRepository;
     private final OpinionRepository opinionRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public Page<RootCommentGroup> getRootComments(Long opinionId, Pageable pageable, Long currentUserId) {
         validateOpinionExists(opinionId);
@@ -63,15 +66,20 @@ public class CommentService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
 
+        Comment saved;
         if (request.parentCommentId() == null) {
-            return commentRepository.save(Comment.root(opinion, user, request.content()));
+            saved = commentRepository.save(Comment.root(opinion, user, request.content()));
+        } else {
+            Comment parent = getEditableComment(request.parentCommentId());
+            if (!parent.getOpinion().getId().equals(opinionId)) {
+                throw new CommentException(CommentErrorCode.COMMENT_NOT_FOUND);
+            }
+            saved = commentRepository.save(Comment.reply(parent, user, request.content()));
         }
 
-        Comment parent = getEditableComment(request.parentCommentId());
-        if (!parent.getOpinion().getId().equals(opinionId)) {
-            throw new CommentException(CommentErrorCode.COMMENT_NOT_FOUND);
-        }
-        return commentRepository.save(Comment.reply(parent, user, request.content()));
+        eventPublisher.publishEvent(
+                new CommentCreatedEvent(saved.getId(), opinionId, opinion.getUser().getId(), userId));
+        return saved;
     }
 
     @Transactional

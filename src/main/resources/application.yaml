@@ -37,3 +37,11 @@ storage:
   upload-dir: ${IMAGE_UPLOAD_DIR:./uploads}
   base-url: /images
   public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8080/images}
+
+# 서비스 계정 키(JSON)를 base64로 인코딩해 주입. 비어있으면 FirebaseConfig가 NoOpFcmPushSender로 폴백한다.
+firebase:
+  credentials-base64: ${FIREBASE_CREDENTIALS_BASE64:}
+
+notification:
+  # "책에 새 의견 N개 이상" 알림 트리거 기준값.
+  book-new-opinions-threshold: ${NOTIFICATION_BOOK_NEW_OPINIONS_THRESHOLD:5}
