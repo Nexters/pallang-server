@@ -60,9 +60,12 @@ public class GroupService {
         return new GroupDetail(group, groupMemberRepository.countByGroupId(groupId));
     }
 
+    // joinGroup(초대 가입)과 같은 Group row 잠금을 사용한다 — 정원을 줄이는 것과 동시 가입이 겹치면
+    // "참여 인원 > 정원"이 될 수 있어(TOCTOU), 두 경로 모두 같은 락으로 직렬화해야 한다.
     @Transactional
     public GroupDetail updateGroup(Long groupId, Long userId, UpdateGroupRequest request) {
-        Group group = getExistingGroup(groupId);
+        Group group = groupRepository.findByIdForUpdate(groupId)
+                .orElseThrow(() -> new GroupException(GroupErrorCode.GROUP_NOT_FOUND));
         validateHost(group, userId);
         long memberCount = groupMemberRepository.countByGroupId(groupId);
         group.updateSettings(request.name(), request.capacity(), request.startDate(), request.endDate(), memberCount);

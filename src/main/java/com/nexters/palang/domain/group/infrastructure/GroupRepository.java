@@ -19,4 +19,12 @@ public interface GroupRepository extends JpaRepository<Group, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select g from Group g where g.inviteCode = :inviteCode")
     Optional<Group> findByInviteCodeForUpdate(String inviteCode);
+
+    // 방 설정 변경(정원 변경) 전용. findByInviteCodeForUpdate와 같은 Group row 잠금을 공유해야
+    // 두 경로가 서로를 배제한다 — 그렇지 않으면 host가 정원을 줄이는 사이 다른 사용자가 가입해
+    // "참여 인원 > 정원"인 모임이 만들어질 수 있다(TOCTOU). 다른 PK로 조회해도 잠그는 row가 같으면
+    // DB가 알아서 직렬화하므로, findByInviteCodeForUpdate와 조회 키가 달라도 안전하다.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select g from Group g where g.id = :groupId")
+    Optional<Group> findByIdForUpdate(Long groupId);
 }
