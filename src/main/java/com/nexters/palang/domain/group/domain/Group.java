@@ -64,9 +64,11 @@ public class Group extends BaseEntity {
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
 
-    // 카카오톡 등으로 공유하는 초대 링크의 식별자. 별도 만료 시각을 두지 않고 endDate가 지나면 자연히
-    // 무효화되는 것으로 취급한다(초대/가입 API는 후속 이슈에서 구현).
-    @Column(name = "invite_code", length = 32, nullable = false, updatable = false)
+    // 카카오톡 등으로 공유하는 초대 링크의 식별자. 별도 만료 시각을 두지 않으며, endDate가 지나도
+    // 무효화되지 않는다 — 기간은 강제되지 않는 안내용 값이라는 결정(isEnded() 주석 참고)과 일관되게,
+    // 종료된 모임에도 초대 링크로 새 멤버가 계속 가입할 수 있다. 유출 등으로 재발급이 필요하면
+    // regenerateInviteCode()로 기존 코드를 무효화한다.
+    @Column(name = "invite_code", length = 32, nullable = false)
     private String inviteCode;
 
     private Group(String name, Book book, User host, int capacity, LocalDate startDate, LocalDate endDate, String inviteCode) {
@@ -103,6 +105,12 @@ public class Group extends BaseEntity {
     // 어떤 조회/쓰기 API도 이 값으로 접근을 막지 않는다.
     public boolean isEnded() {
         return LocalDate.now().isAfter(endDate);
+    }
+
+    // 초대 링크 재발급(host 전용): 기존 코드는 즉시 무효화되고 이 코드로 들어온 이후 요청은 전부
+    // INVALID_INVITE_CODE로 거절된다.
+    public void regenerateInviteCode() {
+        this.inviteCode = generateInviteCode();
     }
 
     private static void validateCapacity(int capacity) {
