@@ -69,7 +69,8 @@ class OpinionLikeServiceTest {
     }
 
     private Opinion opinion(Long id, User owner) {
-        Opinion opinion = Opinion.builder().user(owner).content("흔적 내용").build();
+        Passage passage = Passage.builder().build();
+        Opinion opinion = Opinion.builder().user(owner).passage(passage).content("흔적 내용").build();
         ReflectionTestUtils.setField(opinion, "id", id);
         return opinion;
     }

@@ -92,7 +92,7 @@ class GroupServiceTest {
     @DisplayName("모임을 생성하면 host가 모임원으로 함께 저장된다")
     void createGroupSucceeds() {
         given(bookRepository.findById(book.getId())).willReturn(Optional.of(book));
-        given(userRepository.getReferenceById(host.getId())).willReturn(host);
+        given(userRepository.findById(host.getId())).willReturn(Optional.of(host));
 
         GroupDetail detail = groupService.createGroup(host.getId(), createRequest());
 
@@ -115,7 +115,7 @@ class GroupServiceTest {
     @Test
     @DisplayName("존재하지 않는 모임을 조회하면 예외가 발생한다")
     void getGroupDetailFailsWhenNotFound() {
-        given(groupRepository.findById(999L)).willReturn(Optional.empty());
+        given(groupRepository.findByIdWithBookAndHost(999L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> groupService.getGroupDetail(999L, host.getId())).isInstanceOf(GroupException.class);
     }
@@ -124,7 +124,7 @@ class GroupServiceTest {
     @DisplayName("모임원이 아니면 모임 상세를 조회할 수 없다")
     void getGroupDetailFailsWhenNotMember() {
         Group group = group(1L, host);
-        given(groupRepository.findById(1L)).willReturn(Optional.of(group));
+        given(groupRepository.findByIdWithBookAndHost(1L)).willReturn(Optional.of(group));
         given(groupMemberRepository.existsByGroupIdAndUserId(1L, other.getId())).willReturn(false);
 
         assertThatThrownBy(() -> groupService.getGroupDetail(1L, other.getId())).isInstanceOf(GroupException.class);
@@ -134,7 +134,7 @@ class GroupServiceTest {
     @DisplayName("모임원이면 모임 상세와 참여 인원 수를 함께 조회한다")
     void getGroupDetailSucceeds() {
         Group group = group(1L, host);
-        given(groupRepository.findById(1L)).willReturn(Optional.of(group));
+        given(groupRepository.findByIdWithBookAndHost(1L)).willReturn(Optional.of(group));
         given(groupMemberRepository.existsByGroupIdAndUserId(1L, host.getId())).willReturn(true);
         given(groupMemberRepository.countByGroupId(1L)).willReturn(3L);
 
