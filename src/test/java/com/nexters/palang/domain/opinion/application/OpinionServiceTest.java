@@ -22,6 +22,7 @@ import com.nexters.palang.domain.group.infrastructure.GroupRepository;
 import com.nexters.palang.domain.opinion.common.error.OpinionException;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.opinion.domain.OpinionSortType;
+import com.nexters.palang.domain.opinion.domain.event.OpinionCreatedEvent;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionQueryRepository;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
 import com.nexters.palang.domain.opinion.presentation.dto.CreateOpinionRequest;
@@ -43,6 +44,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -68,6 +70,9 @@ class OpinionServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Mock
     private GroupRepository groupRepository;
 
     @Mock
@@ -79,7 +84,7 @@ class OpinionServiceTest {
     void setUp() {
         opinionService = new OpinionService(
                 opinionRepository, opinionQueryRepository, passageRepository, bookRepository, userRepository,
-                groupRepository, groupAccessValidator);
+                eventPublisher, groupRepository, groupAccessValidator);
     }
 
     private User user(Long id) {
@@ -143,6 +148,7 @@ class OpinionServiceTest {
 
         assertThat(opinion.getPassage().getBook().getId()).isEqualTo(10L);
         assertThat(opinion.getDecorations()).hasSize(1);
+        verify(eventPublisher).publishEvent(any(OpinionCreatedEvent.class));
     }
 
     @Test

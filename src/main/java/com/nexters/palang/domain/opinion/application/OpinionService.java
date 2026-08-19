@@ -15,6 +15,7 @@ import com.nexters.palang.domain.opinion.common.error.OpinionErrorCode;
 import com.nexters.palang.domain.opinion.common.error.OpinionException;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.opinion.domain.OpinionSortType;
+import com.nexters.palang.domain.opinion.domain.event.OpinionCreatedEvent;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionQueryRepository;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
 import com.nexters.palang.domain.opinion.presentation.dto.CreateOpinionRequest;
@@ -32,6 +33,7 @@ import com.nexters.palang.domain.user.infrastructure.UserRepository;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -48,6 +50,7 @@ public class OpinionService {
     private final PassageRepository passageRepository;
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final GroupRepository groupRepository;
     private final GroupAccessValidator groupAccessValidator;
 
@@ -142,6 +145,7 @@ public class OpinionService {
 
         Opinion opinion = Opinion.createWithDecorations(passage, user, request.content(), decorations);
         opinionRepository.save(opinion);
+        eventPublisher.publishEvent(new OpinionCreatedEvent(opinion.getId(), passage.getBook().getId(), userId));
         return opinion;
     }
 

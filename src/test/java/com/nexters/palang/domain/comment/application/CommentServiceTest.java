@@ -12,6 +12,7 @@ import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.comment.common.CommentException;
 import com.nexters.palang.domain.comment.common.NestedReplyNotAllowedException;
 import com.nexters.palang.domain.comment.domain.Comment;
+import com.nexters.palang.domain.comment.domain.event.CommentCreatedEvent;
 import com.nexters.palang.domain.comment.infrastructure.CommentQueryRepository;
 import com.nexters.palang.domain.comment.infrastructure.CommentRepository;
 import com.nexters.palang.domain.comment.presentation.dto.CreateCommentRequest;
@@ -36,6 +37,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -58,6 +60,9 @@ class CommentServiceTest {
     private UserRepository userRepository;
 
     @Mock
+    private ApplicationEventPublisher eventPublisher;
+
+    @Mock
     private GroupAccessValidator groupAccessValidator;
 
     private CommentService commentService;
@@ -69,7 +74,8 @@ class CommentServiceTest {
     @BeforeEach
     void setUp() {
         commentService = new CommentService(
-                commentRepository, commentQueryRepository, opinionRepository, userRepository, groupAccessValidator);
+                commentRepository, commentQueryRepository, opinionRepository, userRepository,
+                eventPublisher, groupAccessValidator);
         writer = user(10L);
         opinion = opinion(1L);
         otherUser = user(20L);
@@ -225,6 +231,7 @@ class CommentServiceTest {
         assertThat(created.getParentComment()).isNull();
         assertThat(created.getContent()).isEqualTo("내용");
         assertThat(created.getUser()).isEqualTo(writer);
+        org.mockito.Mockito.verify(eventPublisher).publishEvent(any(CommentCreatedEvent.class));
     }
 
     @Test

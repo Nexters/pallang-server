@@ -6,11 +6,13 @@ import com.nexters.palang.domain.opinion.common.error.OpinionErrorCode;
 import com.nexters.palang.domain.opinion.common.error.OpinionException;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.opinion.domain.OpinionLike;
+import com.nexters.palang.domain.opinion.domain.event.OpinionLikedEvent;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionLikeRepository;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +25,7 @@ public class OpinionLikeService {
     private final OpinionRepository opinionRepository;
     private final OpinionLikeRepository opinionLikeRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final GroupAccessValidator groupAccessValidator;
 
     @Transactional
@@ -39,6 +42,7 @@ public class OpinionLikeService {
         User user = userRepository.getReferenceById(userId);
         opinionLikeRepository.save(OpinionLike.builder().user(user).opinion(opinion).build());
         opinion.increaseLikeCount();
+        eventPublisher.publishEvent(new OpinionLikedEvent(opinion.getId(), opinion.getUser().getId(), userId));
         return new OpinionLikeResult(opinion.getId(), true, opinion.getLikeCount());
     }
 
