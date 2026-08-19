@@ -46,6 +46,7 @@ public interface PassageControllerDocs {
     );
 
     @Operation(summary = "유사 문장 후보 조회", description = "저장 전 같은 도서의 인접 페이지(±1)에서 정규화 해시가 같은 대목 후보를 조회합니다. "
+            + "groupId를 지정하면 그 모임 전용 대목만(요청자는 모임원이어야 함), 생략하면 전역 공개 대목만 비교합니다. "
             + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공 (후보가 없으면 빈 배열)"),
@@ -60,6 +61,11 @@ public interface PassageControllerDocs {
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(value = "{\"type\":\"/api/passages/similar-check\",\"title\":\"AUTH_401_1\",\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))
             ),
             @ApiResponse(
+                    responseCode = "403",
+                    description = "GROUP_403_2: 모임원만 조회할 수 있습니다.",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(value = "{\"type\":\"/api/passages/similar-check\",\"title\":\"GROUP_403_2\",\"status\":403,\"detail\":\"모임원만 조회할 수 있습니다.\"}"))
+            ),
+            @ApiResponse(
                     responseCode = "404",
                     description = "BOOK_404_1: 해당 도서를 찾을 수 없습니다.",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(value = "{\"type\":\"/api/passages/similar-check\",\"title\":\"BOOK_404_1\",\"status\":404,\"detail\":\"해당 도서를 찾을 수 없습니다.\"}"))
@@ -72,18 +78,23 @@ public interface PassageControllerDocs {
     @Operation(summary = "대목 페이지 목록 조회",
             description = "도서에서 발췌된 페이지 번호를 오름차순으로 조회합니다. "
                     + "스포일러 대목이 있는 페이지도 이 목록에 포함됩니다(스포일러 블러 처리는 프론트 담당, isSpoiler 플래그 기반). "
-                    + "인증은 선택입니다(soft auth) — 헤더가 없어도 조회됩니다.")
+                    + "groupId를 지정하면 그 모임 전용 대목만(요청자는 모임원이어야 함), 생략하면 전역 공개 대목만 조회합니다. "
+                    + "인증은 선택입니다(soft auth) — groupId 없이는 헤더가 없어도 조회됩니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공 (대목이 없으면 빈 배열)"),
             @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/books/1/passages\",\"title\":\"COMMON_400_1\",\"status\":400,\"detail\":\"'size' 파라미터의 값이 올바르지 않습니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "GROUP_403_2: groupId를 지정했는데 모임원이 아님",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/books/1/passages\",\"title\":\"GROUP_403_2\",\"status\":403,\"detail\":\"모임원만 조회할 수 있습니다.\"}"))),
             @ApiResponse(responseCode = "404", description = "BOOK_404_1: 해당 도서를 찾을 수 없습니다.",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/books/1/passages\",\"title\":\"BOOK_404_1\",\"status\":404,\"detail\":\"해당 도서를 찾을 수 없습니다.\"}")))
     })
     DataResponse<PassageResponse.PageNumbers> getPageNumbers(
             @Parameter(description = "도서 ID", required = true) Long bookId,
+            @Parameter(description = "모임 ID. 없으면 전역 공개 대목 기준으로 조회합니다.") Long groupId,
             @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,
             @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
     );
@@ -93,15 +104,20 @@ public interface PassageControllerDocs {
                     + "각 대목에는 좋아요 많은 순 최대 3개, 겹치지 않는 꾸밈만 병합되어 포함됩니다. "
                     + "스포일러로 표기된 대목(isSpoiler=true)도 quotedText/decorations를 그대로 내려줍니다 — "
                     + "블러 처리 후 [버튼]을 누르면 즉시 확인 가능해야 하므로, "
-                    + "블러/확인 전환은 서버 왕복 없이 프론트에서 isSpoiler 플래그로 처리합니다.")
+                    + "블러/확인 전환은 서버 왕복 없이 프론트에서 isSpoiler 플래그로 처리합니다. "
+                    + "groupId를 지정하면 그 모임 전용 대목만(요청자는 모임원이어야 함), 생략하면 전역 공개 대목만 조회합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공 (해당 페이지에 대목이 없으면 빈 배열)"),
+            @ApiResponse(responseCode = "403", description = "GROUP_403_2: groupId를 지정했는데 모임원이 아님",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/books/1/pages/5/passages\",\"title\":\"GROUP_403_2\",\"status\":403,\"detail\":\"모임원만 조회할 수 있습니다.\"}"))),
             @ApiResponse(responseCode = "404", description = "BOOK_404_1: 해당 도서를 찾을 수 없습니다.",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/books/1/pages/5/passages\",\"title\":\"BOOK_404_1\",\"status\":404,\"detail\":\"해당 도서를 찾을 수 없습니다.\"}")))
     })
     DataResponse<PassageResponse.PassagesByPage> getPassagesByPage(
             @Parameter(description = "도서 ID", required = true) Long bookId,
-            @Parameter(description = "페이지 번호", required = true) int page
+            @Parameter(description = "페이지 번호", required = true) int page,
+            @Parameter(description = "모임 ID. 없으면 전역 공개 대목 기준으로 조회합니다.") Long groupId
     );
 }

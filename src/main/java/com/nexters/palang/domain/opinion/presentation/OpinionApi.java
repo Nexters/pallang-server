@@ -26,6 +26,9 @@ public interface OpinionApi {
     @Operation(summary = "흔적 작성 (직접 입력)",
             description = "Passage(신규 생성 또는 기존 병합) + Opinion + Decoration을 원자적으로 생성합니다. "
                     + "passageId가 없으면 새 Passage를 만들고, 있으면 해당 Passage에 병합합니다(Q-06). "
+                    + "groupId를 지정하면 그 모임 전용 흔적/대목이 되며(요청자는 모임원이어야 함), "
+                    + "생략하면 기존처럼 전역 공개로 생성됩니다. passageId와 groupId를 함께 지정한 경우 "
+                    + "기존 대목의 소속 모임과 정확히 일치해야 합니다. "
                     + "OCR 입력은 별도 플로우이며 이 API는 직접 입력만 지원합니다. "
                     + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
@@ -33,12 +36,16 @@ public interface OpinionApi {
             @ApiResponse(responseCode = "400",
                     description = "필수값 누락, 인용 문구/내용 길이 초과(COMMON_400_1), "
                             + "선택한 대목이 지정한 도서와 불일치(PASSAGE_400_2), "
+                            + "선택한 대목이 지정한 모임과 불일치(PASSAGE_400_3), "
+                            + "선택한 도서가 모임의 지정 도서와 불일치(GROUP_400_3), "
                             + "꾸밈 효과 범위 오류(DECORATION_400_1) 또는 겹침(DECORATION_400_2)",
                     content = @Content(
                             schema = @Schema(implementation = ErrorResponse.class),
                             examples = {
                                     @ExampleObject(name = "COMMON_400_1: 필수값 누락/길이 초과", value = "{\"type\":\"/api/opinions\",\"title\":\"COMMON_400_1\",\"status\":400,\"detail\":\"인용 문구는 150자를 초과할 수 없습니다.\"}"),
                                     @ExampleObject(name = "PASSAGE_400_2: 도서 불일치", value = "{\"type\":\"/api/opinions\",\"title\":\"PASSAGE_400_2\",\"status\":400,\"detail\":\"선택한 대목이 지정한 도서와 일치하지 않습니다.\"}"),
+                                    @ExampleObject(name = "PASSAGE_400_3: 모임 불일치", value = "{\"type\":\"/api/opinions\",\"title\":\"PASSAGE_400_3\",\"status\":400,\"detail\":\"선택한 대목이 지정한 모임과 일치하지 않습니다.\"}"),
+                                    @ExampleObject(name = "GROUP_400_3: 모임 도서 불일치", value = "{\"type\":\"/api/opinions\",\"title\":\"GROUP_400_3\",\"status\":400,\"detail\":\"선택한 도서가 모임의 지정 도서와 일치하지 않습니다.\"}"),
                                     @ExampleObject(name = "DECORATION_400_1: 꾸밈 범위 오류", value = "{\"type\":\"/api/opinions\",\"title\":\"DECORATION_400_1\",\"status\":400,\"detail\":\"꾸밈 효과의 시작 위치는 끝 위치보다 작아야 합니다.\"}"),
                                     @ExampleObject(name = "DECORATION_400_2: 꾸밈 영역 겹침", value = "{\"type\":\"/api/opinions\",\"title\":\"DECORATION_400_2\",\"status\":400,\"detail\":\"같은 흔적 안에서는 꾸밈 효과 영역이 겹칠 수 없습니다.\"}")
                             })
@@ -48,13 +55,20 @@ public interface OpinionApi {
                             schema = @Schema(implementation = ErrorResponse.class),
                             examples = @ExampleObject(value = "{\"type\":\"/api/opinions\",\"title\":\"AUTH_401_1\",\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))
             ),
+            @ApiResponse(responseCode = "403", description = "GROUP_403_2: groupId를 지정했는데 모임원이 아님",
+                    content = @Content(
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(value = "{\"type\":\"/api/opinions\",\"title\":\"GROUP_403_2\",\"status\":403,\"detail\":\"모임원만 조회할 수 있습니다.\"}"))
+            ),
             @ApiResponse(responseCode = "404",
-                    description = "해당 도서를 찾을 수 없음(BOOK_404_1) 또는 해당 대목을 찾을 수 없음(PASSAGE_404_1)",
+                    description = "해당 도서를 찾을 수 없음(BOOK_404_1), 해당 대목을 찾을 수 없음(PASSAGE_404_1) "
+                            + "또는 해당 모임을 찾을 수 없음(GROUP_404_1)",
                     content = @Content(
                             schema = @Schema(implementation = ErrorResponse.class),
                             examples = {
                                     @ExampleObject(name = "BOOK_404_1: 도서 없음", value = "{\"type\":\"/api/opinions\",\"title\":\"BOOK_404_1\",\"status\":404,\"detail\":\"해당 도서를 찾을 수 없습니다.\"}"),
-                                    @ExampleObject(name = "PASSAGE_404_1: 대목 없음", value = "{\"type\":\"/api/opinions\",\"title\":\"PASSAGE_404_1\",\"status\":404,\"detail\":\"해당 대목을 찾을 수 없습니다.\"}")
+                                    @ExampleObject(name = "PASSAGE_404_1: 대목 없음", value = "{\"type\":\"/api/opinions\",\"title\":\"PASSAGE_404_1\",\"status\":404,\"detail\":\"해당 대목을 찾을 수 없습니다.\"}"),
+                                    @ExampleObject(name = "GROUP_404_1: 모임 없음", value = "{\"type\":\"/api/opinions\",\"title\":\"GROUP_404_1\",\"status\":404,\"detail\":\"해당 모임을 찾을 수 없습니다.\"}")
                             })
             )
     })
@@ -62,12 +76,16 @@ public interface OpinionApi {
             @Valid CreateOpinionRequest request
     );
 
-    @Operation(summary = "흔적 목록 조회", description = "특정 대목에 남겨진 흔적을 정렬 기준(최신순 기본/좋아요순)으로 조회합니다.")
+    @Operation(summary = "흔적 목록 조회", description = "특정 대목에 남겨진 흔적을 정렬 기준(최신순 기본/좋아요순)으로 조회합니다. "
+            + "대목이 모임 전용이면 모임원만 조회할 수 있습니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/passages/1/opinions\",\"title\":\"COMMON_400_1\",\"status\":400,\"detail\":\"'size' 파라미터의 값이 올바르지 않습니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "GROUP_403_2: 모임 전용 대목인데 모임원이 아님",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/passages/1/opinions\",\"title\":\"GROUP_403_2\",\"status\":403,\"detail\":\"모임원만 조회할 수 있습니다.\"}"))),
             @ApiResponse(responseCode = "404", description = "해당 대목을 찾을 수 없음 (PASSAGE_404_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/passages/1/opinions\",\"title\":\"PASSAGE_404_1\",\"status\":404,\"detail\":\"해당 대목을 찾을 수 없습니다.\"}")))
@@ -79,9 +97,13 @@ public interface OpinionApi {
             @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
     );
 
-    @Operation(summary = "흔적 상세 조회", description = "흔적 작성자가 기록한 꾸밈을 그대로 확인합니다(병합된 결과가 아님).")
+    @Operation(summary = "흔적 상세 조회", description = "흔적 작성자가 기록한 꾸밈을 그대로 확인합니다(병합된 결과가 아님). "
+            + "대목이 모임 전용이면 모임원만 조회할 수 있습니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "403", description = "GROUP_403_2: 모임 전용 흔적인데 모임원이 아님",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/opinions/1\",\"title\":\"GROUP_403_2\",\"status\":403,\"detail\":\"모임원만 조회할 수 있습니다.\"}"))),
             @ApiResponse(responseCode = "404", description = "해당 흔적을 찾을 수 없음 (OPINION_404_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/opinions/1\",\"title\":\"OPINION_404_1\",\"status\":404,\"detail\":\"해당 흔적을 찾을 수 없습니다.\"}")))
