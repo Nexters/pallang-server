@@ -95,4 +95,16 @@ class GroupTest {
 
         assertThat(group.isEnded()).isTrue();
     }
+
+    @Test
+    @DisplayName("초대 코드를 재발급하면 기존 코드와 달라진다")
+    void regeneratesInviteCode() {
+        Group group = Group.create(
+                "고전 뽀개기", book(), user(1L), 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20));
+        String originalInviteCode = group.getInviteCode();
+
+        group.regenerateInviteCode();
+
+        assertThat(group.getInviteCode()).isNotBlank().isNotEqualTo(originalInviteCode);
+    }
 }
