@@ -14,6 +14,8 @@ import com.nexters.palang.domain.group.infrastructure.GroupQueryRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupRepository;
 import com.nexters.palang.domain.group.presentation.dto.CreateGroupRequest;
 import com.nexters.palang.domain.group.presentation.dto.UpdateGroupRequest;
+import com.nexters.palang.domain.user.common.error.UserErrorCode;
+import com.nexters.palang.domain.user.common.error.UserException;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +42,11 @@ public class GroupService {
     public GroupDetail createGroup(Long hostUserId, CreateGroupRequest request) {
         Book book = bookRepository.findById(request.bookId())
                 .orElseThrow(() -> new BookException(BookErrorCode.BOOK_NOT_FOUND));
-        User host = userRepository.getReferenceById(hostUserId);
+        // 응답(GroupDetail → toDetailResponse)에서 host.getNickname()을 읽으므로 프록시만 채우는
+        // getReferenceById 대신 실제로 초기화된 엔티티를 가져온다. currentUserId는 인증된 사용자지만
+        // 탈퇴 등 경합을 고려해 존재 검증도 함께 한다.
+        User host = userRepository.findById(hostUserId)
+                .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
 
         Group group = Group.create(
                 request.name(), book, host, request.capacity(), request.startDate(), request.endDate());
@@ -55,7 +61,8 @@ public class GroupService {
     }
 
     public GroupDetail getGroupDetail(Long groupId, Long userId) {
-        Group group = getExistingGroup(groupId);
+        Group group = groupRepository.findByIdWithBookAndHost(groupId)
+                .orElseThrow(() -> new GroupException(GroupErrorCode.GROUP_NOT_FOUND));
         validateMember(groupId, userId);
         return new GroupDetail(group, groupMemberRepository.countByGroupId(groupId));
     }
