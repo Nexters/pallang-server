@@ -90,6 +90,20 @@ class GroupQueryRepositoryTest {
     }
 
     @Test
+    @DisplayName("마지막 페이지를 넘어가는 페이지를 요청해도 전체 건수는 정확히 반환한다")
+    void findMyGroupsReturnsTotalElementsEvenWhenPageIsEmpty() {
+        User me = user("me");
+        join(group("고전 뽀개기", book("채식주의자"), me), me, GroupMemberRole.HOST);
+        join(group("주말 독서 모임", book("소년이 온다"), me), me, GroupMemberRole.HOST);
+
+        // 전체 2건인데 첫 페이지(size=20)를 넘어가는 두 번째 페이지를 요청 -> content는 비지만 total은 2여야 한다.
+        Page<GroupSummaryProjection> result = groupQueryRepository.findMyGroups(me.getId(), PageRequest.of(1, 20));
+
+        assertThat(result.getContent()).isEmpty();
+        assertThat(result.getTotalElements()).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("모임 멤버 목록은 모임장이 먼저, 그다음 가입 순으로 조회한다")
     void findMembers() {
         User host = user("host");
