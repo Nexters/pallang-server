@@ -2,8 +2,10 @@ package com.nexters.palang.domain.opinion.presentation;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -78,6 +80,11 @@ class OpinionControllerTest {
                 List.of(new DecorationRequest(0, 5, EffectType.UNDERLINE, null)));
     }
 
+    private CreateOpinionRequest requestWithGroup(Long groupId) {
+        return new CreateOpinionRequest(1L, 5, "발췌 문장", false, null, groupId, "흔적 내용",
+                List.of(new DecorationRequest(0, 5, EffectType.UNDERLINE, null)));
+    }
+
     @Test
     @DisplayName("passageId 없이 흔적을 작성하면 새 Passage와 함께 생성된다")
     void createOpinionWithoutPassageId() throws Exception {
@@ -122,13 +129,16 @@ class OpinionControllerTest {
     @DisplayName("모임원이 아닌 사용자가 groupId를 지정해 흔적을 작성하려 하면 403 에러가 발생한다")
     void createOpinionFailsWhenNotGroupMember() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(opinionService.createOpinion(anyLong(), any())).willThrow(new GroupException(GroupErrorCode.NOT_MEMBER));
+        given(opinionService.createOpinion(eq(1L), any(CreateOpinionRequest.class)))
+                .willThrow(new GroupException(GroupErrorCode.NOT_MEMBER));
 
         mockMvc.perform(post("/api/opinions")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request(null))))
+                        .content(objectMapper.writeValueAsString(requestWithGroup(9L))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.title").value("GROUP_403_2"));
+
+        verify(opinionService).createOpinion(eq(1L), argThat(req -> req.groupId().equals(9L)));
     }
 
     @Test

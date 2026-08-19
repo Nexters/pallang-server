@@ -213,12 +213,26 @@ class OpinionServiceTest {
     @Test
     @DisplayName("모임원이 아닌 사용자가 groupId를 지정해 흔적을 생성하려 하면 예외가 발생한다")
     void createOpinionFailsWhenNotGroupMember() {
+        Group group = group(9L, book(10L));
         given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+        given(groupRepository.findById(9L)).willReturn(Optional.of(group));
         doThrow(new GroupException(GroupErrorCode.NOT_MEMBER)).when(groupAccessValidator).validateMember(9L, 1L);
 
         assertThatThrownBy(() -> opinionService.createOpinion(1L, request(10L, null, 9L)))
                 .isInstanceOf(GroupException.class);
         verify(passageRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 groupId로 흔적을 생성하려 하면 (멤버십이 아니라) 모임을 찾을 수 없다는 예외가 발생한다")
+    void createOpinionFailsWhenGroupDoesNotExist() {
+        given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
+        given(groupRepository.findById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> opinionService.createOpinion(1L, request(10L, null, 999L)))
+                .isInstanceOf(GroupException.class)
+                .satisfies(e -> assertThat(((GroupException) e).getErrorCode()).isEqualTo(GroupErrorCode.GROUP_NOT_FOUND));
+        verify(groupAccessValidator, never()).validateMember(any(), any());
     }
 
     @Test
