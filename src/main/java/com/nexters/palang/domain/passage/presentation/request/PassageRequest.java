@@ -21,7 +21,11 @@ public class PassageRequest {
             @NotBlank(message = "인용 문구는 비어 있을 수 없습니다.")
             @Size(max = Passage.QUOTED_TEXT_MAX_LENGTH, message = "인용 문구는 {max}자를 초과할 수 없습니다.")
             @Schema(example = "우리는 모두 이야기를 찾아 헤맨다.")
-            String quotedText
+            String quotedText,
+
+            // 있으면 그 모임 전용 대목만 비교 대상으로 삼는다(요청자는 모임원이어야 함). 없으면 기존처럼 전역 공개 대목만 비교한다.
+            @Schema(description = "모임 ID. 없으면 전역 공개 대목 기준으로 비교합니다.", example = "1", nullable = true)
+            Long groupId
     ) {
     }
 }
