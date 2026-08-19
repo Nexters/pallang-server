@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.book.domain.Book;
+import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.passage.application.MyPassageProjection;
 import com.nexters.palang.domain.passage.application.SimilarPassageProjection;
@@ -12,6 +13,7 @@ import com.nexters.palang.domain.user.domain.SnsProvider;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.global.config.JpaAuditingConfig;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,6 +80,23 @@ class PassageQueryRepositoryTest {
                 .build());
     }
 
+    private Group group(Book book, User host) {
+        Group built = Group.create("모임", book, host, 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20));
+        return entityManager.persistAndFlush(built);
+    }
+
+    private Passage passage(Book book, User creator, Group group, int pageNumber, String quotedText, String normalizedHash) {
+        return entityManager.persistAndFlush(Passage.builder()
+                .book(book)
+                .creator(creator)
+                .group(group)
+                .pageNumber(pageNumber)
+                .quotedText(quotedText)
+                .isSpoiler(false)
+                .normalizedHash(normalizedHash)
+                .build());
+    }
+
     @Test
     @DisplayName("같은 책의 인접 페이지(±1)에서 정규화 해시가 같은 대목을 후보로 조회한다")
     void findSimilarCandidatesReturnsPassagesWithinAdjacentPages() {
@@ -87,7 +106,7 @@ class PassageQueryRepositoryTest {
         Passage adjacentPage = passage(book, writer, 6, "발췌 문장", "hash-1");
         passage(book, writer, 8, "먼 페이지 문장", "hash-1");
 
-        List<SimilarPassageProjection> results = passageQueryRepository.findSimilarCandidates(book.getId(), 5, "hash-1");
+        List<SimilarPassageProjection> results = passageQueryRepository.findSimilarCandidates(book.getId(), 5, "hash-1", null);
 
         assertThat(results).extracting(SimilarPassageProjection::passageId)
                 .containsExactly(samePage.getId(), adjacentPage.getId());
@@ -100,7 +119,7 @@ class PassageQueryRepositoryTest {
         Book book = book("책");
         passage(book, writer, 5, "다른 문장", "hash-different");
 
-        List<SimilarPassageProjection> results = passageQueryRepository.findSimilarCandidates(book.getId(), 5, "hash-1");
+        List<SimilarPassageProjection> results = passageQueryRepository.findSimilarCandidates(book.getId(), 5, "hash-1", null);
 
         assertThat(results).isEmpty();
     }
@@ -114,7 +133,7 @@ class PassageQueryRepositoryTest {
         entityManager.persistAndFlush(Opinion.builder().passage(passage).user(writer).content("흔적1").build());
         entityManager.persistAndFlush(Opinion.builder().passage(passage).user(writer).content("흔적2").build());
 
-        List<SimilarPassageProjection> results = passageQueryRepository.findSimilarCandidates(book.getId(), 5, "hash-1");
+        List<SimilarPassageProjection> results = passageQueryRepository.findSimilarCandidates(book.getId(), 5, "hash-1", null);
 
         assertThat(results).hasSize(1);
         assertThat(results.get(0).opinionCount()).isEqualTo(2);
@@ -129,9 +148,25 @@ class PassageQueryRepositoryTest {
         deleted.delete();
         entityManager.persistAndFlush(deleted);
 
-        List<SimilarPassageProjection> results = passageQueryRepository.findSimilarCandidates(book.getId(), 5, "hash-1");
+        List<SimilarPassageProjection> results = passageQueryRepository.findSimilarCandidates(book.getId(), 5, "hash-1", null);
 
         assertThat(results).isEmpty();
+    }
+
+    @Test
+    @DisplayName("같은 해시라도 모임이 다르면(또는 한쪽이 전역 공개면) 유사 후보로 묶이지 않는다")
+    void findSimilarCandidatesScopesByGroup() {
+        User writer = user("writer-13");
+        Book book = book("책");
+        Group group = group(book, writer);
+        Passage global = passage(book, writer, 5, "발췌 문장", "hash-1");
+        Passage inGroup = passage(book, writer, group, 5, "발췌 문장", "hash-1");
+
+        List<SimilarPassageProjection> globalResults = passageQueryRepository.findSimilarCandidates(book.getId(), 5, "hash-1", null);
+        List<SimilarPassageProjection> groupResults = passageQueryRepository.findSimilarCandidates(book.getId(), 5, "hash-1", group.getId());
+
+        assertThat(globalResults).extracting(SimilarPassageProjection::passageId).containsExactly(global.getId());
+        assertThat(groupResults).extracting(SimilarPassageProjection::passageId).containsExactly(inGroup.getId());
     }
 
     @Test
@@ -144,7 +179,7 @@ class PassageQueryRepositoryTest {
         passage(book, writer, 2, false);
         passage(book, writer, 1, true);
 
-        Page<Integer> result = passageQueryRepository.findPageNumbers(book.getId(), PageRequest.of(0, 10));
+        Page<Integer> result = passageQueryRepository.findPageNumbers(book.getId(), null, PageRequest.of(0, 10));
 
         assertThat(result.getContent()).containsExactly(1, 2, 5);
     }
@@ -159,7 +194,7 @@ class PassageQueryRepositoryTest {
         deleted.delete();
         entityManager.persistAndFlush(deleted);
 
-        Page<Integer> result = passageQueryRepository.findPageNumbers(book.getId(), PageRequest.of(0, 10));
+        Page<Integer> result = passageQueryRepository.findPageNumbers(book.getId(), null, PageRequest.of(0, 10));
 
         assertThat(result.getContent()).containsExactly(1);
         assertThat(result.getTotalElements()).isEqualTo(1);
@@ -170,9 +205,25 @@ class PassageQueryRepositoryTest {
     void findPageNumbersReturnsEmptyWhenNoPassages() {
         Book book = book("빈 책");
 
-        Page<Integer> result = passageQueryRepository.findPageNumbers(book.getId(), PageRequest.of(0, 10));
+        Page<Integer> result = passageQueryRepository.findPageNumbers(book.getId(), null, PageRequest.of(0, 10));
 
         assertThat(result.getContent()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("groupId를 지정하면 그 모임 전용 대목의 페이지 번호만 조회된다")
+    void findPageNumbersScopesByGroup() {
+        User writer = user("writer-14");
+        Book book = book("책");
+        Group group = group(book, writer);
+        passage(book, writer, 1, false);
+        passage(book, writer, group, 2, "모임 전용 문장", "hash-group");
+
+        Page<Integer> globalResult = passageQueryRepository.findPageNumbers(book.getId(), null, PageRequest.of(0, 10));
+        Page<Integer> groupResult = passageQueryRepository.findPageNumbers(book.getId(), group.getId(), PageRequest.of(0, 10));
+
+        assertThat(globalResult.getContent()).containsExactly(1);
+        assertThat(groupResult.getContent()).containsExactly(2);
     }
 
     @Test
@@ -184,7 +235,7 @@ class PassageQueryRepositoryTest {
         Passage second = passage(book, writer, 3, false);
         Passage spoiler = passage(book, writer, 3, true);
 
-        List<Passage> result = passageQueryRepository.findPassagesByPage(book.getId(), 3);
+        List<Passage> result = passageQueryRepository.findPassagesByPage(book.getId(), null, 3);
 
         assertThat(result).extracting(Passage::getId)
                 .containsExactly(first.getId(), second.getId(), spoiler.getId());
@@ -200,9 +251,25 @@ class PassageQueryRepositoryTest {
         deleted.delete();
         entityManager.persistAndFlush(deleted);
 
-        List<Passage> result = passageQueryRepository.findPassagesByPage(book.getId(), 3);
+        List<Passage> result = passageQueryRepository.findPassagesByPage(book.getId(), null, 3);
 
         assertThat(result).extracting(Passage::getId).containsExactly(alive.getId());
+    }
+
+    @Test
+    @DisplayName("groupId를 지정하면 그 모임 전용 대목만 조회되고 전역 공개 대목은 섞이지 않는다")
+    void findPassagesByPageScopesByGroup() {
+        User writer = user("writer-15");
+        Book book = book("책");
+        Group group = group(book, writer);
+        Passage global = passage(book, writer, 3, false);
+        Passage inGroup = passage(book, writer, group, 3, "모임 전용 문장", "hash-group");
+
+        List<Passage> globalResult = passageQueryRepository.findPassagesByPage(book.getId(), null, 3);
+        List<Passage> groupResult = passageQueryRepository.findPassagesByPage(book.getId(), group.getId(), 3);
+
+        assertThat(globalResult).extracting(Passage::getId).containsExactly(global.getId());
+        assertThat(groupResult).extracting(Passage::getId).containsExactly(inGroup.getId());
     }
 
     @Test
