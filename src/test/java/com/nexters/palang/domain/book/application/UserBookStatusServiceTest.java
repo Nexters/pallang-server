@@ -76,7 +76,7 @@ class UserBookStatusServiceTest {
     void updateBookStatusUpdatesExistingStatus() {
         Book book = book(10L, 300);
         UserBookStatus existing = UserBookStatus.builder()
-                .user(user(1L)).book(book).status(ReadingStatus.PLANNED).currentPage(null).build();
+                .user(user(1L)).book(book).status(ReadingStatus.FINISHED).currentPage(null).build();
         given(bookRepository.findById(10L)).willReturn(Optional.of(book));
         given(userBookStatusRepository.findByUserIdAndBookId(1L, 10L)).willReturn(Optional.of(existing));
 
@@ -93,7 +93,7 @@ class UserBookStatusServiceTest {
     void updateBookStatusFallsBackToUpdateWhenConcurrentInsertViolatesUniqueConstraint() {
         Book book = book(10L, 300);
         UserBookStatus winnerOfRace = UserBookStatus.builder()
-                .user(user(1L)).book(book).status(ReadingStatus.PLANNED).currentPage(null).build();
+                .user(user(1L)).book(book).status(ReadingStatus.FINISHED).currentPage(null).build();
         given(bookRepository.findById(10L)).willReturn(Optional.of(book));
         given(userBookStatusRepository.findByUserIdAndBookId(1L, 10L))
                 .willReturn(Optional.empty(), Optional.of(winnerOfRace));

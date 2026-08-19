@@ -15,6 +15,7 @@ import com.nexters.palang.domain.opinion.common.error.OpinionErrorCode;
 import com.nexters.palang.domain.opinion.common.error.OpinionException;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.opinion.domain.OpinionSortType;
+import com.nexters.palang.domain.opinion.domain.event.OpinionCreatedEvent;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionQueryRepository;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
 import com.nexters.palang.domain.opinion.presentation.dto.CreateOpinionRequest;
@@ -26,12 +27,13 @@ import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.infrastructure.PassageRepository;
 import com.nexters.palang.domain.user.common.error.UserErrorCode;
 import com.nexters.palang.domain.user.common.error.UserException;
+import com.nexters.palang.domain.user.domain.GuestSampleAccount;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -48,6 +50,7 @@ public class OpinionService {
     private final PassageRepository passageRepository;
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final GroupRepository groupRepository;
     private final GroupAccessValidator groupAccessValidator;
 
@@ -142,6 +145,7 @@ public class OpinionService {
 
         Opinion opinion = Opinion.createWithDecorations(passage, user, request.content(), decorations);
         opinionRepository.save(opinion);
+        eventPublisher.publishEvent(new OpinionCreatedEvent(opinion.getId(), passage.getBook().getId(), userId));
         return opinion;
     }
 
@@ -163,32 +167,16 @@ public class OpinionService {
         return existing;
     }
 
-    // 비로그인 사용자는 마이페이지 미리보기로 고정 샘플 흔적 3건을 본다 (기획 확정, 이슈 #120).
-    private static final String GUEST_SAMPLE_BOOK_TITLE = "빵충 사육 준수 사항";
-    private static final String GUEST_SAMPLE_AUTHOR = "김혜영 (지은이)";
-    private static final String GUEST_SAMPLE_COVER_IMAGE_URL =
-            "https://image.aladin.co.kr/product/39872/66/cover200/k242130313_1.jpg";
-    private static final String GUEST_SAMPLE_QUOTED_TEXT = "이 모든 건 챗지피티 덕분이었다. 담당자가 준 자료를 복사해서 "
-            + "이 녀석에게 붙여넣기를 반복하니 한눈에 봐도 괜찮은 서류를 달칵 토해냈다. 세상에, AI가 사람을 구했어요.";
-    private static final LocalDateTime GUEST_SAMPLE_CREATED_AT = LocalDateTime.of(2026, 8, 1, 12, 0, 0);
-    private static final List<MyOpinionProjection> GUEST_SAMPLE_OPINIONS = List.of(
-            new MyOpinionProjection(1L, 18L, GUEST_SAMPLE_BOOK_TITLE, GUEST_SAMPLE_AUTHOR,
-                    GUEST_SAMPLE_COVER_IMAGE_URL, 1L, GUEST_SAMPLE_QUOTED_TEXT, 33,
-                    "애증의 관계", 5, GUEST_SAMPLE_CREATED_AT),
-            new MyOpinionProjection(2L, 18L, GUEST_SAMPLE_BOOK_TITLE, GUEST_SAMPLE_AUTHOR,
-                    GUEST_SAMPLE_COVER_IMAGE_URL, 1L, GUEST_SAMPLE_QUOTED_TEXT, 33,
-                    "정말… 사람 구했다", 3, GUEST_SAMPLE_CREATED_AT),
-            new MyOpinionProjection(3L, 18L, GUEST_SAMPLE_BOOK_TITLE, GUEST_SAMPLE_AUTHOR,
-                    GUEST_SAMPLE_COVER_IMAGE_URL, 1L, GUEST_SAMPLE_QUOTED_TEXT, 33,
-                    "지피티야 나랑 영원히 함께하자", 8, GUEST_SAMPLE_CREATED_AT)
-    );
-
+    // 비로그인 사용자는 마이페이지 미리보기로 샘플 계정(GuestSampleAccount)의 실제 흔적을 본다
+    // (기획 확정, 이슈 #120). 이 계정과 그 계정의 흔적/꾸밈은 OpinionGuestSampleSeedRunner가 앱 기동
+    // 시 미리 만들어둔다 — 하드코딩 대신 실데이터를 재사용해야 상세 화면의 Decoration(밑줄/동그라미 등)도
+    // 자연스럽게 함께 보인다. 씨딩 전이거나 실패한 환경(로컬 등)에서는 빈 목록을 반환한다.
     public Page<MyOpinionProjection> getMyOpinions(Long userId, Long bookId, Pageable pageable) {
         if (userId == null) {
-            List<MyOpinionProjection> guestSample = bookId == null || bookId.equals(18L)
-                    ? GUEST_SAMPLE_OPINIONS
-                    : List.of();
-            return new PageImpl<>(guestSample, pageable, guestSample.size());
+            return userRepository
+                    .findBySnsProviderAndSnsId(GuestSampleAccount.SNS_PROVIDER, GuestSampleAccount.SNS_ID)
+                    .map(sampleUser -> opinionQueryRepository.findMyOpinions(sampleUser.getId(), bookId, pageable))
+                    .orElseGet(() -> new PageImpl<>(List.of(), pageable, 0));
         }
         return opinionQueryRepository.findMyOpinions(userId, bookId, pageable);
     }
@@ -198,8 +186,8 @@ public class OpinionService {
     }
 
     // 좋아요 관리 화면의 "전체 책 보기" 드롭다운: 내가 좋아요를 누른 흔적이 있는 도서 목록.
-    public List<BookOptionProjection> getLikedBookOptions(Long userId) {
-        return opinionQueryRepository.findLikedBookOptions(userId);
+    public Page<BookOptionProjection> getLikedBookOptions(Long userId, Pageable pageable) {
+        return opinionQueryRepository.findLikedBookOptions(userId, pageable);
     }
 
     public long getMyOpinionCount(Long userId) {
