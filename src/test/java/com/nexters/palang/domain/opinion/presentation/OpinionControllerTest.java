@@ -280,4 +280,15 @@ class OpinionControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("OPINION_404_1"));
     }
+
+    @Test
+    @DisplayName("모임원이 아닌 사용자가 모임 전용 흔적에 좋아요를 시도하면 403 에러가 발생한다")
+    void toggleOpinionLikeFailsWhenNotGroupMember() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(opinionLikeService.toggleLike(1L, 10L)).willThrow(new GroupException(GroupErrorCode.NOT_MEMBER));
+
+        mockMvc.perform(post("/api/opinions/{opinionId}/like", 10L))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("GROUP_403_2"));
+    }
 }
