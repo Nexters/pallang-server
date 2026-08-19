@@ -148,7 +148,7 @@ class GroupServiceTest {
     @DisplayName("모임장이 아니면 방 설정을 변경할 수 없다")
     void updateGroupFailsWhenNotHost() {
         Group group = group(1L, host);
-        given(groupRepository.findById(1L)).willReturn(Optional.of(group));
+        given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group));
 
         assertThatThrownBy(() -> groupService.updateGroup(
                 1L, other.getId(), new UpdateGroupRequest("주말 독서 모임", 6, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20))))
@@ -159,7 +159,7 @@ class GroupServiceTest {
     @DisplayName("현재 참여 인원보다 적은 인원으로 방 설정을 변경하면 예외가 발생한다")
     void updateGroupFailsWhenCapacityBelowMemberCount() {
         Group group = group(1L, host);
-        given(groupRepository.findById(1L)).willReturn(Optional.of(group));
+        given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group));
         given(groupMemberRepository.countByGroupId(1L)).willReturn(3L);
 
         assertThatThrownBy(() -> groupService.updateGroup(
@@ -171,7 +171,7 @@ class GroupServiceTest {
     @DisplayName("모임장은 방 설정을 변경할 수 있다")
     void updateGroupSucceeds() {
         Group group = group(1L, host);
-        given(groupRepository.findById(1L)).willReturn(Optional.of(group));
+        given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group));
         given(groupMemberRepository.countByGroupId(1L)).willReturn(1L);
 
         GroupDetail detail = groupService.updateGroup(
@@ -179,6 +179,20 @@ class GroupServiceTest {
 
         assertThat(detail.group().getName()).isEqualTo("주말 독서 모임");
         assertThat(detail.group().getCapacity()).isEqualTo(6);
+    }
+
+    @Test
+    @DisplayName("방 설정을 변경할 때는 동시 가입과의 정원 race를 막기 위해 잠금 조회를 사용한다")
+    void updateGroupUsesLockedLookup() {
+        Group group = group(1L, host);
+        given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group));
+        given(groupMemberRepository.countByGroupId(1L)).willReturn(1L);
+
+        groupService.updateGroup(
+                1L, host.getId(), new UpdateGroupRequest("주말 독서 모임", 6, LocalDate.of(2026, 8, 21), LocalDate.of(2026, 9, 27)));
+
+        verify(groupRepository).findByIdForUpdate(1L);
+        verify(groupRepository, never()).findById(any());
     }
 
     @Test
