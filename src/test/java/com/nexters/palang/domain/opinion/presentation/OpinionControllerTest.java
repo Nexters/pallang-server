@@ -2,6 +2,7 @@ package com.nexters.palang.domain.opinion.presentation;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -14,6 +15,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.decoration.domain.Decoration;
 import com.nexters.palang.domain.decoration.domain.EffectType;
+import com.nexters.palang.domain.group.common.error.GroupErrorCode;
+import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.opinion.application.OpinionLikeResult;
 import com.nexters.palang.domain.opinion.application.OpinionLikeService;
 import com.nexters.palang.domain.opinion.application.OpinionService;
@@ -71,7 +74,7 @@ class OpinionControllerTest {
     }
 
     private CreateOpinionRequest request(Long passageId) {
-        return new CreateOpinionRequest(1L, 5, "발췌 문장", false, passageId, "흔적 내용",
+        return new CreateOpinionRequest(1L, 5, "발췌 문장", false, passageId, null, "흔적 내용",
                 List.of(new DecorationRequest(0, 5, EffectType.UNDERLINE, null)));
     }
 
@@ -116,9 +119,22 @@ class OpinionControllerTest {
     }
 
     @Test
+    @DisplayName("모임원이 아닌 사용자가 groupId를 지정해 흔적을 작성하려 하면 403 에러가 발생한다")
+    void createOpinionFailsWhenNotGroupMember() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(opinionService.createOpinion(anyLong(), any())).willThrow(new GroupException(GroupErrorCode.NOT_MEMBER));
+
+        mockMvc.perform(post("/api/opinions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request(null))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("GROUP_403_2"));
+    }
+
+    @Test
     @DisplayName("꾸밈 효과 없이 흔적을 작성하면 400 에러가 발생한다")
     void createOpinionFailsWhenDecorationsIsEmpty() throws Exception {
-        CreateOpinionRequest request = new CreateOpinionRequest(1L, 5, "발췌 문장", false, null, "흔적 내용", List.of());
+        CreateOpinionRequest request = new CreateOpinionRequest(1L, 5, "발췌 문장", false, null, null, "흔적 내용", List.of());
 
         mockMvc.perform(post("/api/opinions")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -144,7 +160,7 @@ class OpinionControllerTest {
     @Test
     @DisplayName("흔적 상세를 조회하면 작성자의 꾸밈을 그대로 반환한다")
     void getOpinion() throws Exception {
-        given(opinionService.getOpinion(1L)).willReturn(opinionWithDecoration(1L, 100L));
+        given(opinionService.getOpinion(eq(1L), any())).willReturn(opinionWithDecoration(1L, 100L));
 
         mockMvc.perform(get("/api/opinions/1"))
                 .andExpect(status().isOk())
@@ -155,11 +171,21 @@ class OpinionControllerTest {
     @Test
     @DisplayName("존재하지 않는 흔적을 상세 조회하면 404 에러가 발생한다")
     void getOpinionFailsWhenNotFound() throws Exception {
-        given(opinionService.getOpinion(1L)).willThrow(new OpinionException(OpinionErrorCode.OPINION_NOT_FOUND));
+        given(opinionService.getOpinion(eq(1L), any())).willThrow(new OpinionException(OpinionErrorCode.OPINION_NOT_FOUND));
 
         mockMvc.perform(get("/api/opinions/1"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("OPINION_404_1"));
+    }
+
+    @Test
+    @DisplayName("모임 전용 흔적을 모임원이 아닌 사용자가 조회하면 403 에러가 발생한다")
+    void getOpinionFailsWhenNotGroupMember() throws Exception {
+        given(opinionService.getOpinion(eq(1L), any())).willThrow(new GroupException(GroupErrorCode.NOT_MEMBER));
+
+        mockMvc.perform(get("/api/opinions/1"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("GROUP_403_2"));
     }
 
     @Test
