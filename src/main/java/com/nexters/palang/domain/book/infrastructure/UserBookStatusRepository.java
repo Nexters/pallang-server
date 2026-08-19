@@ -7,4 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface UserBookStatusRepository extends JpaRepository<UserBookStatus, Long> {
 
     Optional<UserBookStatus> findByUserIdAndBookId(Long userId, Long bookId);
+
+    boolean existsByUserIdAndBookId(Long userId, Long bookId);
+
+    void deleteByUserIdAndBookId(Long userId, Long bookId);
 }

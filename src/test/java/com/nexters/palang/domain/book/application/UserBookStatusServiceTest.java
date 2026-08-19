@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.domain.Book;
@@ -124,6 +125,25 @@ class UserBookStatusServiceTest {
 
         assertThatThrownBy(() -> userBookStatusService.updateBookStatus(
                 1L, new UpdateUserBookStatusRequest(10L, ReadingStatus.READING, 50)))
+                .isInstanceOf(BookException.class);
+    }
+
+    @Test
+    @DisplayName("설정된 읽기상태를 해제하면 삭제된다")
+    void removeBookStatusDeletesExistingStatus() {
+        given(userBookStatusRepository.existsByUserIdAndBookId(1L, 10L)).willReturn(true);
+
+        userBookStatusService.removeBookStatus(1L, 10L);
+
+        verify(userBookStatusRepository).deleteByUserIdAndBookId(1L, 10L);
+    }
+
+    @Test
+    @DisplayName("설정된 읽기상태가 없으면 해제 시 예외가 발생한다")
+    void removeBookStatusThrowsExceptionWhenStatusDoesNotExist() {
+        given(userBookStatusRepository.existsByUserIdAndBookId(1L, 10L)).willReturn(false);
+
+        assertThatThrownBy(() -> userBookStatusService.removeBookStatus(1L, 10L))
                 .isInstanceOf(BookException.class);
     }
 }
