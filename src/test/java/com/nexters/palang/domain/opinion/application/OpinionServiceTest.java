@@ -30,6 +30,7 @@ import com.nexters.palang.domain.opinion.presentation.dto.UpdateOpinionRequest;
 import com.nexters.palang.domain.passage.common.error.PassageException;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.infrastructure.PassageRepository;
+import com.nexters.palang.domain.user.domain.GuestSampleAccount;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
 import java.time.LocalDate;
@@ -429,22 +430,36 @@ class OpinionServiceTest {
     }
 
     @Test
-    @DisplayName("비로그인 사용자가 내가 남긴 흔적 목록을 조회하면 QueryRepository 대신 고정 샘플 3건을 반환한다")
-    void getMyOpinionsReturnsSampleWhenGuest() {
+    @DisplayName("비로그인 사용자가 내가 남긴 흔적 목록을 조회하면 샘플 계정의 실제 흔적을 QueryRepository로 조회해 반환한다")
+    void getMyOpinionsReturnsSampleAccountOpinionsWhenGuest() {
         Pageable pageable = PageRequest.of(0, 20);
+        User sampleUser = User.builder()
+                .nickname(GuestSampleAccount.NICKNAME)
+                .snsProvider(GuestSampleAccount.SNS_PROVIDER)
+                .snsId(GuestSampleAccount.SNS_ID)
+                .build();
+        ReflectionTestUtils.setField(sampleUser, "id", 999L);
+        Page<MyOpinionProjection> expected = new PageImpl<>(
+                List.of(new MyOpinionProjection(1L, 18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "cover", 100L, "발췌", 33,
+                        "애증의 관계", 0, LocalDateTime.now())),
+                pageable, 1);
+        given(userRepository.findBySnsProviderAndSnsId(GuestSampleAccount.SNS_PROVIDER, GuestSampleAccount.SNS_ID))
+                .willReturn(Optional.of(sampleUser));
+        given(opinionQueryRepository.findMyOpinions(999L, null, pageable)).willReturn(expected);
 
         Page<MyOpinionProjection> results = opinionService.getMyOpinions(null, null, pageable);
 
-        assertThat(results.getTotalElements()).isEqualTo(3);
-        assertThat(results.getContent()).allMatch(o -> o.bookId().equals(18L) && o.pageNumber() == 33);
+        assertThat(results).isEqualTo(expected);
     }
 
     @Test
-    @DisplayName("비로그인 사용자가 다른 책 bookId로 조회하면 샘플이 아닌 빈 목록을 반환한다")
-    void getMyOpinionsReturnsEmptyWhenGuestFiltersOtherBook() {
+    @DisplayName("비로그인 사용자인데 샘플 계정이 씨딩되지 않았다면 빈 목록을 반환한다")
+    void getMyOpinionsReturnsEmptyWhenGuestAndSampleAccountMissing() {
         Pageable pageable = PageRequest.of(0, 20);
+        given(userRepository.findBySnsProviderAndSnsId(GuestSampleAccount.SNS_PROVIDER, GuestSampleAccount.SNS_ID))
+                .willReturn(Optional.empty());
 
-        Page<MyOpinionProjection> results = opinionService.getMyOpinions(null, 999L, pageable);
+        Page<MyOpinionProjection> results = opinionService.getMyOpinions(null, null, pageable);
 
         assertThat(results.getTotalElements()).isZero();
     }
