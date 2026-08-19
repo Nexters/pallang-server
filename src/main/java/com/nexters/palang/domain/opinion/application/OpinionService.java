@@ -6,6 +6,11 @@ import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.decoration.domain.Decoration;
+import com.nexters.palang.domain.group.application.GroupAccessValidator;
+import com.nexters.palang.domain.group.common.error.GroupErrorCode;
+import com.nexters.palang.domain.group.common.error.GroupException;
+import com.nexters.palang.domain.group.domain.Group;
+import com.nexters.palang.domain.group.infrastructure.GroupRepository;
 import com.nexters.palang.domain.opinion.common.error.OpinionErrorCode;
 import com.nexters.palang.domain.opinion.common.error.OpinionException;
 import com.nexters.palang.domain.opinion.domain.Opinion;
@@ -25,6 +30,7 @@ import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -42,19 +48,30 @@ public class OpinionService {
     private final PassageRepository passageRepository;
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
+    private final GroupRepository groupRepository;
+    private final GroupAccessValidator groupAccessValidator;
 
     // 흔적 목록(FR-OPINION-03): 최신순(기본)/좋아요순. currentUserId는 비로그인 시 null(liked는 항상 false).
+    // 대목이 모임 전용이면(passage.group != null) 모임원만 조회할 수 있다.
     public Page<OpinionSummaryProjection> getOpinions(
             Long passageId, OpinionSortType sortType, Pageable pageable, Long currentUserId) {
-        if (!passageRepository.existsByIdAndDeletedAtIsNull(passageId)) {
-            throw new PassageException(PassageErrorCode.PASSAGE_NOT_FOUND);
+        Passage passage = passageRepository.findByIdAndDeletedAtIsNull(passageId)
+                .orElseThrow(() -> new PassageException(PassageErrorCode.PASSAGE_NOT_FOUND));
+        if (passage.getGroup() != null) {
+            groupAccessValidator.validateMember(passage.getGroup().getId(), currentUserId);
         }
         return opinionQueryRepository.findOpinions(passageId, sortType, pageable, currentUserId);
     }
 
     // 흔적 상세(FR-OPINION-05): 이 흔적 작성자가 기록한 꾸밈을 그대로 보여준다.
-    public Opinion getOpinion(Long opinionId) {
-        return getExistingOpinion(opinionId);
+    // 대목이 모임 전용이면 모임원만 조회할 수 있다. currentUserId는 비로그인 시 null(Soft Authentication).
+    public Opinion getOpinion(Long opinionId, Long currentUserId) {
+        Opinion opinion = getExistingOpinion(opinionId);
+        Group group = opinion.getPassage().getGroup();
+        if (group != null) {
+            groupAccessValidator.validateMember(group.getId(), currentUserId);
+        }
+        return opinion;
     }
 
     @Transactional
@@ -95,10 +112,14 @@ public class OpinionService {
     }
 
     // Passage(신규 생성 또는 기존 병합) + Opinion + Decoration을 한 트랜잭션에서 원자적으로 생성한다. (직접 입력만)
+    // request.groupId()가 있으면 그 모임 전용 흔적/대목이 되며, 작성자가 모임원인지 먼저 검증한다.
     @Transactional
     public Opinion createOpinion(Long userId, CreateOpinionRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
+        if (request.groupId() != null) {
+            groupAccessValidator.validateMember(request.groupId(), userId);
+        }
 
         boolean merged = request.passageId() != null;
         Passage passage = merged ? mergeIntoExistingPassage(request) : createNewPassage(request, user);
@@ -125,6 +146,12 @@ public class OpinionService {
         }
         if (!existing.getBook().getId().equals(request.bookId())) {
             throw new PassageException(PassageErrorCode.PASSAGE_BOOK_MISMATCH);
+        }
+        // 병합 대상 대목의 소속 모임과 요청이 지정한 모임이 정확히 일치해야 한다(둘 다 null=전역 공개도 일치).
+        // 그렇지 않으면 전역 공개 대목에 모임 흔적이 섞이거나 그 반대가 될 수 있다.
+        Long existingGroupId = existing.getGroup() != null ? existing.getGroup().getId() : null;
+        if (!Objects.equals(existingGroupId, request.groupId())) {
+            throw new PassageException(PassageErrorCode.PASSAGE_GROUP_MISMATCH);
         }
         return existing;
     }
@@ -175,14 +202,30 @@ public class OpinionService {
     private Passage createNewPassage(CreateOpinionRequest request, User creator) {
         Book book = bookRepository.findById(request.bookId())
                 .orElseThrow(() -> new BookException(BookErrorCode.BOOK_NOT_FOUND));
+        Group group = resolveGroup(request.groupId(), request.bookId());
         Passage passage = Passage.builder()
                 .book(book)
                 .creator(creator)
+                .group(group)
                 .pageNumber(request.pageNumber())
                 .quotedText(request.quotedText())
                 .isSpoiler(request.isSpoiler())
                 .normalizedHash(PassageNormalizer.normalizedHash(request.quotedText()))
                 .build();
         return passageRepository.save(passage);
+    }
+
+    // 모임은 생성 시 책이 고정되므로(Group 불변식), 이 모임 소속으로 새 대목을 만들 때 요청의 bookId가
+    // 그 모임의 책과 다르면 막는다.
+    private Group resolveGroup(Long groupId, Long bookId) {
+        if (groupId == null) {
+            return null;
+        }
+        Group group = groupRepository.findById(groupId)
+                .orElseThrow(() -> new GroupException(GroupErrorCode.GROUP_NOT_FOUND));
+        if (!group.getBook().getId().equals(bookId)) {
+            throw new GroupException(GroupErrorCode.GROUP_BOOK_MISMATCH);
+        }
+        return group;
     }
 }
