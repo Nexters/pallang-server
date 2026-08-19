@@ -7,6 +7,8 @@ import com.nexters.palang.domain.comment.infrastructure.CommentQueryRepository;
 import com.nexters.palang.domain.comment.infrastructure.CommentRepository;
 import com.nexters.palang.domain.comment.presentation.dto.CreateCommentRequest;
 import com.nexters.palang.domain.comment.presentation.dto.UpdateCommentRequest;
+import com.nexters.palang.domain.group.application.GroupAccessValidator;
+import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.domain.opinion.common.error.OpinionErrorCode;
 import com.nexters.palang.domain.opinion.common.error.OpinionException;
 import com.nexters.palang.domain.opinion.domain.Opinion;
@@ -35,9 +37,12 @@ public class CommentService {
     private final CommentQueryRepository commentQueryRepository;
     private final OpinionRepository opinionRepository;
     private final UserRepository userRepository;
+    private final GroupAccessValidator groupAccessValidator;
 
+    // 흔적이 모임 전용이면(passage.group != null) 모임원만 댓글을 보거나 남길 수 있다.
     public Page<RootCommentGroup> getRootComments(Long opinionId, Pageable pageable, Long currentUserId) {
-        validateOpinionExists(opinionId);
+        Opinion opinion = getExistingOpinion(opinionId);
+        validateGroupAccess(opinion, currentUserId);
 
         Page<Comment> roots = commentQueryRepository.findRootComments(opinionId, pageable, currentUserId);
         List<Long> rootIds = roots.getContent().stream().map(Comment::getId).toList();
@@ -53,13 +58,15 @@ public class CommentService {
 
     public Page<Comment> getReplies(Long parentCommentId, Pageable pageable, Long currentUserId) {
         Comment parent = getExistingComment(parentCommentId);
-        getExistingOpinion(parent.getOpinion().getId());
+        Opinion opinion = getExistingOpinion(parent.getOpinion().getId());
+        validateGroupAccess(opinion, currentUserId);
         return commentQueryRepository.findReplies(parentCommentId, pageable, currentUserId);
     }
 
     @Transactional
     public Comment createComment(Long opinionId, Long userId, CreateCommentRequest request) {
         Opinion opinion = getExistingOpinion(opinionId);
+        validateGroupAccess(opinion, userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new UserException(UserErrorCode.USER_NOT_FOUND));
 
@@ -89,8 +96,11 @@ public class CommentService {
         comment.delete();
     }
 
-    private void validateOpinionExists(Long opinionId) {
-        getExistingOpinion(opinionId);
+    private void validateGroupAccess(Opinion opinion, Long userId) {
+        Group group = opinion.getPassage().getGroup();
+        if (group != null) {
+            groupAccessValidator.validateMember(group.getId(), userId);
+        }
     }
 
     private Opinion getExistingOpinion(Long opinionId) {
