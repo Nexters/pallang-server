@@ -98,6 +98,9 @@ public class Group extends BaseEntity {
         this.endDate = endDate;
     }
 
+    // 기간은 모임원끼리 정하는 안내용 값일 뿐 강제되지 않는다(PM 확인: 기간이 지나도 모임 목록 노출,
+    // 흔적/의견 작성 모두 계속 가능). isEnded()는 FE가 "종료됨" 배지를 보여주는 용도로만 쓰이며,
+    // 어떤 조회/쓰기 API도 이 값으로 접근을 막지 않는다.
     public boolean isEnded() {
         return LocalDate.now().isAfter(endDate);
     }
