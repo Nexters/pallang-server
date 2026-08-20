@@ -20,14 +20,14 @@ public final class GroupMapper {
     private GroupMapper() {
     }
 
-    public static GroupDetailResponse toDetailResponse(GroupDetail detail) {
+    public static GroupDetailResponse toDetailResponse(GroupDetail detail, Long currentUserId) {
         Group group = detail.group();
         Book book = group.getBook();
         User host = group.getHost();
         return new GroupDetailResponse(
                 group.getId(), group.getName(), book.getId(), book.getTitle(), book.getAuthor(), book.getCoverImageUrl(),
                 host.getId(), host.getNickname(), group.getCapacity(), detail.memberCount(),
-                group.getStartDate(), group.getEndDate(), group.isEnded());
+                group.getStartDate(), group.getEndDate(), group.isEnded(), host.getId().equals(currentUserId));
     }
 
     public static GroupSummaryResponse toSummaryResponse(GroupSummaryProjection projection) {

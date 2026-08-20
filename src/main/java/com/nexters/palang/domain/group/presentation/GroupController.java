@@ -43,7 +43,7 @@ public class GroupController implements GroupApi {
     public ResponseEntity<DataResponse<GroupDetailResponse>> createGroup(@Valid @RequestBody CreateGroupRequest request) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         GroupDetail detail = groupService.createGroup(currentUserId, request);
-        return ResponseEntity.ok(DataResponse.from(GroupMapper.toDetailResponse(detail)));
+        return ResponseEntity.ok(DataResponse.from(GroupMapper.toDetailResponse(detail, currentUserId)));
     }
 
     @Override
@@ -61,7 +61,7 @@ public class GroupController implements GroupApi {
     public ResponseEntity<DataResponse<GroupDetailResponse>> getGroupDetail(@PathVariable Long groupId) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         GroupDetail detail = groupService.getGroupDetail(groupId, currentUserId);
-        return ResponseEntity.ok(DataResponse.from(GroupMapper.toDetailResponse(detail)));
+        return ResponseEntity.ok(DataResponse.from(GroupMapper.toDetailResponse(detail, currentUserId)));
     }
 
     @Override
@@ -70,7 +70,7 @@ public class GroupController implements GroupApi {
             @PathVariable Long groupId, @RequestBody @Valid UpdateGroupRequest request) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         GroupDetail detail = groupService.updateGroup(groupId, currentUserId, request);
-        return ResponseEntity.ok(DataResponse.from(GroupMapper.toDetailResponse(detail)));
+        return ResponseEntity.ok(DataResponse.from(GroupMapper.toDetailResponse(detail, currentUserId)));
     }
 
     @Override
@@ -121,7 +121,7 @@ public class GroupController implements GroupApi {
     public ResponseEntity<DataResponse<GroupDetailResponse>> joinGroup(@PathVariable String inviteCode) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         GroupDetail detail = groupService.joinGroup(inviteCode, currentUserId);
-        return ResponseEntity.ok(DataResponse.from(GroupMapper.toDetailResponse(detail)));
+        return ResponseEntity.ok(DataResponse.from(GroupMapper.toDetailResponse(detail, currentUserId)));
     }
 
     private Pageable pageable(int page, int size) {
