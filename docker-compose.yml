@@ -61,6 +61,9 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
       - --default-time-zone=+09:00
+    # SSH 터널 경유 GUI 클라이언트(DataGrip 등) 접속용. 루프백에만 바인딩해 외부 노출은 막는다.
+    ports:
+      - "127.0.0.1:3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
