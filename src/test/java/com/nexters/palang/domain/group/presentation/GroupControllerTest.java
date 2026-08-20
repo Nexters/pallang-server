@@ -97,7 +97,8 @@ class GroupControllerTest {
                         .content(objectMapper.writeValueAsString(createRequest())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.groupId").value(1))
-                .andExpect(jsonPath("$.data.memberCount").value(1));
+                .andExpect(jsonPath("$.data.memberCount").value(1))
+                .andExpect(jsonPath("$.data.isHost").value(true));
     }
 
     @Test
@@ -142,7 +143,20 @@ class GroupControllerTest {
 
         mockMvc.perform(get("/api/groups/1"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.memberCount").value(2));
+                .andExpect(jsonPath("$.data.memberCount").value(2))
+                .andExpect(jsonPath("$.data.isHost").value(true));
+    }
+
+    @Test
+    @DisplayName("모임장이 아닌 모임원이 상세 조회하면 isHost는 false다")
+    void getGroupDetail_whenNotHost_thenIsHostFalse() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(2L);
+        Group group = group(1L, user(1L));
+        given(groupService.getGroupDetail(1L, 2L)).willReturn(new GroupDetail(group, 2L));
+
+        mockMvc.perform(get("/api/groups/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.isHost").value(false));
     }
 
     @Test
@@ -179,7 +193,8 @@ class GroupControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updateRequest())))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.name").value("주말 독서 모임"));
+                .andExpect(jsonPath("$.data.name").value("주말 독서 모임"))
+                .andExpect(jsonPath("$.data.isHost").value(true));
     }
 
     @Test
@@ -312,7 +327,8 @@ class GroupControllerTest {
 
         mockMvc.perform(post("/api/groups/invitations/" + group.getInviteCode() + "/join"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.memberCount").value(2));
+                .andExpect(jsonPath("$.data.memberCount").value(2))
+                .andExpect(jsonPath("$.data.isHost").value(false));
     }
 
     @Test
