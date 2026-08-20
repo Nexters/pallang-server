@@ -43,7 +43,7 @@ public class OpinionGuestSampleSeedRunner implements ApplicationRunner {
     private static final int SAMPLE_PAGE_70 = 70;
     private static final String SAMPLE_QUOTE_70 = "빵충은 번데기로 변태하는 순간 영양 성분이 급격히 변질되며, 특유의 향과 식감이 사라져 "
             + "상품 가치가 사라집니다. 또한 번데기에서는 다량의 온실가스가 배출되어 기후 변화에 악영향을 미칠 가능성이 발견되었습니다.";
-    private static final List<String> SAMPLE_OPINIONS_70 = List.of("응 ???", "위험한걸 왜 사육하는거임?");
+    private static final List<String> SAMPLE_OPINIONS_70 = List.of("응 ???");
 
     private static final String DECORATION_COLOR = "#FF0000";
 
