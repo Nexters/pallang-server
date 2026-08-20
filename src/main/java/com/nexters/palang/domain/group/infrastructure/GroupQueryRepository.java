@@ -65,10 +65,12 @@ public class GroupQueryRepository {
         List<GroupSummaryProjection> content = groupIds.stream()
                 .map(groupsById::get)
                 .filter(Objects::nonNull)
+                // host는 fetch join 대상이 아니라 LAZY 프록시지만, id만 읽는 건 프록시 초기화 없이도
+                // 안전하다(식별자는 프록시 생성 시점에 이미 채워져 있음) — LazyInitializationException 걱정 없다.
                 .map(g -> new GroupSummaryProjection(
                         g.getId(), g.getName(), g.getBook().getId(), g.getBook().getTitle(),
                         g.getBook().getCoverImageUrl(), memberCountsByGroupId.getOrDefault(g.getId(), 0L),
-                        g.getCapacity(), g.getStartDate(), g.getEndDate()))
+                        g.getCapacity(), g.getStartDate(), g.getEndDate(), g.getHost().getId().equals(userId)))
                 .toList();
 
         long total = countMyGroups(userId);

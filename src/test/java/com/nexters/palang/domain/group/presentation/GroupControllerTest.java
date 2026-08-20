@@ -16,6 +16,7 @@ import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.group.application.GroupDetail;
 import com.nexters.palang.domain.group.application.GroupInvitationPreview;
 import com.nexters.palang.domain.group.application.GroupService;
+import com.nexters.palang.domain.group.application.GroupSummaryProjection;
 import com.nexters.palang.domain.group.common.error.GroupErrorCode;
 import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.group.domain.Group;
@@ -132,6 +133,25 @@ class GroupControllerTest {
         given(groupService.getMyGroups(eq(1L), any())).willReturn(new PageImpl<>(List.of(), DEFAULT_PAGEABLE, 0));
 
         mockMvc.perform(get("/api/groups")).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("모임 목록 조회 응답에는 모임별 isHost 여부가 포함된다")
+    void getMyGroups_includesIsHostPerGroup() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        GroupSummaryProjection hostedGroup = new GroupSummaryProjection(
+                1L, "고전 뽀개기", 1L, "채식주의자", null, 1L, 4,
+                LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20), true);
+        GroupSummaryProjection joinedGroup = new GroupSummaryProjection(
+                2L, "주말 독서 모임", 2L, "소년이 온다", null, 2L, 4,
+                LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20), false);
+        given(groupService.getMyGroups(eq(1L), any()))
+                .willReturn(new PageImpl<>(List.of(hostedGroup, joinedGroup), DEFAULT_PAGEABLE, 2));
+
+        mockMvc.perform(get("/api/groups"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.groups[0].isHost").value(true))
+                .andExpect(jsonPath("$.data.groups[1].isHost").value(false));
     }
 
     @Test

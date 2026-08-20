@@ -12,6 +12,7 @@ public record GroupSummaryProjection(
         long memberCount,
         int capacity,
         LocalDate startDate,
-        LocalDate endDate
+        LocalDate endDate,
+        boolean isHost
 ) {
 }
