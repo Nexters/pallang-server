@@ -87,6 +87,8 @@ class GroupQueryRepositoryTest {
                 .containsExactly(myGroup2.getId(), myGroup1.getId());
         assertThat(result.getContent().get(0).memberCount()).isEqualTo(2L);
         assertThat(result.getContent().get(1).memberCount()).isEqualTo(1L);
+        assertThat(result.getContent().get(0).isHost()).isFalse(); // myGroup2는 other가 host, me는 member
+        assertThat(result.getContent().get(1).isHost()).isTrue(); // myGroup1은 me가 host
     }
 
     @Test

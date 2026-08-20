@@ -35,7 +35,7 @@ public final class GroupMapper {
         return new GroupSummaryResponse(
                 projection.groupId(), projection.name(), projection.bookId(), projection.bookTitle(),
                 projection.bookCoverImageUrl(), projection.memberCount(), projection.capacity(),
-                projection.startDate(), projection.endDate(), ended);
+                projection.startDate(), projection.endDate(), ended, projection.isHost());
     }
 
     public static GroupListResponse toListResponse(Page<GroupSummaryProjection> page) {
