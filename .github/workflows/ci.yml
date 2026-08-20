@@ -78,6 +78,15 @@ jobs:
           path: build/reports/tests/test
           retention-days: 5
 
+      # Docker의 builder 스테이지(Gradle 컴파일)를 CI에서 또 돌리면 위의 "Build and run tests"와
+      # 완전히 같은 컴파일이 중복 실행된다. 이미 만들어진 jar를 builder 스테이지 결과물 자리에
+      # 대신 채워 넣어(--build-context로 builder 스테이지 자체를 치환) 재컴파일을 건너뛴다.
+      # Dockerfile 구조는 그대로이므로 실제 배포 이미지를 빌드하는 cd.yml은 영향받지 않고 전체 빌드를 그대로 수행한다.
+      - name: Prepare pre-built jar for Docker builder-stage override
+        run: |
+          mkdir -p docker-builder-context/workspace/build/libs
+          cp build/libs/*.jar docker-builder-context/workspace/build/libs/
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -85,6 +94,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          build-contexts: |
+            builder=docker-builder-context
           push: false
           tags: pallang-ci-check:${{ github.sha }}
           cache-from: type=gha
