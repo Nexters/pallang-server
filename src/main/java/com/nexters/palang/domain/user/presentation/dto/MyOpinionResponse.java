@@ -7,6 +7,7 @@ public record MyOpinionResponse(
         @Schema(example = "1", requiredMode = Schema.RequiredMode.REQUIRED) Long opinionId,
         @Schema(example = "1", requiredMode = Schema.RequiredMode.REQUIRED) Long bookId,
         @Schema(example = "채식주의자", requiredMode = Schema.RequiredMode.REQUIRED) String bookTitle,
+        @Schema(example = "한강", requiredMode = Schema.RequiredMode.REQUIRED) String author,
         @Schema(example = "https://image.aladin.co.kr/product/123/45/cover/8936434120_1.jpg", nullable = true) String bookCoverImageUrl,
         @Schema(example = "1", requiredMode = Schema.RequiredMode.REQUIRED) Long passageId,
         @Schema(example = "우리는 모두 이야기를 찾아 헤맨다.", requiredMode = Schema.RequiredMode.REQUIRED) String quotedText,

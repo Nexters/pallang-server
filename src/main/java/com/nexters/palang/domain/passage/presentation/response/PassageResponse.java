@@ -15,6 +15,15 @@ import org.springframework.data.domain.Page;
 
 public class PassageResponse {
 
+    public record SpoilerUpdate(
+            @Schema(example = "1", requiredMode = Schema.RequiredMode.REQUIRED) Long passageId,
+            @Schema(example = "false", requiredMode = Schema.RequiredMode.REQUIRED) boolean isSpoiler
+    ) {
+        public static SpoilerUpdate from(Passage passage) {
+            return new SpoilerUpdate(passage.getId(), passage.isSpoiler());
+        }
+    }
+
     public record SimilarCandidates(
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<SimilarCandidate> passages
     ) {

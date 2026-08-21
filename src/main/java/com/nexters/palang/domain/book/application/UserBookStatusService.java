@@ -72,4 +72,12 @@ public class UserBookStatusService {
             throw new BookException(BookErrorCode.INVALID_CURRENT_PAGE);
         }
     }
+
+    @Transactional
+    public void removeBookStatus(Long userId, Long bookId) {
+        if (!userBookStatusRepository.existsByUserIdAndBookId(userId, bookId)) {
+            throw new BookException(BookErrorCode.USER_BOOK_STATUS_NOT_FOUND);
+        }
+        userBookStatusRepository.deleteByUserIdAndBookId(userId, bookId);
+    }
 }

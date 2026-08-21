@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.opinion.infrastructure;
 
 import com.nexters.palang.domain.block.domain.QUserBlock;
+import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.book.domain.QBook;
 import com.nexters.palang.domain.comment.domain.QComment;
 import com.nexters.palang.domain.opinion.application.LikedOpinionProjection;
@@ -89,20 +90,22 @@ public class OpinionQueryRepository {
         return new OrderSpecifier<?>[]{opinion.createdAt.desc(), opinion.id.desc()};
     }
 
-    public Page<MyOpinionProjection> findMyOpinions(Long userId, Pageable pageable) {
+    public Page<MyOpinionProjection> findMyOpinions(Long userId, Long bookId, Pageable pageable) {
         QOpinion opinion = QOpinion.opinion;
         QPassage passage = QPassage.passage;
         QBook book = QBook.book;
 
+        BooleanExpression bookFilter = bookId != null ? book.id.eq(bookId) : null;
+
         List<MyOpinionProjection> content = queryFactory
                 .select(Projections.constructor(MyOpinionProjection.class,
-                        opinion.id, book.id, book.title, book.coverImageUrl,
+                        opinion.id, book.id, book.title, book.author, book.coverImageUrl,
                         passage.id, passage.quotedText, passage.pageNumber,
                         opinion.content, opinion.likeCount, opinion.createdAt))
                 .from(opinion)
                 .join(opinion.passage, passage)
                 .join(passage.book, book)
-                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull())
+                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(), bookFilter)
                 .orderBy(opinion.createdAt.desc(), opinion.id.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
@@ -111,29 +114,35 @@ public class OpinionQueryRepository {
         Long total = queryFactory
                 .select(opinion.count())
                 .from(opinion)
-                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull())
+                .join(opinion.passage, passage)
+                .join(passage.book, book)
+                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(), bookFilter)
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
     }
 
     // liked_at(=OpinionLike.createdAt) 최신순. idx_likes_user_created(user_id, created_at) 인덱스와 정합.
-    public Page<LikedOpinionProjection> findLikedOpinions(Long userId, Pageable pageable) {
+    public Page<LikedOpinionProjection> findLikedOpinions(Long userId, Long bookId, Pageable pageable) {
         QOpinionLike opinionLike = QOpinionLike.opinionLike;
         QOpinion opinion = QOpinion.opinion;
         QPassage passage = QPassage.passage;
         QBook book = QBook.book;
+        QUser author = QUser.user;
+
+        BooleanExpression bookFilter = bookId != null ? book.id.eq(bookId) : null;
 
         List<LikedOpinionProjection> content = queryFactory
                 .select(Projections.constructor(LikedOpinionProjection.class,
-                        opinion.id, book.id, book.title, book.coverImageUrl,
+                        opinion.id, book.id, book.title, book.author, book.coverImageUrl,
                         passage.id, passage.quotedText, passage.pageNumber,
-                        opinion.content, opinion.likeCount, opinion.createdAt, opinionLike.createdAt))
+                        opinion.content, author.nickname, opinion.likeCount, opinion.createdAt, opinionLike.createdAt))
                 .from(opinionLike)
                 .join(opinionLike.opinion, opinion)
                 .join(opinion.passage, passage)
                 .join(passage.book, book)
-                .where(opinionLike.user.id.eq(userId), opinion.deletedAt.isNull())
+                .join(opinion.user, author)
+                .where(opinionLike.user.id.eq(userId), opinion.deletedAt.isNull(), bookFilter)
                 .orderBy(opinionLike.createdAt.desc(), opinionLike.id.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
@@ -143,6 +152,40 @@ public class OpinionQueryRepository {
                 .select(opinionLike.count())
                 .from(opinionLike)
                 .join(opinionLike.opinion, opinion)
+                .join(opinion.passage, passage)
+                .join(passage.book, book)
+                .where(opinionLike.user.id.eq(userId), opinion.deletedAt.isNull(), bookFilter)
+                .fetchOne();
+
+        return new PageImpl<>(content, pageable, total != null ? total : 0L);
+    }
+
+    // 좋아요·스포일러 관리 화면 공용 "전체 책 보기" 드롭다운: 활동(좋아요/스포일러) 최신순으로 중복 없이 책만 나열.
+    public Page<BookOptionProjection> findLikedBookOptions(Long userId, Pageable pageable) {
+        QOpinionLike opinionLike = QOpinionLike.opinionLike;
+        QOpinion opinion = QOpinion.opinion;
+        QPassage passage = QPassage.passage;
+        QBook book = QBook.book;
+
+        List<BookOptionProjection> content = queryFactory
+                .select(Projections.constructor(BookOptionProjection.class, book.id, book.title))
+                .from(opinionLike)
+                .join(opinionLike.opinion, opinion)
+                .join(opinion.passage, passage)
+                .join(passage.book, book)
+                .where(opinionLike.user.id.eq(userId), opinion.deletedAt.isNull())
+                .groupBy(book.id, book.title)
+                .orderBy(opinionLike.createdAt.max().desc())
+                .offset(pageable.getOffset())
+                .limit(pageable.getPageSize())
+                .fetch();
+
+        Long total = queryFactory
+                .select(book.countDistinct())
+                .from(opinionLike)
+                .join(opinionLike.opinion, opinion)
+                .join(opinion.passage, passage)
+                .join(passage.book, book)
                 .where(opinionLike.user.id.eq(userId), opinion.deletedAt.isNull())
                 .fetchOne();
 

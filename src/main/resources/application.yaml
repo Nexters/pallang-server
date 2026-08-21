@@ -22,7 +22,7 @@ apple:
   private-key: ${APPLE_PRIVATE_KEY:}
 
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3009,http://localhost:3010}
 
 jwt:
   secret: ${JWT_SECRET:local-dev-jwt-secret-key-please-change-this-01234567890123456789}
@@ -31,6 +31,17 @@ jwt:
 
 # 이미지 업로드 저장 경로. 가비아 상용 클라우드에는 오브젝트 스토리지 상품이 없어
 # 서버(Docker volume)에 직접 저장하고 /images/** 경로로 서빙한다.
+# base-url: Spring 리소스 핸들러 매핑 경로(WebStorageConfig), public-base-url: 클라이언트에 내려줄 절대 URL(FileStorageService).
+# 이 둘을 분리하지 않으면 base-url이 상대 경로라 클라이언트가 자기 자신의 origin 기준으로 이미지를 요청해 404가 난다.
 storage:
   upload-dir: ${IMAGE_UPLOAD_DIR:./uploads}
   base-url: /images
+  public-base-url: ${STORAGE_PUBLIC_BASE_URL:http://localhost:8080/images}
+
+# 서비스 계정 키(JSON)를 base64로 인코딩해 주입. 비어있으면 FirebaseConfig가 NoOpFcmPushSender로 폴백한다.
+firebase:
+  credentials-base64: ${FIREBASE_CREDENTIALS_BASE64:}
+
+notification:
+  # "책에 새 의견 N개 이상" 알림 트리거 기준값.
+  book-new-opinions-threshold: ${NOTIFICATION_BOOK_NEW_OPINIONS_THRESHOLD:5}

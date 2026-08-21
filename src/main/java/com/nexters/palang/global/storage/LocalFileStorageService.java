@@ -14,13 +14,13 @@ import org.springframework.web.multipart.MultipartFile;
 public class LocalFileStorageService implements FileStorageService {
 
     private final Path uploadDir;
-    private final String baseUrl;
+    private final String publicBaseUrl;
 
     public LocalFileStorageService(
             @Value("${storage.upload-dir}") String uploadDir,
-            @Value("${storage.base-url}") String baseUrl) {
+            @Value("${storage.public-base-url}") String publicBaseUrl) {
         this.uploadDir = Path.of(uploadDir).toAbsolutePath().normalize();
-        this.baseUrl = baseUrl;
+        this.publicBaseUrl = publicBaseUrl;
     }
 
     @Override
@@ -37,6 +37,6 @@ public class LocalFileStorageService implements FileStorageService {
             throw new AppException(GlobalErrorCode.INTERNAL_SERVER_ERROR);
         }
 
-        return baseUrl + "/" + subDirectory + "/" + filename;
+        return publicBaseUrl + "/" + subDirectory + "/" + filename;
     }
 }

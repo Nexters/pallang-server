@@ -1,15 +1,17 @@
 package com.nexters.palang.domain.book.presentation;
 
 import com.nexters.palang.domain.book.application.BookMapper;
+import com.nexters.palang.domain.book.application.BookSearchSort;
 import com.nexters.palang.domain.book.application.BookService;
+import com.nexters.palang.domain.book.application.OpinionCountScope;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.presentation.dto.BookActivityListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookCarouselListResponse;
+import com.nexters.palang.domain.book.presentation.dto.BookDetailResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookSearchListResponse;
 import com.nexters.palang.domain.book.presentation.dto.CreateBookRequest;
-import com.nexters.palang.domain.book.presentation.dto.ExternalBookListResponse;
 import com.nexters.palang.global.common.response.DataResponse;
 import com.nexters.palang.global.security.CurrentUserProvider;
 import jakarta.validation.Valid;
@@ -19,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -38,22 +41,23 @@ public class BookController implements BookApi {
 
     @Override
     @GetMapping("/api/books/search")
-    public ResponseEntity<DataResponse<ExternalBookListResponse>> searchExternalBooks(
+    public ResponseEntity<DataResponse<BookSearchListResponse>> searchBooks(
             @RequestParam String keyword,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         return ResponseEntity.ok(DataResponse.from(
-                BookMapper.toExternalListResponse(bookService.searchExternalBooks(keyword, pageable(page, size)))));
+                BookMapper.toSearchListResponse(bookService.searchBooks(keyword, pageable(page, size)))));
     }
 
     @Override
     @GetMapping("/api/books/internal-search")
     public ResponseEntity<DataResponse<BookSearchListResponse>> searchInternalBooks(
             @RequestParam String keyword,
+            @RequestParam(defaultValue = "RECENT") BookSearchSort sort,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
-        return ResponseEntity.ok(DataResponse.from(
-                BookMapper.toSearchListResponse(bookService.searchInternalBooks(keyword, pageable(page, size)))));
+        return ResponseEntity.ok(DataResponse.from(BookMapper.toSearchListResponse(
+                bookService.searchInternalBooks(keyword, sort, pageable(page, size)))));
     }
 
     @Override
@@ -76,13 +80,25 @@ public class BookController implements BookApi {
     }
 
     @Override
+    @GetMapping("/api/books/my-library")
+    public ResponseEntity<DataResponse<BookActivityListResponse>> getMyLibraryBooks(
+            @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size,
+            @RequestParam(defaultValue = "ALL") OpinionCountScope opinionCountScope) {
+        Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
+        return ResponseEntity.ok(DataResponse.from(BookMapper.toActivityListResponse(
+                bookService.getMyLibraryBooks(currentUserId, pageable(page, size), opinionCountScope))));
+    }
+
+    @Override
     @GetMapping("/api/books/recent")
     public ResponseEntity<DataResponse<BookListResponse>> getRecentBooks(
+            @RequestParam(required = false) String keyword,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        return ResponseEntity.ok(DataResponse.from(
-                BookMapper.toListResponse(bookService.getRecentBooks(currentUserId, pageable(page, size)))));
+        return ResponseEntity.ok(DataResponse.from(BookMapper.toListResponse(
+                bookService.getRecentBooks(currentUserId, keyword, pageable(page, size)))));
     }
 
     @Override
@@ -92,6 +108,14 @@ public class BookController implements BookApi {
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         return ResponseEntity.ok(DataResponse.from(
                 BookMapper.toActivityListResponse(bookService.getPopularBooks(pageable(page, size)))));
+    }
+
+    @Override
+    @GetMapping("/api/books/{bookId}")
+    public ResponseEntity<DataResponse<BookDetailResponse>> getBookDetail(@PathVariable Long bookId) {
+        Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
+        return ResponseEntity.ok(DataResponse.from(
+                BookMapper.toDetailResponse(bookService.getBookDetail(bookId, currentUserId))));
     }
 
     private Pageable pageable(int page, int size) {
