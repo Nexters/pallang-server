@@ -167,12 +167,16 @@ public class OpinionService {
         return existing;
     }
 
-    // 비로그인 사용자는 마이페이지 미리보기로 샘플 계정(GuestSampleAccount)의 실제 흔적을 본다
-    // (기획 확정, 이슈 #120). 이 계정과 그 계정의 흔적/꾸밈은 OpinionGuestSampleSeedRunner가 앱 기동
-    // 시 미리 만들어둔다 — 하드코딩 대신 실데이터를 재사용해야 상세 화면의 Decoration(밑줄/동그라미 등)도
-    // 자연스럽게 함께 보인다. 씨딩 전이거나 실패한 환경(로컬 등)에서는 빈 목록을 반환한다.
+    // 비로그인 사용자와, 로그인했지만 아직 남긴 흔적이 하나도 없는 신규 가입 계정은 마이페이지 미리보기로
+    // 샘플 계정(GuestSampleAccount)의 실제 흔적을 본다 (기획 확정, 이슈 #120). 이 계정과 그 계정의
+    // 흔적/꾸밈은 OpinionGuestSampleSeedRunner가 앱 기동 시 미리 만들어둔다 — 하드코딩 대신 실데이터를
+    // 재사용해야 상세 화면의 Decoration(밑줄/동그라미 등)도 자연스럽게 함께 보인다. 씨딩 전이거나 실패한
+    // 환경(로컬 등)에서는 빈 목록을 반환한다. bookId로 필터링해서 우연히 결과가 0건인 경우(다른 책에는
+    // 흔적이 있음)와 구분하기 위해, "흔적이 하나도 없다"는 판단은 bookId 필터 없이 전체 기준으로 한다.
     public Page<MyOpinionProjection> getMyOpinions(Long userId, Long bookId, Pageable pageable) {
-        if (userId == null) {
+        boolean isNewAccountWithNoOpinions =
+                userId != null && opinionRepository.countByUserIdAndDeletedAtIsNull(userId) == 0;
+        if (userId == null || isNewAccountWithNoOpinions) {
             return userRepository
                     .findBySnsProviderAndSnsId(GuestSampleAccount.SNS_PROVIDER, GuestSampleAccount.SNS_ID)
                     .map(sampleUser -> opinionQueryRepository.findMyOpinions(sampleUser.getId(), bookId, pageable))

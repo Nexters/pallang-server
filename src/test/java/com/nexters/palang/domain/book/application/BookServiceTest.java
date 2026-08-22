@@ -390,7 +390,8 @@ class BookServiceTest {
     @DisplayName("내 서재 조회는 opinionCountScope가 MINE이어도 그대로 리포지토리에 위임한다")
     void getMyLibraryBooksDelegatesMineScopeToRepository() {
         Pageable pageable = PageRequest.of(1, 20);
-        Page<BookActivityProjection> expected = new PageImpl<>(List.of(), pageable, 0);
+        Page<BookActivityProjection> expected = new PageImpl<>(
+                List.of(new BookActivityProjection(1L, "책1", "작가", "출판사", "cover", 5, 0)), pageable, 21);
         given(bookQueryRepository.findMyLibraryBooks(10L, pageable, OpinionCountScope.MINE)).willReturn(expected);
 
         Page<BookActivityProjection> results = bookService.getMyLibraryBooks(10L, pageable, OpinionCountScope.MINE);
@@ -404,6 +405,20 @@ class BookServiceTest {
         Pageable pageable = PageRequest.of(0, 20);
 
         Page<BookActivityProjection> results = bookService.getMyLibraryBooks(null, pageable, OpinionCountScope.ALL);
+
+        assertThat(results.getTotalElements()).isEqualTo(1);
+        assertThat(results.getContent().get(0).bookId()).isEqualTo(18L);
+        assertThat(results.getContent().get(0).title()).isEqualTo("빵충 사육 준수 사항");
+    }
+
+    @Test
+    @DisplayName("로그인했지만 서재에 책이 하나도 없는 신규 가입 계정이 조회하면 고정 샘플 도서 1건을 반환한다")
+    void getMyLibraryBooksReturnsSampleWhenNewAccountWithNoBooks() {
+        Pageable pageable = PageRequest.of(0, 20);
+        given(bookQueryRepository.findMyLibraryBooks(10L, pageable, OpinionCountScope.ALL))
+                .willReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        Page<BookActivityProjection> results = bookService.getMyLibraryBooks(10L, pageable, OpinionCountScope.ALL);
 
         assertThat(results.getTotalElements()).isEqualTo(1);
         assertThat(results.getContent().get(0).bookId()).isEqualTo(18L);

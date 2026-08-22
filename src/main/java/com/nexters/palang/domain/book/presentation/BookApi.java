@@ -114,8 +114,8 @@ public interface BookApi {
                     + "가장 최근에 흔적을 남긴 도서부터 내림차순으로 정렬됩니다. opinionCountScope로 흔적 수 집계 "
                     + "기준을 선택할 수 있습니다: ALL(기본값, 도서 전체 흔적 수 - 홈 화면 노출용) 또는 "
                     + "MINE(로그인 사용자 본인이 남긴 흔적 수 - 마이페이지 노출용). "
-                    + "인증 불필요. Authorization: Bearer {accessToken} 헤더가 없으면(비로그인) 샘플 도서 1건을 "
-                    + "고정 응답으로 반환합니다.")
+                    + "인증 불필요. Authorization: Bearer {accessToken} 헤더가 없거나(비로그인), 로그인했지만 "
+                    + "서재에 책이 하나도 없는 신규 가입 계정이면 샘플 도서 1건을 고정 응답으로 반환합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",

@@ -132,7 +132,8 @@ public class BookService {
         return Math.max(0, (total - size) / 2);
     }
 
-    // 비로그인 사용자는 홈에서 실제 서재 대신 고정 샘플 도서 1건을 본다 (기획 확정, 이슈 #119).
+    // 비로그인 사용자와, 로그인했지만 서재에 책이 하나도 없는 신규 가입 계정은 홈에서 실제 서재 대신 고정
+    // 샘플 도서 1건을 본다 (기획 확정, 이슈 #119).
     private static final BookActivityProjection GUEST_SAMPLE_LIBRARY_BOOK = new BookActivityProjection(
             18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "안전가옥",
             "https://image.aladin.co.kr/product/39872/66/cover200/k242130313_1.jpg", 13L, 17L);
@@ -142,7 +143,11 @@ public class BookService {
         if (userId == null) {
             return new PageImpl<>(List.of(GUEST_SAMPLE_LIBRARY_BOOK), pageable, 1);
         }
-        return bookQueryRepository.findMyLibraryBooks(userId, pageable, opinionCountScope);
+        Page<BookActivityProjection> myLibraryBooks = bookQueryRepository.findMyLibraryBooks(userId, pageable, opinionCountScope);
+        if (myLibraryBooks.getTotalElements() == 0) {
+            return new PageImpl<>(List.of(GUEST_SAMPLE_LIBRARY_BOOK), pageable, 1);
+        }
+        return myLibraryBooks;
     }
 
     public Page<Book> getRecentBooks(Long userId, String keyword, Pageable pageable) {
