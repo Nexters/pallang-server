@@ -146,8 +146,8 @@ public interface UserApi {
 
     @Operation(summary = "내가 남긴 흔적 목록", description = "내가 작성한 흔적을 최신순으로 조회합니다. "
             + "bookId를 지정하면 해당 책의 흔적만 조회합니다(내 서재 책 상세 - 의견 탭). 생략하면 전체 책을 대상으로 합니다. "
-            + "인증 불필요. Authorization: Bearer {accessToken} 헤더가 없으면(비로그인) 샘플 흔적 목록을 "
-            + "고정 응답으로 반환합니다.")
+            + "인증 불필요. Authorization: Bearer {accessToken} 헤더가 없거나(비로그인), 로그인했지만 남긴 "
+            + "흔적이 하나도 없는 계정이면 샘플 흔적 목록을 고정 응답으로 반환합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
