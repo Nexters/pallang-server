@@ -460,7 +460,7 @@ class OpinionServiceTest {
     }
 
     @Test
-    @DisplayName("로그인했지만 남긴 흔적이 하나도 없는 신규 가입 계정이 조회하면 샘플 계정의 실제 흔적을 반환한다")
+    @DisplayName("로그인했지만 남긴 흔적이 하나도 없는 계정이 조회하면 샘플 계정의 실제 흔적을 반환한다")
     void getMyOpinionsReturnsSampleAccountOpinionsWhenNewAccountWithNoOpinions() {
         Pageable pageable = PageRequest.of(0, 20);
         User sampleUser = User.builder()

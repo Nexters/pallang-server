@@ -412,8 +412,8 @@ class BookServiceTest {
     }
 
     @Test
-    @DisplayName("로그인했지만 서재에 책이 하나도 없는 신규 가입 계정이 조회하면 고정 샘플 도서 1건을 반환한다")
-    void getMyLibraryBooksReturnsSampleWhenNewAccountWithNoBooks() {
+    @DisplayName("로그인했지만 서재에 책이 하나도 없는 계정이 조회하면 고정 샘플 도서 1건을 반환한다")
+    void getMyLibraryBooksReturnsSampleWhenAccountHasNoBooks() {
         Pageable pageable = PageRequest.of(0, 20);
         given(bookQueryRepository.findMyLibraryBooks(10L, pageable, OpinionCountScope.ALL))
                 .willReturn(new PageImpl<>(List.of(), pageable, 0));
@@ -423,6 +423,44 @@ class BookServiceTest {
         assertThat(results.getTotalElements()).isEqualTo(1);
         assertThat(results.getContent().get(0).bookId()).isEqualTo(18L);
         assertThat(results.getContent().get(0).title()).isEqualTo("빵충 사육 준수 사항");
+    }
+
+    @Test
+    @DisplayName("서재가 비어 있는 계정이 opinionCountScope=MINE으로 조회하면 샘플 도서의 내 흔적 수는 0이다")
+    void getMyLibraryBooksReturnsSampleWithZeroOpinionCountForMineScope() {
+        Pageable pageable = PageRequest.of(0, 20);
+        given(bookQueryRepository.findMyLibraryBooks(10L, pageable, OpinionCountScope.MINE))
+                .willReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        Page<BookActivityProjection> results = bookService.getMyLibraryBooks(10L, pageable, OpinionCountScope.MINE);
+
+        assertThat(results.getTotalElements()).isEqualTo(1);
+        assertThat(results.getContent().get(0).bookId()).isEqualTo(18L);
+        assertThat(results.getContent().get(0).opinionCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("서재가 비어 있어도 첫 페이지가 아니면 샘플 도서를 반복해서 반환하지 않는다")
+    void getMyLibraryBooksDoesNotRepeatSampleOnLaterPages() {
+        Pageable secondPage = PageRequest.of(1, 20);
+        given(bookQueryRepository.findMyLibraryBooks(10L, secondPage, OpinionCountScope.ALL))
+                .willReturn(new PageImpl<>(List.of(), secondPage, 0));
+
+        Page<BookActivityProjection> results = bookService.getMyLibraryBooks(10L, secondPage, OpinionCountScope.ALL);
+
+        assertThat(results.getContent()).isEmpty();
+        assertThat(results.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("비로그인 사용자도 첫 페이지가 아니면 샘플 도서를 반복해서 반환하지 않는다")
+    void getMyLibraryBooksDoesNotRepeatSampleOnLaterPagesWhenGuest() {
+        Pageable secondPage = PageRequest.of(1, 20);
+
+        Page<BookActivityProjection> results = bookService.getMyLibraryBooks(null, secondPage, OpinionCountScope.ALL);
+
+        assertThat(results.getContent()).isEmpty();
+        assertThat(results.getTotalElements()).isEqualTo(1);
     }
 
     @Test
