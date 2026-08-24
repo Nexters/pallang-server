@@ -12,4 +12,7 @@ public interface DeviceTokenRepository extends JpaRepository<DeviceToken, Long> 
     List<DeviceToken> findAllByUserId(Long userId);
 
     void deleteByTokenAndUserId(String token, Long userId);
+
+    // 관리자 유저 삭제(AdminUserService): 이 유저의 디바이스 토큰 전부.
+    void deleteAllByUserId(Long userId);
 }

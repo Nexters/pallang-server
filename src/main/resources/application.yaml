@@ -45,3 +45,8 @@ firebase:
 notification:
   # "책에 새 의견 N개 이상" 알림 트리거 기준값.
   book-new-opinions-threshold: ${NOTIFICATION_BOOK_NEW_OPINIONS_THRESHOLD:5}
+
+# 관리자 페이지/API 접근 화이트리스트. 별도 관리자 계정 체계 없이, 기존 로그인 JWT의 userId가
+# 이 목록에 있어야 통과한다(AdminAccessGuard). 콤마로 구분된 userId 목록.
+admin:
+  user-ids: ${ADMIN_USER_IDS:}
