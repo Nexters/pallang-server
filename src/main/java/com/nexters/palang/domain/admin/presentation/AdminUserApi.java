@@ -18,7 +18,7 @@ import org.springframework.http.ResponseEntity;
 public interface AdminUserApi {
 
     @Operation(summary = "관리자 유저 검색", description = "닉네임 또는 이메일에 키워드가 포함된 유저를 검색합니다. "
-            + "관리자 화이트리스트(admin.user-ids)에 속한 계정의 JWT로만 호출할 수 있습니다.")
+            + "관리자 로그인(POST /api/admin/auth/login)으로 발급받은 토큰으로만 호출할 수 있습니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "403", description = "관리자 권한 없음 (ADMIN_403_1)",

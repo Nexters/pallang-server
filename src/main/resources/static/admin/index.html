@@ -96,35 +96,43 @@
 </head>
 <body>
   <h1>Pallang 관리자</h1>
-  <p class="subtitle">테스트/QA 데이터를 검색해서 수정·삭제합니다. 관리자 화이트리스트(admin.user-ids)에 등록된 계정의
-    JWT access token으로만 동작합니다. 삭제는 되돌릴 수 없습니다.</p>
+  <p class="subtitle">테스트/QA 데이터를 검색해서 수정·삭제합니다. 일반 유저 로그인과는 별개인 관리자 전용 계정으로
+    로그인해야 합니다. 삭제는 되돌릴 수 없습니다.</p>
 
-  <div class="card">
+  <div class="card" id="loginCard">
     <div class="row">
-      <input id="token" type="password" placeholder="Authorization: Bearer 없이 access token만 붙여넣으세요" />
-      <button id="saveToken" class="secondary">토큰 저장</button>
+      <input id="loginUsername" type="text" placeholder="아이디" autocomplete="username" />
+      <input id="loginPassword" type="password" placeholder="비밀번호" autocomplete="current-password" />
+      <button id="loginBtn">로그인</button>
     </div>
+    <div id="loginStatus"></div>
   </div>
 
-  <div class="tabs" id="tabs"></div>
-
-  <div class="card">
-    <div class="row">
-      <input id="keyword" type="text" />
-      <button id="searchBtn">검색</button>
+  <div id="mainContent" style="display: none;">
+    <div class="row" style="justify-content: flex-end; margin-bottom: 8px;">
+      <button id="logoutBtn" class="secondary">로그아웃</button>
     </div>
-    <div id="status"></div>
-  </div>
 
-  <div class="card">
-    <table>
-      <thead id="thead"></thead>
-      <tbody id="rows"></tbody>
-    </table>
-    <div class="pager">
-      <button id="prevBtn" class="secondary">이전</button>
-      <span id="pageLabel"></span>
-      <button id="nextBtn" class="secondary">다음</button>
+    <div class="tabs" id="tabs"></div>
+
+    <div class="card">
+      <div class="row">
+        <input id="keyword" type="text" />
+        <button id="searchBtn">검색</button>
+      </div>
+      <div id="status"></div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead id="thead"></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="pager">
+        <button id="prevBtn" class="secondary">이전</button>
+        <span id="pageLabel"></span>
+        <button id="nextBtn" class="secondary">다음</button>
+      </div>
     </div>
   </div>
 
@@ -260,8 +268,12 @@
     },
   };
 
-  const TOKEN_KEY = "pallang_admin_token";
-  const tokenInput = document.getElementById("token");
+  const TOKEN_KEY = "pallang_admin_session_token";
+  const loginCard = document.getElementById("loginCard");
+  const mainContent = document.getElementById("mainContent");
+  const loginUsernameInput = document.getElementById("loginUsername");
+  const loginPasswordInput = document.getElementById("loginPassword");
+  const loginStatusEl = document.getElementById("loginStatus");
   const keywordInput = document.getElementById("keyword");
   const theadEl = document.getElementById("thead");
   const rowsEl = document.getElementById("rows");
@@ -281,15 +293,68 @@
     }
   }
 
-  tokenInput.value = loadToken();
-
-  document.getElementById("saveToken").addEventListener("click", () => {
+  function saveToken(token) {
     try {
-      localStorage.setItem(TOKEN_KEY, tokenInput.value.trim());
-      setStatus("토큰을 저장했습니다.", "ok");
+      localStorage.setItem(TOKEN_KEY, token);
     } catch {
-      setStatus("이 브라우저에서는 토큰을 저장할 수 없습니다(시크릿 모드 등). 매번 다시 붙여넣어야 합니다.", "error");
+      // 시크릿 모드 등 저장이 안 되는 브라우저에서도 이번 세션 안에서는 그대로 동작하게 둔다.
     }
+  }
+
+  function clearToken() {
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      // no-op
+    }
+  }
+
+  function showLoggedOut(message) {
+    loginCard.style.display = "";
+    mainContent.style.display = "none";
+    if (message) setLoginStatus(message, "error");
+  }
+
+  function showLoggedIn() {
+    loginCard.style.display = "none";
+    mainContent.style.display = "";
+  }
+
+  function setLoginStatus(message, kind) {
+    loginStatusEl.textContent = message || "";
+    loginStatusEl.className = kind || "";
+  }
+
+  document.getElementById("loginBtn").addEventListener("click", async () => {
+    const username = loginUsernameInput.value.trim();
+    const password = loginPasswordInput.value;
+    if (!username || !password) {
+      setLoginStatus("아이디와 비밀번호를 입력하세요.", "error");
+      return;
+    }
+    setLoginStatus("로그인 중...");
+    try {
+      const result = await callApi("/api/admin/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      }, /* skipAuth */ true);
+      saveToken(result.data.accessToken);
+      loginPasswordInput.value = "";
+      setLoginStatus("");
+      showLoggedIn();
+      switchTab(currentTabKey);
+    } catch (e) {
+      setLoginStatus("로그인 실패: " + e.message, "error");
+    }
+  });
+
+  loginPasswordInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("loginBtn").click();
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    clearToken();
+    showLoggedOut();
   });
 
   function setStatus(message, kind) {
@@ -297,18 +362,22 @@
     statusEl.className = kind || "";
   }
 
-  async function callApi(path, options) {
+  async function callApi(path, options, skipAuth) {
     const token = loadToken();
     const response = await fetch(path, {
       ...options,
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: "Bearer " + token } : {}),
+        ...(!skipAuth && token ? { Authorization: "Bearer " + token } : {}),
         ...(options && options.headers ? options.headers : {}),
       },
     });
     const body = await response.json().catch(() => null);
     if (!response.ok) {
+      if (!skipAuth && (response.status === 401 || response.status === 403)) {
+        clearToken();
+        showLoggedOut("세션이 만료되었습니다. 다시 로그인해주세요.");
+      }
       const detail = body && body.detail ? body.detail : response.status + " 오류";
       throw new Error(detail);
     }
@@ -523,6 +592,13 @@
 
   renderTabs();
   switchTab(currentTabKey);
+  // 저장된 세션 토큰이 있으면 바로 메인 화면을 보여준다. 토큰이 실제로 만료/무효였다면 첫 API 호출이
+  // 401/403을 돌려주고 callApi가 자동으로 로그인 화면으로 되돌린다.
+  if (loadToken()) {
+    showLoggedIn();
+  } else {
+    showLoggedOut();
+  }
 </script>
 </body>
 </html>

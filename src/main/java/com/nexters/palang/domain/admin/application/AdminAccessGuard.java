@@ -2,29 +2,35 @@ package com.nexters.palang.domain.admin.application;
 
 import com.nexters.palang.domain.admin.common.error.AdminErrorCode;
 import com.nexters.palang.domain.admin.common.error.AdminException;
-import com.nexters.palang.global.security.CurrentUserProvider;
-import java.util.List;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-// 인가는 서비스/컨트롤러 레이어의 CurrentUserProvider가 담당한다는 이 프로젝트의 컨벤션(SecurityConfig
-// 참고)을 그대로 따른다: 별도 관리자 로그인/역할 체계를 새로 만들지 않고, 기존 로그인 JWT의 userId가
-// admin.user-ids 화이트리스트에 있는지만 확인한다.
+// 관리자 페이지/API는 일반 유저 로그인(JWT+CurrentUserProvider)과 완전히 분리된 별도 로그인
+// (AdminLoginService, POST /api/admin/auth/login)을 쓴다. 이 가드는 Authorization 헤더의 토큰을
+// AdminJwtProvider로 직접 검증한다 — 특정 유저 계정에 종속되지 않는, 이 페이지만을 위한 자격 증명이다.
 @Component
 @RequiredArgsConstructor
 public class AdminAccessGuard {
 
-    private final CurrentUserProvider currentUserProvider;
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String BEARER_PREFIX = "Bearer ";
 
-    @Value("${admin.user-ids:}")
-    private List<Long> adminUserIds;
+    private final HttpServletRequest request;
+    private final AdminJwtProvider adminJwtProvider;
 
-    public Long requireAdmin() {
-        Long userId = currentUserProvider.getCurrentUserId();
-        if (!adminUserIds.contains(userId)) {
+    public void requireAdmin() {
+        String token = resolveToken();
+        if (token == null || !adminJwtProvider.isValid(token)) {
             throw new AdminException(AdminErrorCode.ADMIN_ACCESS_DENIED);
         }
-        return userId;
+    }
+
+    private String resolveToken() {
+        String header = request.getHeader(AUTHORIZATION_HEADER);
+        if (header != null && header.startsWith(BEARER_PREFIX)) {
+            return header.substring(BEARER_PREFIX.length());
+        }
+        return null;
     }
 }
