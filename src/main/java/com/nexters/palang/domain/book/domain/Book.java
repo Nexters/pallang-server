@@ -80,6 +80,17 @@ public class Book extends BaseEntity {
         this.source = source != null ? source : BookSource.API;
     }
 
+    // 관리자 전용 수정(AdminBookService). 일반 유저 플로우에는 등록된 도서 정보를 고치는 기능이 없다
+    // (알라딘 API로 잘못 들어온 정보나 중복 도서 정리 목적). titleNormalized는 @PreUpdate에서 자동 갱신된다.
+    public void update(String title, String author, String publisher, int pageCount, String isbn, String coverImageUrl) {
+        this.title = title;
+        this.author = author;
+        this.publisher = publisher;
+        this.pageCount = pageCount;
+        this.isbn = isbn;
+        this.coverImageUrl = coverImageUrl;
+    }
+
     @PrePersist
     @PreUpdate
     private void normalizeTitle() {

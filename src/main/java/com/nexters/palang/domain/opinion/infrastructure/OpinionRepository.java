@@ -3,6 +3,8 @@ package com.nexters.palang.domain.opinion.infrastructure;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -10,6 +12,9 @@ import org.springframework.data.repository.query.Param;
 public interface OpinionRepository extends JpaRepository<Opinion, Long> {
 
     long countByUserIdAndDeletedAtIsNull(Long userId);
+
+    // 관리자 의견 검색(AdminOpinionService): 소프트 삭제 여부와 무관하게 내용에 키워드가 포함된 의견 전부.
+    Page<Opinion> findByContentContaining(String keyword, Pageable pageable);
 
     // 흔적 삭제 시 그 대목에 남은 다른 살아있는 흔적이 있는지 확인하기 위함 (없으면 대목도 함께 삭제).
     boolean existsByPassageIdAndDeletedAtIsNullAndIdNot(Long passageId, Long id);

@@ -2,6 +2,7 @@ package com.nexters.palang.domain.book.infrastructure;
 
 import com.nexters.palang.domain.book.domain.Book;
 import java.util.List;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -12,4 +13,7 @@ public interface BookRepository extends JpaRepository<Book, Long> {
     // 페이지네이션을 쓰면 이전 배치가 채워지며 IS NULL 조건에서 빠져나가 다음 행을 건너뛸 수 있어
     // id > :id 조건으로 이어서 조회해야 한다(pageable은 정렬/LIMIT 용도로만 사용, offset은 항상 0).
     List<Book> findByTitleNormalizedIsNullAndIdGreaterThanOrderByIdAsc(Long id, Pageable pageable);
+
+    // 관리자 도서 검색(AdminBookService): 제목 또는 저자에 키워드가 포함된 도서 전부.
+    Page<Book> findByTitleContainingOrAuthorContaining(String titleKeyword, String authorKeyword, Pageable pageable);
 }
