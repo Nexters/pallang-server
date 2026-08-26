@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Pallang 관리자 - 유저 정리</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f5f7;
+    --card: #ffffff;
+    --border: #e0e0e5;
+    --text: #1c1c1e;
+    --muted: #6b6b70;
+    --danger: #d73a4a;
+    --danger-dark: #b3212f;
+    --accent: #3366ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Pretendard, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.subtitle { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  input[type="text"], input[type="password"] {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  button {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button.secondary { background: #fff; color: var(--text); }
+  button.danger { background: var(--danger); border-color: var(--danger); }
+  button.danger:hover { background: var(--danger-dark); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
+    background: #eef0ff; color: var(--accent);
+  }
+  .badge.warn { background: #fff3e0; color: #b3620a; }
+  #status { font-size: 13px; margin-top: 8px; white-space: pre-wrap; }
+  #status.error { color: var(--danger); }
+  #status.ok { color: #1a7f37; }
+  .pager { display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 13px; }
+</style>
+</head>
+<body>
+  <h1>Pallang 관리자 — 유저 정리</h1>
+  <p class="subtitle">테스트/QA 계정을 검색해서 삭제합니다. 관리자 화이트리스트(admin.user-ids)에 등록된 계정의
+    JWT access token으로만 동작합니다. 삭제는 되돌릴 수 없습니다.</p>
+
+  <div class="card">
+    <div class="row">
+      <input id="token" type="password" placeholder="Authorization: Bearer 없이 access token만 붙여넣으세요" />
+      <button id="saveToken" class="secondary">토큰 저장</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <input id="keyword" type="text" placeholder="닉네임 또는 이메일 검색어" />
+      <button id="searchBtn">검색</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>닉네임</th><th>이메일</th><th>SNS</th><th>가입일</th><th>호스트 모임 수</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="pager">
+      <button id="prevBtn" class="secondary">이전</button>
+      <span id="pageLabel"></span>
+      <button id="nextBtn" class="secondary">다음</button>
+    </div>
+  </div>
+
+<script>
+  const TOKEN_KEY = "pallang_admin_token";
+  const tokenInput = document.getElementById("token");
+  const rowsEl = document.getElementById("rows");
+  const statusEl = document.getElementById("status");
+  const pageLabel = document.getElementById("pageLabel");
+
+  let currentKeyword = "";
+  let currentPage = 0;
+  let lastPageInfo = null;
+
+  function loadToken() {
+    try {
+      return localStorage.getItem(TOKEN_KEY) || "";
+    } catch {
+      return "";
+    }
+  }
+
+  tokenInput.value = loadToken();
+
+  document.getElementById("saveToken").addEventListener("click", () => {
+    try {
+      localStorage.setItem(TOKEN_KEY, tokenInput.value.trim());
+      setStatus("토큰을 저장했습니다.", "ok");
+    } catch {
+      setStatus("이 브라우저에서는 토큰을 저장할 수 없습니다(시크릿 모드 등). 매번 다시 붙여넣어야 합니다.", "error");
+    }
+  });
+
+  function setStatus(message, kind) {
+    statusEl.textContent = message || "";
+    statusEl.className = kind || "";
+  }
+
+  async function callApi(path, options) {
+    const token = loadToken();
+    const response = await fetch(path, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: "Bearer " + token } : {}),
+        ...(options && options.headers ? options.headers : {}),
+      },
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok) {
+      const detail = body && body.detail ? body.detail : response.status + " 오류";
+      throw new Error(detail);
+    }
+    return body;
+  }
+
+  async function search(page) {
+    if (!currentKeyword) {
+      setStatus("검색어를 입력하세요.", "error");
+      return;
+    }
+    setStatus("검색 중...");
+    try {
+      const result = await callApi(
+        "/api/admin/users?keyword=" + encodeURIComponent(currentKeyword) + "&page=" + page + "&size=20",
+        { method: "GET" },
+      );
+      currentPage = page;
+      lastPageInfo = result.data.pageInfo;
+      renderRows(result.data.users);
+      renderPager();
+      setStatus(result.data.users.length + "명 조회됨.", "ok");
+    } catch (e) {
+      setStatus(e.message, "error");
+    }
+  }
+
+  function renderRows(users) {
+    rowsEl.innerHTML = "";
+    for (const user of users) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${user.userId}</td>
+        <td>${escapeHtml(user.nickname)}${user.withdrawn ? ' <span class="badge warn">탈퇴</span>' : ""}</td>
+        <td>${escapeHtml(user.email || "-")}</td>
+        <td><span class="badge">${escapeHtml(user.snsProvider)}</span></td>
+        <td>${escapeHtml((user.createdAt || "").replace("T", " ").slice(0, 16))}</td>
+        <td>${user.hostedGroupCount}</td>
+        <td></td>
+      `;
+      const deleteCell = tr.lastElementChild;
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "danger";
+      deleteBtn.textContent = "삭제";
+      deleteBtn.addEventListener("click", () => deleteUser(user, deleteBtn));
+      deleteCell.appendChild(deleteBtn);
+      rowsEl.appendChild(tr);
+    }
+  }
+
+  async function deleteUser(user, button) {
+    const confirmed = confirm(
+      `${user.nickname}(id: ${user.userId})을(를) 삭제할까요?\n연관된 모임/흔적/의견/댓글이 함께 사라지며 되돌릴 수 없습니다.`,
+    );
+    if (!confirmed) return;
+
+    button.disabled = true;
+    setStatus("삭제 중...");
+    try {
+      await callApi("/api/admin/users/" + user.userId, { method: "DELETE" });
+      setStatus(`${user.nickname}(id: ${user.userId}) 삭제 완료.`, "ok");
+      search(currentPage);
+    } catch (e) {
+      setStatus("삭제 실패: " + e.message, "error");
+      button.disabled = false;
+    }
+  }
+
+  function renderPager() {
+    if (!lastPageInfo) {
+      pageLabel.textContent = "";
+      return;
+    }
+    pageLabel.textContent = `${lastPageInfo.page + 1} / ${Math.max(lastPageInfo.totalPages, 1)}페이지 (총 ${lastPageInfo.totalElements}명)`;
+    document.getElementById("prevBtn").disabled = lastPageInfo.page <= 0;
+    document.getElementById("nextBtn").disabled = !lastPageInfo.hasNext;
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[c]));
+  }
+
+  document.getElementById("searchBtn").addEventListener("click", () => {
+    currentKeyword = document.getElementById("keyword").value.trim();
+    search(0);
+  });
+  document.getElementById("keyword").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("searchBtn").click();
+  });
+  document.getElementById("prevBtn").addEventListener("click", () => {
+    if (currentPage > 0) search(currentPage - 1);
+  });
+  document.getElementById("nextBtn").addEventListener("click", () => {
+    if (lastPageInfo && lastPageInfo.hasNext) search(currentPage + 1);
+  });
+</script>
+</body>
+</html>

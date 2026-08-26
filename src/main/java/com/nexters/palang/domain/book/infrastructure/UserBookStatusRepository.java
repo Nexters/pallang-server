@@ -11,4 +11,7 @@ public interface UserBookStatusRepository extends JpaRepository<UserBookStatus, 
     boolean existsByUserIdAndBookId(Long userId, Long bookId);
 
     void deleteByUserIdAndBookId(Long userId, Long bookId);
+
+    // 관리자 유저 삭제(AdminUserService): 이 유저의 읽기 상태 전부.
+    void deleteAllByUserId(Long userId);
 }

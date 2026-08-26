@@ -20,10 +20,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ErrorResponse> handleAppException(AppException e, HttpServletRequest request) {
         BaseErrorCode errorCode = e.getErrorCode();
-        log.warn("AppException 발생: {}, 에러가 발생한 지점: {} {}", errorCode.getMessage(), request.getMethod(), request.getRequestURI());
-        
+        log.warn("AppException 발생: {}, 에러가 발생한 지점: {} {}", e.getDetail(), request.getMethod(), request.getRequestURI());
+
         return ResponseEntity.status(errorCode.getHttpStatus())
-                .body(ErrorResponse.of(request.getRequestURI(), errorCode));
+                .body(ErrorResponse.of(request.getRequestURI(), errorCode, e.getDetail()));
     }
 
     // @Valid 검사 실패(필수 파라미터가 null 또는 공백) 인 경우 예외를 잡는 핸들러

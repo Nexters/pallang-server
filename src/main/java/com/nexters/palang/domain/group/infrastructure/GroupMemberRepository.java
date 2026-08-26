@@ -10,4 +10,7 @@ public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> 
     long countByGroupId(Long groupId);
 
     void deleteAllByGroupId(Long groupId);
+
+    // 관리자 유저 삭제(AdminUserService): 이 유저의 모든 모임 멤버십(본인이 호스트인 모임 포함)을 제거한다.
+    void deleteAllByUserId(Long userId);
 }
