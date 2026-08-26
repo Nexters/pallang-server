@@ -3,6 +3,8 @@ package com.nexters.palang.domain.comment.infrastructure;
 import com.nexters.palang.domain.comment.domain.Comment;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -13,6 +15,9 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     // 트랜잭션 안에서 user를 미리 로딩해야 LazyInitializationException을 피할 수 있다.
     @Query("select c from Comment c join fetch c.user where c.id = :id")
     Optional<Comment> findByIdWithUser(@Param("id") Long id);
+
+    // 관리자 댓글 검색(AdminCommentService): 소프트 삭제 여부와 무관하게 내용에 키워드가 포함된 댓글 전부.
+    Page<Comment> findByContentContaining(String keyword, Pageable pageable);
 
     // 관리자 유저 삭제(AdminUserService): 이 유저 본인의 댓글/답글 id 전부(삭제 순서 계산용).
     @Query("select c.id from Comment c where c.user.id = :userId")

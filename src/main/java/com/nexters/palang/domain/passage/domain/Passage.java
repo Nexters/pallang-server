@@ -95,6 +95,13 @@ public class Passage extends BaseEntity {
         this.isSpoiler = isSpoiler;
     }
 
+    // 관리자 전용 수정(AdminPassageService). 일반 유저 플로우에는 대목 내용을 고치는 기능이 없다
+    // (오탈자·부적절한 내용 정리 목적).
+    public void updateContent(String quotedText, int pageNumber) {
+        this.quotedText = quotedText;
+        this.pageNumber = pageNumber;
+    }
+
     public boolean isDeleted() {
         return this.deletedAt != null;
     }

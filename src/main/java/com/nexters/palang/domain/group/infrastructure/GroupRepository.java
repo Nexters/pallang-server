@@ -4,6 +4,8 @@ import com.nexters.palang.domain.group.domain.Group;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -16,6 +18,12 @@ public interface GroupRepository extends JpaRepository<Group, Long> {
 
     // 관리자 페이지 유저 목록에서 "호스트인 모임 수"를 보여주기 위한 참고용 카운트.
     long countByHostId(Long hostId);
+
+    // 관리자 도서 삭제(AdminBookService): 이 책으로 만들어진 모임 전부.
+    List<Group> findAllByBookId(Long bookId);
+
+    // 관리자 모임 검색(AdminGroupService): 모임명에 키워드가 포함된 모임 전부.
+    Page<Group> findByNameContaining(String keyword, Pageable pageable);
 
     // 초대 링크 미리보기 등 단순 조회용. 잠금이 필요 없는 경로에서 사용한다. book 제목/저자/표지를 응답에
     // 바로 내려줘야 해서(GroupMapper.toInvitationPreviewResponse) join fetch로 같이 읽는다 — book이

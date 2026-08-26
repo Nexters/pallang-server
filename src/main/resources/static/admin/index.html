@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="robots" content="noindex, nofollow" />
-<title>Pallang 관리자 - 유저 정리</title>
+<title>Pallang 관리자</title>
 <style>
   :root {
     color-scheme: light dark;
@@ -35,14 +35,18 @@
     margin-bottom: 16px;
   }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  input[type="text"], input[type="password"] {
+  input[type="text"], input[type="password"], input[type="number"], input[type="date"], textarea {
     flex: 1;
     min-width: 200px;
     padding: 8px 10px;
     border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 14px;
+    font-family: inherit;
+    background: var(--card);
+    color: var(--text);
   }
+  textarea { min-height: 70px; resize: vertical; }
   button {
     padding: 8px 14px;
     border-radius: 8px;
@@ -57,8 +61,10 @@
   button.danger:hover { background: var(--danger-dark); }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
   th { color: var(--muted); font-weight: 600; }
+  td.actions { white-space: nowrap; }
+  td.actions button { margin-right: 4px; }
   .badge {
     display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
     background: #eef0ff; color: var(--accent);
@@ -68,54 +74,216 @@
   #status.error { color: var(--danger); }
   #status.ok { color: #1a7f37; }
   .pager { display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 13px; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tabs button { background: #fff; color: var(--text); }
+  .tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4);
+    align-items: center; justify-content: center; z-index: 10;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--card); border-radius: 12px; padding: 20px; width: 420px; max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px); overflow-y: auto;
+  }
+  .modal h2 { font-size: 16px; margin: 0 0 12px; }
+  .modal .field { margin-bottom: 10px; }
+  .modal .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .modal .field.checkbox { display: flex; align-items: center; gap: 6px; }
+  .modal .field.checkbox label { margin: 0; }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 </style>
 </head>
 <body>
-  <h1>Pallang 관리자 — 유저 정리</h1>
-  <p class="subtitle">테스트/QA 계정을 검색해서 삭제합니다. 관리자 화이트리스트(admin.user-ids)에 등록된 계정의
-    JWT access token으로만 동작합니다. 삭제는 되돌릴 수 없습니다.</p>
+  <h1>Pallang 관리자</h1>
+  <p class="subtitle">테스트/QA 데이터를 검색해서 수정·삭제합니다. 일반 유저 로그인과는 별개인 관리자 전용 계정으로
+    로그인해야 합니다. 삭제는 되돌릴 수 없습니다.</p>
 
-  <div class="card">
+  <div class="card" id="loginCard">
     <div class="row">
-      <input id="token" type="password" placeholder="Authorization: Bearer 없이 access token만 붙여넣으세요" />
-      <button id="saveToken" class="secondary">토큰 저장</button>
+      <input id="loginUsername" type="text" placeholder="아이디" autocomplete="username" />
+      <input id="loginPassword" type="password" placeholder="비밀번호" autocomplete="current-password" />
+      <button id="loginBtn">로그인</button>
+    </div>
+    <div id="loginStatus"></div>
+  </div>
+
+  <div id="mainContent" style="display: none;">
+    <div class="row" style="justify-content: flex-end; margin-bottom: 8px;">
+      <button id="logoutBtn" class="secondary">로그아웃</button>
+    </div>
+
+    <div class="tabs" id="tabs"></div>
+
+    <div class="card">
+      <div class="row">
+        <input id="keyword" type="text" />
+        <button id="searchBtn">검색</button>
+      </div>
+      <div id="status"></div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead id="thead"></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="pager">
+        <button id="prevBtn" class="secondary">이전</button>
+        <span id="pageLabel"></span>
+        <button id="nextBtn" class="secondary">다음</button>
+      </div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="row">
-      <input id="keyword" type="text" placeholder="닉네임 또는 이메일 검색어" />
-      <button id="searchBtn">검색</button>
-    </div>
-    <div id="status"></div>
-  </div>
-
-  <div class="card">
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th><th>닉네임</th><th>이메일</th><th>SNS</th><th>가입일</th><th>호스트 모임 수</th><th></th>
-        </tr>
-      </thead>
-      <tbody id="rows"></tbody>
-    </table>
-    <div class="pager">
-      <button id="prevBtn" class="secondary">이전</button>
-      <span id="pageLabel"></span>
-      <button id="nextBtn" class="secondary">다음</button>
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <h2 id="modalTitle">수정</h2>
+      <div id="modalFields"></div>
+      <div class="actions">
+        <button id="modalCancel" class="secondary">취소</button>
+        <button id="modalSave">저장</button>
+      </div>
     </div>
   </div>
 
 <script>
-  const TOKEN_KEY = "pallang_admin_token";
-  const tokenInput = document.getElementById("token");
+  // 탭마다 목록/수정/삭제 API 경로와 표에 보여줄 컬럼, 수정 폼에 쓸 필드를 정의한다. 탭을 늘릴 때는
+  // 이 설정 객체만 추가하면 되고, 검색·페이징·수정 모달·삭제 확인 로직은 공용으로 재사용된다.
+  const TABS = {
+    users: {
+      label: "유저", listUrl: "/api/admin/users", listKey: "users", idKey: "userId",
+      searchPlaceholder: "닉네임 또는 이메일 검색어",
+      columns: [
+        { label: "ID", render: r => r.userId },
+        { label: "닉네임", render: r => escapeHtml(r.nickname) + (r.withdrawn ? ' <span class="badge warn">탈퇴</span>' : "") },
+        { label: "이메일", render: r => escapeHtml(r.email || "-") },
+        { label: "SNS", render: r => `<span class="badge">${escapeHtml(r.snsProvider)}</span>` },
+        { label: "가입일", render: r => fmtDate(r.createdAt) },
+        { label: "호스트 모임 수", render: r => r.hostedGroupCount },
+      ],
+      deleteUrl: r => `/api/admin/users/${r.userId}`,
+      deleteConfirmText: r => `${r.nickname}(id: ${r.userId})을(를) 삭제할까요?\n연관된 모임/흔적/의견/댓글이 함께 사라지며 되돌릴 수 없습니다.`,
+    },
+    passages: {
+      label: "대목", listUrl: "/api/admin/passages", listKey: "passages", idKey: "passageId",
+      searchPlaceholder: "인용문 검색어",
+      columns: [
+        { label: "ID", render: r => r.passageId },
+        { label: "책", render: r => escapeHtml(r.bookTitle) },
+        { label: "모임", render: r => r.groupName ? escapeHtml(r.groupName) : "-" },
+        { label: "작성자", render: r => escapeHtml(r.creatorNickname) },
+        { label: "페이지", render: r => r.pageNumber },
+        { label: "인용문", render: r => escapeHtml(truncate(r.quotedText, 40)) },
+        { label: "상태", render: r => (r.deleted ? '<span class="badge warn">삭제됨</span> ' : "") + (r.isSpoiler ? '<span class="badge">스포일러</span>' : "") },
+      ],
+      editFields: [
+        { name: "quotedText", label: "인용문", type: "textarea", value: r => r.quotedText },
+        { name: "pageNumber", label: "페이지 번호", type: "number", value: r => r.pageNumber },
+        { name: "isSpoiler", label: "스포일러", type: "checkbox", value: r => r.isSpoiler },
+      ],
+      updateUrl: r => `/api/admin/passages/${r.passageId}`,
+      deleteUrl: r => `/api/admin/passages/${r.passageId}`,
+      deleteConfirmText: r => `대목(id: ${r.passageId})을(를) 삭제할까요?\n달린 의견/댓글/데코/좋아요까지 함께 사라지며 되돌릴 수 없습니다.`,
+    },
+    opinions: {
+      label: "의견", listUrl: "/api/admin/opinions", listKey: "opinions", idKey: "opinionId",
+      searchPlaceholder: "내용 검색어",
+      columns: [
+        { label: "ID", render: r => r.opinionId },
+        { label: "대목", render: r => escapeHtml(truncate(r.passageQuotedText, 20)) },
+        { label: "작성자", render: r => escapeHtml(r.userNickname) },
+        { label: "내용", render: r => escapeHtml(truncate(r.content, 40)) },
+        { label: "좋아요", render: r => r.likeCount },
+        { label: "상태", render: r => r.deleted ? '<span class="badge warn">삭제됨</span>' : "" },
+      ],
+      editFields: [
+        { name: "content", label: "내용", type: "textarea", value: r => r.content },
+      ],
+      updateUrl: r => `/api/admin/opinions/${r.opinionId}`,
+      deleteUrl: r => `/api/admin/opinions/${r.opinionId}`,
+      deleteConfirmText: r => `의견(id: ${r.opinionId})을(를) 삭제할까요?\n달린 댓글/데코/좋아요까지 함께 사라지며, 대목에 남은 의견이 없으면 대목도 함께 정리됩니다. 되돌릴 수 없습니다.`,
+    },
+    comments: {
+      label: "댓글", listUrl: "/api/admin/comments", listKey: "comments", idKey: "commentId",
+      searchPlaceholder: "내용 검색어",
+      columns: [
+        { label: "ID", render: r => r.commentId },
+        { label: "의견 ID", render: r => r.opinionId },
+        { label: "구분", render: r => r.parentCommentId ? `답글(→${r.parentCommentId})` : "원댓글" },
+        { label: "작성자", render: r => escapeHtml(r.userNickname) },
+        { label: "내용", render: r => escapeHtml(truncate(r.content, 40)) },
+        { label: "상태", render: r => r.deleted ? '<span class="badge warn">삭제됨</span>' : "" },
+      ],
+      editFields: [
+        { name: "content", label: "내용", type: "textarea", value: r => r.content },
+      ],
+      updateUrl: r => `/api/admin/comments/${r.commentId}`,
+      deleteUrl: r => `/api/admin/comments/${r.commentId}`,
+      deleteConfirmText: r => `댓글(id: ${r.commentId})을(를) 삭제할까요?\n원댓글이면 달린 답글도 함께 사라지며 되돌릴 수 없습니다.`,
+    },
+    groups: {
+      label: "모임", listUrl: "/api/admin/groups", listKey: "groups", idKey: "groupId",
+      searchPlaceholder: "모임명 검색어",
+      columns: [
+        { label: "ID", render: r => r.groupId },
+        { label: "모임명", render: r => escapeHtml(r.name) },
+        { label: "책", render: r => escapeHtml(r.bookTitle) },
+        { label: "호스트", render: r => escapeHtml(r.hostNickname) },
+        { label: "인원", render: r => `${r.memberCount}/${r.capacity}` },
+        { label: "기간", render: r => `${r.startDate} ~ ${r.endDate}` },
+      ],
+      editFields: [
+        { name: "name", label: "모임명", type: "text", value: r => r.name },
+        { name: "capacity", label: "정원(2~10)", type: "number", value: r => r.capacity },
+        { name: "startDate", label: "시작일", type: "date", value: r => r.startDate },
+        { name: "endDate", label: "종료일", type: "date", value: r => r.endDate },
+      ],
+      updateUrl: r => `/api/admin/groups/${r.groupId}`,
+      deleteUrl: r => `/api/admin/groups/${r.groupId}`,
+      deleteConfirmText: r => `모임(${r.name}, id: ${r.groupId})을(를) 삭제할까요?\n안의 대목/의견/댓글/모임원까지 함께 사라지며 되돌릴 수 없습니다.`,
+    },
+    books: {
+      label: "책", listUrl: "/api/admin/books", listKey: "books", idKey: "bookId",
+      searchPlaceholder: "제목 또는 저자 검색어",
+      columns: [
+        { label: "ID", render: r => r.bookId },
+        { label: "제목", render: r => escapeHtml(r.title) },
+        { label: "저자", render: r => escapeHtml(r.author) },
+        { label: "출판사", render: r => escapeHtml(r.publisher) },
+        { label: "쪽수", render: r => r.pageCount },
+        { label: "출처", render: r => `<span class="badge">${escapeHtml(r.source)}</span>` },
+      ],
+      editFields: [
+        { name: "title", label: "제목", type: "text", value: r => r.title },
+        { name: "author", label: "저자", type: "text", value: r => r.author },
+        { name: "publisher", label: "출판사", type: "text", value: r => r.publisher },
+        { name: "pageCount", label: "쪽수", type: "number", value: r => r.pageCount },
+        { name: "isbn", label: "ISBN", type: "text", value: r => r.isbn || "" },
+        { name: "coverImageUrl", label: "표지 URL", type: "text", value: r => r.coverImageUrl || "" },
+      ],
+      updateUrl: r => `/api/admin/books/${r.bookId}`,
+      deleteUrl: r => `/api/admin/books/${r.bookId}`,
+      deleteConfirmText: r => `책(${r.title}, id: ${r.bookId})을(를) 삭제할까요?\n이 책으로 만들어진 모임/대목/의견/댓글까지 전부 함께 사라지며 되돌릴 수 없습니다. 여러 사용자에게 영향을 줄 수 있는 위험한 작업입니다.`,
+    },
+  };
+
+  const TOKEN_KEY = "pallang_admin_session_token";
+  const loginCard = document.getElementById("loginCard");
+  const mainContent = document.getElementById("mainContent");
+  const loginUsernameInput = document.getElementById("loginUsername");
+  const loginPasswordInput = document.getElementById("loginPassword");
+  const loginStatusEl = document.getElementById("loginStatus");
+  const keywordInput = document.getElementById("keyword");
+  const theadEl = document.getElementById("thead");
   const rowsEl = document.getElementById("rows");
   const statusEl = document.getElementById("status");
   const pageLabel = document.getElementById("pageLabel");
+  const tabsEl = document.getElementById("tabs");
 
-  let currentKeyword = "";
-  let currentPage = 0;
-  let lastPageInfo = null;
+  let currentTabKey = "users";
+  // 탭별 검색어/페이지를 따로 기억해, 탭을 오갈 때 이전 검색 상태가 유지되게 한다.
+  const tabState = Object.fromEntries(Object.keys(TABS).map(key => [key, { keyword: "", page: 0, pageInfo: null }]));
 
   function loadToken() {
     try {
@@ -125,15 +293,68 @@
     }
   }
 
-  tokenInput.value = loadToken();
-
-  document.getElementById("saveToken").addEventListener("click", () => {
+  function saveToken(token) {
     try {
-      localStorage.setItem(TOKEN_KEY, tokenInput.value.trim());
-      setStatus("토큰을 저장했습니다.", "ok");
+      localStorage.setItem(TOKEN_KEY, token);
     } catch {
-      setStatus("이 브라우저에서는 토큰을 저장할 수 없습니다(시크릿 모드 등). 매번 다시 붙여넣어야 합니다.", "error");
+      // 시크릿 모드 등 저장이 안 되는 브라우저에서도 이번 세션 안에서는 그대로 동작하게 둔다.
     }
+  }
+
+  function clearToken() {
+    try {
+      localStorage.removeItem(TOKEN_KEY);
+    } catch {
+      // no-op
+    }
+  }
+
+  function showLoggedOut(message) {
+    loginCard.style.display = "";
+    mainContent.style.display = "none";
+    if (message) setLoginStatus(message, "error");
+  }
+
+  function showLoggedIn() {
+    loginCard.style.display = "none";
+    mainContent.style.display = "";
+  }
+
+  function setLoginStatus(message, kind) {
+    loginStatusEl.textContent = message || "";
+    loginStatusEl.className = kind || "";
+  }
+
+  document.getElementById("loginBtn").addEventListener("click", async () => {
+    const username = loginUsernameInput.value.trim();
+    const password = loginPasswordInput.value;
+    if (!username || !password) {
+      setLoginStatus("아이디와 비밀번호를 입력하세요.", "error");
+      return;
+    }
+    setLoginStatus("로그인 중...");
+    try {
+      const result = await callApi("/api/admin/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ username, password }),
+      }, /* skipAuth */ true);
+      saveToken(result.data.accessToken);
+      loginPasswordInput.value = "";
+      setLoginStatus("");
+      showLoggedIn();
+      switchTab(currentTabKey);
+    } catch (e) {
+      setLoginStatus("로그인 실패: " + e.message, "error");
+    }
+  });
+
+  loginPasswordInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") document.getElementById("loginBtn").click();
+  });
+
+  document.getElementById("logoutBtn").addEventListener("click", () => {
+    clearToken();
+    showLoggedOut();
   });
 
   function setStatus(message, kind) {
@@ -141,80 +362,114 @@
     statusEl.className = kind || "";
   }
 
-  async function callApi(path, options) {
+  async function callApi(path, options, skipAuth) {
     const token = loadToken();
     const response = await fetch(path, {
       ...options,
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: "Bearer " + token } : {}),
+        ...(!skipAuth && token ? { Authorization: "Bearer " + token } : {}),
         ...(options && options.headers ? options.headers : {}),
       },
     });
     const body = await response.json().catch(() => null);
     if (!response.ok) {
+      if (!skipAuth && (response.status === 401 || response.status === 403)) {
+        clearToken();
+        showLoggedOut("세션이 만료되었습니다. 다시 로그인해주세요.");
+      }
       const detail = body && body.detail ? body.detail : response.status + " 오류";
       throw new Error(detail);
     }
     return body;
   }
 
+  function renderTabs() {
+    tabsEl.innerHTML = "";
+    for (const [key, tab] of Object.entries(TABS)) {
+      const btn = document.createElement("button");
+      btn.textContent = tab.label;
+      btn.className = key === currentTabKey ? "active" : "secondary";
+      btn.addEventListener("click", () => switchTab(key));
+      tabsEl.appendChild(btn);
+    }
+  }
+
+  function switchTab(key) {
+    currentTabKey = key;
+    renderTabs();
+    const tab = TABS[key];
+    keywordInput.placeholder = tab.searchPlaceholder;
+    keywordInput.value = tabState[key].keyword;
+    renderTableHead();
+    rowsEl.innerHTML = "";
+    setStatus("");
+    renderPager();
+  }
+
+  function renderTableHead() {
+    const tab = TABS[currentTabKey];
+    theadEl.innerHTML = "<tr>" + tab.columns.map(c => `<th>${c.label}</th>`).join("") + "<th></th></tr>";
+  }
+
   async function search(page) {
-    if (!currentKeyword) {
+    const tab = TABS[currentTabKey];
+    const state = tabState[currentTabKey];
+    if (!state.keyword) {
       setStatus("검색어를 입력하세요.", "error");
       return;
     }
     setStatus("검색 중...");
     try {
       const result = await callApi(
-        "/api/admin/users?keyword=" + encodeURIComponent(currentKeyword) + "&page=" + page + "&size=20",
+        `${tab.listUrl}?keyword=${encodeURIComponent(state.keyword)}&page=${page}&size=20`,
         { method: "GET" },
       );
-      currentPage = page;
-      lastPageInfo = result.data.pageInfo;
-      renderRows(result.data.users);
+      state.page = page;
+      state.pageInfo = result.data.pageInfo;
+      const list = result.data[tab.listKey];
+      renderRows(list);
       renderPager();
-      setStatus(result.data.users.length + "명 조회됨.", "ok");
+      setStatus(list.length + "건 조회됨.", "ok");
     } catch (e) {
       setStatus(e.message, "error");
     }
   }
 
-  function renderRows(users) {
+  function renderRows(list) {
+    const tab = TABS[currentTabKey];
     rowsEl.innerHTML = "";
-    for (const user of users) {
+    for (const row of list) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${user.userId}</td>
-        <td>${escapeHtml(user.nickname)}${user.withdrawn ? ' <span class="badge warn">탈퇴</span>' : ""}</td>
-        <td>${escapeHtml(user.email || "-")}</td>
-        <td><span class="badge">${escapeHtml(user.snsProvider)}</span></td>
-        <td>${escapeHtml((user.createdAt || "").replace("T", " ").slice(0, 16))}</td>
-        <td>${user.hostedGroupCount}</td>
-        <td></td>
-      `;
-      const deleteCell = tr.lastElementChild;
+      tr.innerHTML = tab.columns.map(c => `<td>${c.render(row)}</td>`).join("") + '<td class="actions"></td>';
+      const actionsCell = tr.lastElementChild;
+      if (tab.editFields) {
+        const editBtn = document.createElement("button");
+        editBtn.className = "secondary";
+        editBtn.textContent = "수정";
+        editBtn.addEventListener("click", () => openEditModal(row));
+        actionsCell.appendChild(editBtn);
+      }
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "danger";
       deleteBtn.textContent = "삭제";
-      deleteBtn.addEventListener("click", () => deleteUser(user, deleteBtn));
-      deleteCell.appendChild(deleteBtn);
+      deleteBtn.addEventListener("click", () => deleteRow(row, deleteBtn));
+      actionsCell.appendChild(deleteBtn);
       rowsEl.appendChild(tr);
     }
   }
 
-  async function deleteUser(user, button) {
-    const confirmed = confirm(
-      `${user.nickname}(id: ${user.userId})을(를) 삭제할까요?\n연관된 모임/흔적/의견/댓글이 함께 사라지며 되돌릴 수 없습니다.`,
-    );
+  async function deleteRow(row, button) {
+    const tab = TABS[currentTabKey];
+    const confirmed = confirm(tab.deleteConfirmText(row));
     if (!confirmed) return;
 
     button.disabled = true;
     setStatus("삭제 중...");
     try {
-      await callApi("/api/admin/users/" + user.userId, { method: "DELETE" });
-      setStatus(`${user.nickname}(id: ${user.userId}) 삭제 완료.`, "ok");
-      search(currentPage);
+      await callApi(tab.deleteUrl(row), { method: "DELETE" });
+      setStatus(`id: ${row[tab.idKey]} 삭제 완료.`, "ok");
+      search(tabState[currentTabKey].page);
     } catch (e) {
       setStatus("삭제 실패: " + e.message, "error");
       button.disabled = false;
@@ -222,13 +477,95 @@
   }
 
   function renderPager() {
-    if (!lastPageInfo) {
+    const pageInfo = tabState[currentTabKey].pageInfo;
+    if (!pageInfo) {
       pageLabel.textContent = "";
+      document.getElementById("prevBtn").disabled = true;
+      document.getElementById("nextBtn").disabled = true;
       return;
     }
-    pageLabel.textContent = `${lastPageInfo.page + 1} / ${Math.max(lastPageInfo.totalPages, 1)}페이지 (총 ${lastPageInfo.totalElements}명)`;
-    document.getElementById("prevBtn").disabled = lastPageInfo.page <= 0;
-    document.getElementById("nextBtn").disabled = !lastPageInfo.hasNext;
+    pageLabel.textContent = `${pageInfo.page + 1} / ${Math.max(pageInfo.totalPages, 1)}페이지 (총 ${pageInfo.totalElements}건)`;
+    document.getElementById("prevBtn").disabled = pageInfo.page <= 0;
+    document.getElementById("nextBtn").disabled = !pageInfo.hasNext;
+  }
+
+  // --- 수정 모달 ---
+  const modalBackdrop = document.getElementById("modalBackdrop");
+  const modalTitle = document.getElementById("modalTitle");
+  const modalFields = document.getElementById("modalFields");
+  let editingRow = null;
+
+  function openEditModal(row) {
+    const tab = TABS[currentTabKey];
+    editingRow = row;
+    modalTitle.textContent = `${tab.label} 수정 (id: ${row[tab.idKey]})`;
+    modalFields.innerHTML = "";
+    for (const field of tab.editFields) {
+      const wrapper = document.createElement("div");
+      const initial = field.value(row);
+      if (field.type === "checkbox") {
+        wrapper.className = "field checkbox";
+        wrapper.innerHTML = `<input type="checkbox" id="f_${field.name}" ${initial ? "checked" : ""} />
+          <label for="f_${field.name}">${field.label}</label>`;
+      } else if (field.type === "textarea") {
+        wrapper.className = "field";
+        wrapper.innerHTML = `<label for="f_${field.name}">${field.label}</label>
+          <textarea id="f_${field.name}">${escapeHtml(String(initial ?? ""))}</textarea>`;
+      } else {
+        wrapper.className = "field";
+        wrapper.innerHTML = `<label for="f_${field.name}">${field.label}</label>
+          <input type="${field.type}" id="f_${field.name}" value="${escapeHtml(String(initial ?? ""))}" />`;
+      }
+      modalFields.appendChild(wrapper);
+    }
+    modalBackdrop.classList.add("open");
+  }
+
+  function closeEditModal() {
+    modalBackdrop.classList.remove("open");
+    editingRow = null;
+  }
+
+  document.getElementById("modalCancel").addEventListener("click", closeEditModal);
+  modalBackdrop.addEventListener("click", (e) => {
+    if (e.target === modalBackdrop) closeEditModal();
+  });
+
+  document.getElementById("modalSave").addEventListener("click", async () => {
+    const tab = TABS[currentTabKey];
+    const row = editingRow;
+    if (!row) return;
+
+    const body = {};
+    for (const field of tab.editFields) {
+      const el = document.getElementById(`f_${field.name}`);
+      if (field.type === "checkbox") {
+        body[field.name] = el.checked;
+      } else if (field.type === "number") {
+        body[field.name] = Number(el.value);
+      } else {
+        body[field.name] = el.value;
+      }
+    }
+
+    setStatus("저장 중...");
+    try {
+      await callApi(tab.updateUrl(row), { method: "PATCH", body: JSON.stringify(body) });
+      setStatus(`id: ${row[tab.idKey]} 수정 완료.`, "ok");
+      closeEditModal();
+      search(tabState[currentTabKey].page);
+    } catch (e) {
+      setStatus("수정 실패: " + e.message, "error");
+    }
+  });
+
+  function truncate(value, maxLength) {
+    const text = String(value ?? "");
+    return text.length > maxLength ? text.slice(0, maxLength) + "…" : text;
+  }
+
+  function fmtDate(value) {
+    return escapeHtml((value || "").replace("T", " ").slice(0, 16));
   }
 
   function escapeHtml(value) {
@@ -238,18 +575,30 @@
   }
 
   document.getElementById("searchBtn").addEventListener("click", () => {
-    currentKeyword = document.getElementById("keyword").value.trim();
+    tabState[currentTabKey].keyword = keywordInput.value.trim();
     search(0);
   });
-  document.getElementById("keyword").addEventListener("keydown", (e) => {
+  keywordInput.addEventListener("keydown", (e) => {
     if (e.key === "Enter") document.getElementById("searchBtn").click();
   });
   document.getElementById("prevBtn").addEventListener("click", () => {
-    if (currentPage > 0) search(currentPage - 1);
+    const state = tabState[currentTabKey];
+    if (state.page > 0) search(state.page - 1);
   });
   document.getElementById("nextBtn").addEventListener("click", () => {
-    if (lastPageInfo && lastPageInfo.hasNext) search(currentPage + 1);
+    const state = tabState[currentTabKey];
+    if (state.pageInfo && state.pageInfo.hasNext) search(state.page + 1);
   });
+
+  renderTabs();
+  switchTab(currentTabKey);
+  // 저장된 세션 토큰이 있으면 바로 메인 화면을 보여준다. 토큰이 실제로 만료/무효였다면 첫 API 호출이
+  // 401/403을 돌려주고 callApi가 자동으로 로그인 화면으로 되돌린다.
+  if (loadToken()) {
+    showLoggedIn();
+  } else {
+    showLoggedOut();
+  }
 </script>
 </body>
 </html>
