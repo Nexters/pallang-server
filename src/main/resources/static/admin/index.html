@@ -405,6 +405,11 @@
     rowsEl.innerHTML = "";
     setStatus("");
     renderPager();
+    // 로그인된 상태에서 탭을 열면 바로 목록을 보여준다 — 검색어를 먼저 입력해야만 뭔가 보이는
+    // 상태로 두면 "데이터가 하나도 없다"처럼 보이기 쉽다.
+    if (loadToken()) {
+      search(tabState[key].page);
+    }
   }
 
   function renderTableHead() {
@@ -415,10 +420,8 @@
   async function search(page) {
     const tab = TABS[currentTabKey];
     const state = tabState[currentTabKey];
-    if (!state.keyword) {
-      setStatus("검색어를 입력하세요.", "error");
-      return;
-    }
+    // 검색어를 비워두면 서버가 전체 목록을 돌려준다(모든 admin 검색 API가 Containing 쿼리라 빈
+    // 문자열은 모든 값에 매치된다) — 굳이 아무 키워드나 입력해야만 목록을 볼 수 있게 막지 않는다.
     setStatus("검색 중...");
     try {
       const result = await callApi(
