@@ -37,7 +37,7 @@ class AdminPassageServiceTest {
     @Test
     @DisplayName("존재하지 않는 대목을 수정하려 하면 예외가 발생한다")
     void updateFailsWhenPassageNotFound() {
-        given(passageRepository.findById(1L)).willReturn(Optional.empty());
+        given(passageRepository.findWithAssociationsById(1L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> adminPassageService.updatePassage(1L, "내용", 10, false))
                 .isInstanceOf(PassageException.class);
@@ -47,7 +47,7 @@ class AdminPassageServiceTest {
     @DisplayName("대목을 수정하면 인용문/페이지/스포일러 여부가 바뀐다")
     void updatePassageChangesContent() {
         Passage passage = mock(Passage.class);
-        given(passageRepository.findById(1L)).willReturn(Optional.of(passage));
+        given(passageRepository.findWithAssociationsById(1L)).willReturn(Optional.of(passage));
 
         Passage result = adminPassageService.updatePassage(1L, "새 인용문", 20, true);
 
@@ -59,7 +59,7 @@ class AdminPassageServiceTest {
     @Test
     @DisplayName("존재하지 않는 대목을 삭제하려 하면 예외가 발생한다")
     void deleteFailsWhenPassageNotFound() {
-        given(passageRepository.findById(1L)).willReturn(Optional.empty());
+        given(passageRepository.findWithAssociationsById(1L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> adminPassageService.deletePassage(1L)).isInstanceOf(PassageException.class);
     }
@@ -67,7 +67,7 @@ class AdminPassageServiceTest {
     @Test
     @DisplayName("대목을 삭제하면 cascade 삭제기가 호출된다")
     void deletePassageDelegatesToCascadeDeleter() {
-        given(passageRepository.findById(1L)).willReturn(Optional.of(mock(Passage.class)));
+        given(passageRepository.findWithAssociationsById(1L)).willReturn(Optional.of(mock(Passage.class)));
 
         adminPassageService.deletePassage(1L);
 

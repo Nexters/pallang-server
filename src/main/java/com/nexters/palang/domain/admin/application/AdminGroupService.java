@@ -49,7 +49,7 @@ public class AdminGroupService {
     }
 
     private Group getExistingGroup(Long groupId) {
-        return groupRepository.findById(groupId)
+        return groupRepository.findWithAssociationsById(groupId)
                 .orElseThrow(() -> new GroupException(GroupErrorCode.GROUP_NOT_FOUND));
     }
 }

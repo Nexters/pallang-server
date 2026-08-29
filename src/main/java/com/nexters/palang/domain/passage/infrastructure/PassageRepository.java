@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PassageRepository extends JpaRepository<Passage, Long> {
@@ -25,5 +26,13 @@ public interface PassageRepository extends JpaRepository<Passage, Long> {
     List<Passage> findAllByBookId(Long bookId);
 
     // 관리자 대목 검색(AdminPassageService): 소프트 삭제 여부와 무관하게 인용문에 키워드가 포함된 대목 전부.
+    // open-in-view: false 환경에서 AdminPassageMapper가 컨트롤러 단(트랜잭션 밖)에서 book/creator/group을
+    // 참조하므로, EntityGraph로 미리 로딩해두지 않으면 LazyInitializationException이 난다.
+    @EntityGraph(attributePaths = {"book", "creator", "group"})
     Page<Passage> findByQuotedTextContaining(String keyword, Pageable pageable);
+
+    // 관리자 대목 수정/삭제(AdminPassageService): 위와 같은 이유로, 단건 조회에도 book/creator/group을
+    // 미리 로딩해둔다(수정 응답도 컨트롤러 단에서 같은 필드를 참조한다).
+    @EntityGraph(attributePaths = {"book", "creator", "group"})
+    Optional<Passage> findWithAssociationsById(Long id);
 }

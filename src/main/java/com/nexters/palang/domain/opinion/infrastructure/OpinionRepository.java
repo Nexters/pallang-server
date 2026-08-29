@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,7 +15,15 @@ public interface OpinionRepository extends JpaRepository<Opinion, Long> {
     long countByUserIdAndDeletedAtIsNull(Long userId);
 
     // 관리자 의견 검색(AdminOpinionService): 소프트 삭제 여부와 무관하게 내용에 키워드가 포함된 의견 전부.
+    // open-in-view: false 환경에서 AdminOpinionMapper가 컨트롤러 단(트랜잭션 밖)에서 passage/user를
+    // 참조하므로, EntityGraph로 미리 로딩해두지 않으면 LazyInitializationException이 난다.
+    @EntityGraph(attributePaths = {"passage", "user"})
     Page<Opinion> findByContentContaining(String keyword, Pageable pageable);
+
+    // 관리자 의견 수정/삭제(AdminOpinionService): 위와 같은 이유로, 단건 조회에도 passage/user를
+    // 미리 로딩해둔다(수정 응답도 컨트롤러 단에서 같은 필드를 참조한다).
+    @EntityGraph(attributePaths = {"passage", "user"})
+    Optional<Opinion> findWithAssociationsById(Long id);
 
     // 흔적 삭제 시 그 대목에 남은 다른 살아있는 흔적이 있는지 확인하기 위함 (없으면 대목도 함께 삭제).
     boolean existsByPassageIdAndDeletedAtIsNullAndIdNot(Long passageId, Long id);

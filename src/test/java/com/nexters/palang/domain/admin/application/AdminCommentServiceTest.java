@@ -35,7 +35,7 @@ class AdminCommentServiceTest {
     @Test
     @DisplayName("존재하지 않는 댓글을 삭제하려 하면 예외가 발생한다")
     void deleteFailsWhenCommentNotFound() {
-        given(commentRepository.findById(1L)).willReturn(Optional.empty());
+        given(commentRepository.findWithAssociationsById(1L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> adminCommentService.deleteComment(1L)).isInstanceOf(CommentException.class);
     }
@@ -43,7 +43,7 @@ class AdminCommentServiceTest {
     @Test
     @DisplayName("댓글을 삭제하면 답글을 먼저 지운 뒤 본인을 지운다")
     void deleteCommentRemovesRepliesBeforeItself() {
-        given(commentRepository.findById(1L)).willReturn(Optional.of(mock(Comment.class)));
+        given(commentRepository.findWithAssociationsById(1L)).willReturn(Optional.of(mock(Comment.class)));
 
         adminCommentService.deleteComment(1L);
 

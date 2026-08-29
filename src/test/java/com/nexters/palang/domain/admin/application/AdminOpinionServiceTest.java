@@ -41,7 +41,7 @@ class AdminOpinionServiceTest {
     @Test
     @DisplayName("존재하지 않는 의견을 삭제하려 하면 예외가 발생한다")
     void deleteFailsWhenOpinionNotFound() {
-        given(opinionRepository.findById(1L)).willReturn(Optional.empty());
+        given(opinionRepository.findWithAssociationsById(1L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> adminOpinionService.deleteOpinion(1L)).isInstanceOf(OpinionException.class);
     }
@@ -53,7 +53,7 @@ class AdminOpinionServiceTest {
         given(passage.getId()).willReturn(100L);
         Opinion opinion = mock(Opinion.class);
         given(opinion.getPassage()).willReturn(passage);
-        given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
+        given(opinionRepository.findWithAssociationsById(1L)).willReturn(Optional.of(opinion));
         given(opinionRepository.existsByPassageIdAndDeletedAtIsNullAndIdNot(100L, 1L)).willReturn(false);
         given(passageRepository.findById(100L)).willReturn(Optional.of(passage));
 
@@ -70,7 +70,7 @@ class AdminOpinionServiceTest {
         given(passage.getId()).willReturn(100L);
         Opinion opinion = mock(Opinion.class);
         given(opinion.getPassage()).willReturn(passage);
-        given(opinionRepository.findById(1L)).willReturn(Optional.of(opinion));
+        given(opinionRepository.findWithAssociationsById(1L)).willReturn(Optional.of(opinion));
         given(opinionRepository.existsByPassageIdAndDeletedAtIsNullAndIdNot(100L, 1L)).willReturn(true);
 
         adminOpinionService.deleteOpinion(1L);

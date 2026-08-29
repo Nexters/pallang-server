@@ -41,7 +41,7 @@ public class AdminPassageService {
     }
 
     private Passage getExistingPassage(Long passageId) {
-        return passageRepository.findById(passageId)
+        return passageRepository.findWithAssociationsById(passageId)
                 .orElseThrow(() -> new PassageException(PassageErrorCode.PASSAGE_NOT_FOUND));
     }
 }

@@ -41,7 +41,7 @@ public class AdminCommentService {
     }
 
     private Comment getExistingComment(Long commentId) {
-        return commentRepository.findById(commentId)
+        return commentRepository.findWithAssociationsById(commentId)
                 .orElseThrow(() -> new CommentException(CommentErrorCode.COMMENT_NOT_FOUND));
     }
 }
