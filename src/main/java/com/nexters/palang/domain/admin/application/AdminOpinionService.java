@@ -51,7 +51,7 @@ public class AdminOpinionService {
     }
 
     private Opinion getExistingOpinion(Long opinionId) {
-        return opinionRepository.findById(opinionId)
+        return opinionRepository.findWithAssociationsById(opinionId)
                 .orElseThrow(() -> new OpinionException(OpinionErrorCode.OPINION_NOT_FOUND));
     }
 }

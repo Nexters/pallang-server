@@ -40,7 +40,7 @@ class AdminGroupServiceTest {
     @Test
     @DisplayName("존재하지 않는 모임을 수정하려 하면 예외가 발생한다")
     void updateFailsWhenGroupNotFound() {
-        given(groupRepository.findById(1L)).willReturn(Optional.empty());
+        given(groupRepository.findWithAssociationsById(1L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> adminGroupService.updateGroup(1L, "이름", 4, LocalDate.now(), LocalDate.now().plusDays(1)))
                 .isInstanceOf(GroupException.class);
@@ -50,7 +50,7 @@ class AdminGroupServiceTest {
     @DisplayName("모임을 수정하면 현재 참여 인원을 기준으로 설정이 바뀐다")
     void updateGroupDelegatesToEntity() {
         Group group = mock(Group.class);
-        given(groupRepository.findById(1L)).willReturn(Optional.of(group));
+        given(groupRepository.findWithAssociationsById(1L)).willReturn(Optional.of(group));
         given(groupMemberRepository.countByGroupId(1L)).willReturn(3L);
         LocalDate start = LocalDate.of(2026, 1, 1);
         LocalDate end = LocalDate.of(2026, 2, 1);
@@ -64,7 +64,7 @@ class AdminGroupServiceTest {
     @Test
     @DisplayName("존재하지 않는 모임을 삭제하려 하면 예외가 발생한다")
     void deleteFailsWhenGroupNotFound() {
-        given(groupRepository.findById(1L)).willReturn(Optional.empty());
+        given(groupRepository.findWithAssociationsById(1L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> adminGroupService.deleteGroup(1L)).isInstanceOf(GroupException.class);
     }
@@ -72,7 +72,7 @@ class AdminGroupServiceTest {
     @Test
     @DisplayName("모임을 삭제하면 cascade 삭제기가 호출된다")
     void deleteGroupDelegatesToCascadeDeleter() {
-        given(groupRepository.findById(1L)).willReturn(Optional.of(mock(Group.class)));
+        given(groupRepository.findWithAssociationsById(1L)).willReturn(Optional.of(mock(Group.class)));
 
         adminGroupService.deleteGroup(1L);
 

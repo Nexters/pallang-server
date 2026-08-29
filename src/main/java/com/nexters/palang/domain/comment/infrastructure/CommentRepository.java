@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,7 +18,15 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     Optional<Comment> findByIdWithUser(@Param("id") Long id);
 
     // 관리자 댓글 검색(AdminCommentService): 소프트 삭제 여부와 무관하게 내용에 키워드가 포함된 댓글 전부.
+    // open-in-view: false 환경에서 AdminCommentMapper가 컨트롤러 단(트랜잭션 밖)에서 user.getNickname()을
+    // 참조하므로 EntityGraph로 미리 로딩해야 한다(opinion/parentComment는 getId()만 쓰여 프록시로 충분하다).
+    @EntityGraph(attributePaths = {"user"})
     Page<Comment> findByContentContaining(String keyword, Pageable pageable);
+
+    // 관리자 댓글 수정/삭제(AdminCommentService): 위와 같은 이유로, 단건 조회에도 user를 미리
+    // 로딩해둔다(수정 응답도 컨트롤러 단에서 같은 필드를 참조한다).
+    @EntityGraph(attributePaths = {"user"})
+    Optional<Comment> findWithAssociationsById(Long id);
 
     // 관리자 유저 삭제(AdminUserService): 이 유저 본인의 댓글/답글 id 전부(삭제 순서 계산용).
     @Query("select c.id from Comment c where c.user.id = :userId")
