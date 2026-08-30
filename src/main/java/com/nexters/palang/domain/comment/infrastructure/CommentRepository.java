@@ -1,7 +1,11 @@
 package com.nexters.palang.domain.comment.infrastructure;
 
 import com.nexters.palang.domain.comment.domain.Comment;
+import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,4 +16,28 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     // 트랜잭션 안에서 user를 미리 로딩해야 LazyInitializationException을 피할 수 있다.
     @Query("select c from Comment c join fetch c.user where c.id = :id")
     Optional<Comment> findByIdWithUser(@Param("id") Long id);
+
+    // 관리자 댓글 검색(AdminCommentService): 소프트 삭제 여부와 무관하게 내용에 키워드가 포함된 댓글 전부.
+    // open-in-view: false 환경에서 AdminCommentMapper가 컨트롤러 단(트랜잭션 밖)에서 user.getNickname()을
+    // 참조하므로 EntityGraph로 미리 로딩해야 한다(opinion/parentComment는 getId()만 쓰여 프록시로 충분하다).
+    @EntityGraph(attributePaths = {"user"})
+    Page<Comment> findByContentContaining(String keyword, Pageable pageable);
+
+    // 관리자 댓글 수정/삭제(AdminCommentService): 위와 같은 이유로, 단건 조회에도 user를 미리
+    // 로딩해둔다(수정 응답도 컨트롤러 단에서 같은 필드를 참조한다).
+    @EntityGraph(attributePaths = {"user"})
+    Optional<Comment> findWithAssociationsById(Long id);
+
+    // 관리자 유저 삭제(AdminUserService): 이 유저 본인의 댓글/답글 id 전부(삭제 순서 계산용).
+    @Query("select c.id from Comment c where c.user.id = :userId")
+    List<Long> findIdsByUserId(@Param("userId") Long userId);
+
+    // 아래 세 메서드는 comments.parent_comment_id(자기참조 FK)를 위반하지 않도록 자식(답글)부터 지우기
+    // 위한 것이다. 삭제 순서: ①이 유저의 댓글에 달린 답글(작성자 무관) → ②삭제 대상 의견에 달린 댓글/답글
+    // 전부(한 쿼리 안에서 부모/자식이 함께 지워지므로 순서 문제가 없다) → ③이 유저의 나머지 댓글.
+    void deleteAllByParentCommentIdIn(List<Long> parentCommentIds);
+
+    void deleteAllByOpinionIdIn(List<Long> opinionIds);
+
+    void deleteAllByUserId(Long userId);
 }

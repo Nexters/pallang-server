@@ -132,17 +132,37 @@ public class BookService {
         return Math.max(0, (total - size) / 2);
     }
 
-    // 비로그인 사용자는 홈에서 실제 서재 대신 고정 샘플 도서 1건을 본다 (기획 확정, 이슈 #119).
+    // 비로그인 사용자와, 로그인했지만 서재에 책이 하나도 없는 계정은 홈에서 실제 서재 대신 고정 샘플 도서
+    // 1건을 본다 (기획 확정, 이슈 #119). opinionCountScope=MINE(마이페이지, 본인이 남긴 흔적 수)일 때 책
+    // 전체 흔적 수(17)를 그대로 노출하면 "내가 남긴 흔적 수"가 17인 것처럼 잘못 보이므로, scope별로 값이
+    // 다른 고정 projection을 따로 둔다.
     private static final BookActivityProjection GUEST_SAMPLE_LIBRARY_BOOK = new BookActivityProjection(
             18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "안전가옥",
             "https://image.aladin.co.kr/product/39872/66/cover200/k242130313_1.jpg", 13L, 17L);
+    private static final BookActivityProjection GUEST_SAMPLE_LIBRARY_BOOK_MINE = new BookActivityProjection(
+            18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "안전가옥",
+            "https://image.aladin.co.kr/product/39872/66/cover200/k242130313_1.jpg", 13L, 0L);
 
     // 내 서재는 홈 캐러셀과 달리 가운데 기준 없이 최근 흔적 순으로 나열하며, 표준 page/size 페이지네이션을 사용한다.
     public Page<BookActivityProjection> getMyLibraryBooks(Long userId, Pageable pageable, OpinionCountScope opinionCountScope) {
         if (userId == null) {
-            return new PageImpl<>(List.of(GUEST_SAMPLE_LIBRARY_BOOK), pageable, 1);
+            return sampleLibraryPage(pageable, opinionCountScope);
         }
-        return bookQueryRepository.findMyLibraryBooks(userId, pageable, opinionCountScope);
+        Page<BookActivityProjection> myLibraryBooks = bookQueryRepository.findMyLibraryBooks(userId, pageable, opinionCountScope);
+        if (myLibraryBooks.getTotalElements() == 0) {
+            return sampleLibraryPage(pageable, opinionCountScope);
+        }
+        return myLibraryBooks;
+    }
+
+    // 샘플 도서는 실제로는 1건뿐이므로 첫 페이지(offset 0)에서만 내려주고, 이후 페이지는 빈 목록을 반환한다.
+    // 그렇지 않으면 요청한 모든 페이지에서 같은 샘플 도서가 계속 반복 노출된다.
+    private Page<BookActivityProjection> sampleLibraryPage(Pageable pageable, OpinionCountScope opinionCountScope) {
+        BookActivityProjection sample = opinionCountScope == OpinionCountScope.MINE
+                ? GUEST_SAMPLE_LIBRARY_BOOK_MINE
+                : GUEST_SAMPLE_LIBRARY_BOOK;
+        List<BookActivityProjection> content = pageable.getOffset() == 0 ? List.of(sample) : List.of();
+        return new PageImpl<>(content, pageable, 1);
     }
 
     public Page<Book> getRecentBooks(Long userId, String keyword, Pageable pageable) {

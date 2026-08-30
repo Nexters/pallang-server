@@ -2,12 +2,37 @@ package com.nexters.palang.domain.group.infrastructure;
 
 import com.nexters.palang.domain.group.domain.Group;
 import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 
 public interface GroupRepository extends JpaRepository<Group, Long> {
+
+    // 관리자 유저 삭제(AdminUserService): 이 유저가 호스트인 모임을 전부 조회해, 다른 멤버가 있는
+    // 모임인지(삭제 차단) / 혼자뿐인 모임인지(함께 삭제 가능)를 판별하는 데 쓴다.
+    List<Group> findAllByHostId(Long hostId);
+
+    // 관리자 페이지 유저 목록에서 "호스트인 모임 수"를 보여주기 위한 참고용 카운트.
+    long countByHostId(Long hostId);
+
+    // 관리자 도서 삭제(AdminBookService): 이 책으로 만들어진 모임 전부.
+    List<Group> findAllByBookId(Long bookId);
+
+    // 관리자 모임 검색(AdminGroupService): 모임명에 키워드가 포함된 모임 전부.
+    // open-in-view: false 환경에서 AdminGroupMapper가 컨트롤러 단(트랜잭션 밖)에서 book/host를
+    // 참조하므로, EntityGraph로 미리 로딩해두지 않으면 LazyInitializationException이 난다.
+    @EntityGraph(attributePaths = {"book", "host"})
+    Page<Group> findByNameContaining(String keyword, Pageable pageable);
+
+    // 관리자 모임 수정/삭제(AdminGroupService): 위와 같은 이유로, 단건 조회에도 book/host를 미리
+    // 로딩해둔다(수정 응답도 컨트롤러 단에서 같은 필드를 참조한다).
+    @EntityGraph(attributePaths = {"book", "host"})
+    Optional<Group> findWithAssociationsById(Long id);
 
     // 초대 링크 미리보기 등 단순 조회용. 잠금이 필요 없는 경로에서 사용한다. book 제목/저자/표지를 응답에
     // 바로 내려줘야 해서(GroupMapper.toInvitationPreviewResponse) join fetch로 같이 읽는다 — book이

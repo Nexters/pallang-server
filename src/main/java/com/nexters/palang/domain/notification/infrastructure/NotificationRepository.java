@@ -22,4 +22,8 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Query("update Notification n set n.read = true, n.readAt = current_timestamp "
             + "where n.receiver.id = :receiverId and n.read = false")
     int markAllAsRead(@Param("receiverId") Long receiverId);
+
+    // 관리자 유저 삭제(AdminUserService): 이 유저가 수신자인 알림 전부. actorId(알림을 유발한 유저)가
+    // 이 유저를 가리키는 다른 사람의 알림은 FK 제약이 없어 그대로 남는다(알려진 한계, 이슈 #155 참고).
+    void deleteAllByReceiverId(Long receiverId);
 }

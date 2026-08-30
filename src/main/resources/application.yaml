@@ -22,7 +22,7 @@ apple:
   private-key: ${APPLE_PRIVATE_KEY:}
 
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3009,http://localhost:3010}
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:8080,http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005,http://localhost:3006,http://localhost:3007,http://localhost:3008,http://localhost:3009,http://localhost:3010}
 
 jwt:
   secret: ${JWT_SECRET:local-dev-jwt-secret-key-please-change-this-01234567890123456789}
@@ -45,3 +45,12 @@ firebase:
 notification:
   # "책에 새 의견 N개 이상" 알림 트리거 기준값.
   book-new-opinions-threshold: ${NOTIFICATION_BOOK_NEW_OPINIONS_THRESHOLD:5}
+
+# 관리자 페이지(/admin) 전용 로그인. 일반 유저 로그인(JWT)과 완전히 분리된 별도 계정 체계다.
+# login-username/password 둘 다 기본값이 없어(빈 문자열) 설정 전까지는 로그인이 항상 실패한다.
+# jwt-secret도 설정하지 않으면 AdminJwtProvider가 기동마다 바뀌는 임시 키를 써서 안전하게 막아둔다.
+admin:
+  login-username: ${ADMIN_LOGIN_USERNAME:}
+  login-password: ${ADMIN_LOGIN_PASSWORD:}
+  jwt-secret: ${ADMIN_JWT_SECRET:}
+  session-expiration-seconds: ${ADMIN_SESSION_EXPIRATION_SECONDS:43200}
