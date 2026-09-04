@@ -2,11 +2,16 @@ package com.nexters.palang.domain.book.infrastructure;
 
 import com.nexters.palang.domain.book.domain.Book;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface BookRepository extends JpaRepository<Book, Long> {
+
+    // 홈 화면 고정 샘플 도서(SampleLibraryBookSeeder/BookService#sampleLibraryPage) 조회용. 환경마다
+    // 이 책의 로컬 PK가 다를 수 있어 ISBN으로 찾는다.
+    Optional<Book> findByIsbn(String isbn);
 
     // title_normalized 백필 대상(BookTitleNormalizationBackfillRunner) 조회용. 기존 도서가 많을 때
     // 한 번에 전부 불러오지 않도록, id 기준 키셋 페이지네이션으로 한 배치씩만 조회한다. offset

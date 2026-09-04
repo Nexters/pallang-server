@@ -4,6 +4,7 @@ import com.nexters.palang.domain.book.common.error.BookErrorCode;
 import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
+import com.nexters.palang.domain.book.domain.SampleLibraryBook;
 import com.nexters.palang.domain.book.domain.UserBookStatus;
 import com.nexters.palang.domain.book.infrastructure.AladinBookApiClient;
 import com.nexters.palang.domain.book.infrastructure.AladinSearchResult;
@@ -134,14 +135,10 @@ public class BookService {
 
     // 비로그인 사용자와, 로그인했지만 서재에 책이 하나도 없는 계정은 홈에서 실제 서재 대신 고정 샘플 도서
     // 1건을 본다 (기획 확정, 이슈 #119). opinionCountScope=MINE(마이페이지, 본인이 남긴 흔적 수)일 때 책
-    // 전체 흔적 수(17)를 그대로 노출하면 "내가 남긴 흔적 수"가 17인 것처럼 잘못 보이므로, scope별로 값이
-    // 다른 고정 projection을 따로 둔다.
-    private static final BookActivityProjection GUEST_SAMPLE_LIBRARY_BOOK = new BookActivityProjection(
-            18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "안전가옥",
-            "https://image.aladin.co.kr/product/39872/66/cover200/k242130313_1.jpg", 13L, 17L);
-    private static final BookActivityProjection GUEST_SAMPLE_LIBRARY_BOOK_MINE = new BookActivityProjection(
-            18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "안전가옥",
-            "https://image.aladin.co.kr/product/39872/66/cover200/k242130313_1.jpg", 13L, 0L);
+    // 전체 흔적 수를 그대로 노출하면 "내가 남긴 흔적 수"가 그만큼인 것처럼 잘못 보이므로, scope별로 값이
+    // 다르다. 어느 스크린이든 이 두 값은 실제 book row와 무관한 고정 표시값이다.
+    private static final long SAMPLE_LIBRARY_BOOK_PASSAGE_COUNT = 13L;
+    private static final long SAMPLE_LIBRARY_BOOK_OPINION_COUNT = 17L;
 
     // 내 서재는 홈 캐러셀과 달리 가운데 기준 없이 최근 흔적 순으로 나열하며, 표준 page/size 페이지네이션을 사용한다.
     public Page<BookActivityProjection> getMyLibraryBooks(Long userId, Pageable pageable, OpinionCountScope opinionCountScope) {
@@ -158,11 +155,24 @@ public class BookService {
     // 샘플 도서는 실제로는 1건뿐이므로 첫 페이지(offset 0)에서만 내려주고, 이후 페이지는 빈 목록을 반환한다.
     // 그렇지 않으면 요청한 모든 페이지에서 같은 샘플 도서가 계속 반복 노출된다.
     private Page<BookActivityProjection> sampleLibraryPage(Pageable pageable, OpinionCountScope opinionCountScope) {
-        BookActivityProjection sample = opinionCountScope == OpinionCountScope.MINE
-                ? GUEST_SAMPLE_LIBRARY_BOOK_MINE
-                : GUEST_SAMPLE_LIBRARY_BOOK;
-        List<BookActivityProjection> content = pageable.getOffset() == 0 ? List.of(sample) : List.of();
-        return new PageImpl<>(content, pageable, 1);
+        if (pageable.getOffset() != 0) {
+            return new PageImpl<>(List.of(), pageable, 1);
+        }
+        // ISBN으로 찾는다: 이 책의 로컬 PK는 환경(dev/prod)마다 다를 수 있어, PK를 그대로 하드코딩하면
+        // 그 PK가 없는 환경에서 존재하지 않는 도서를 가리키게 된다(SampleLibraryBookSeeder가 앱 시작
+        // 시 없으면 만들어 두지만, 그 전이라면 이 조회가 비어 있을 수 있다).
+        return bookRepository.findByIsbn(SampleLibraryBook.ISBN)
+                .map(book -> sampleLibraryPageOf(book, pageable, opinionCountScope))
+                .orElseGet(() -> Page.empty(pageable));
+    }
+
+    private Page<BookActivityProjection> sampleLibraryPageOf(
+            Book book, Pageable pageable, OpinionCountScope opinionCountScope) {
+        long opinionCount = opinionCountScope == OpinionCountScope.MINE ? 0L : SAMPLE_LIBRARY_BOOK_OPINION_COUNT;
+        BookActivityProjection sample = new BookActivityProjection(
+                book.getId(), book.getTitle(), book.getAuthor(), book.getPublisher(), book.getCoverImageUrl(),
+                SAMPLE_LIBRARY_BOOK_PASSAGE_COUNT, opinionCount);
+        return new PageImpl<>(List.of(sample), pageable, 1);
     }
 
     public Page<Book> getRecentBooks(Long userId, String keyword, Pageable pageable) {
