@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
+import com.nexters.palang.domain.book.domain.SampleLibraryBook;
 import com.nexters.palang.domain.book.infrastructure.AladinBookApiClient;
 import com.nexters.palang.domain.book.infrastructure.AladinSearchResult;
 import com.nexters.palang.domain.book.domain.ReadingStatus;
@@ -403,6 +404,8 @@ class BookServiceTest {
     @DisplayName("비로그인 사용자가 내 서재를 조회하면 리포지토리 대신 고정 샘플 도서 1건을 반환한다")
     void getMyLibraryBooksReturnsSampleWhenGuest() {
         Pageable pageable = PageRequest.of(0, 20);
+        given(bookRepository.findByIsbn(SampleLibraryBook.ISBN))
+                .willReturn(Optional.of(book(18L, "빵충 사육 준수 사항")));
 
         Page<BookActivityProjection> results = bookService.getMyLibraryBooks(null, pageable, OpinionCountScope.ALL);
 
@@ -417,6 +420,8 @@ class BookServiceTest {
         Pageable pageable = PageRequest.of(0, 20);
         given(bookQueryRepository.findMyLibraryBooks(10L, pageable, OpinionCountScope.ALL))
                 .willReturn(new PageImpl<>(List.of(), pageable, 0));
+        given(bookRepository.findByIsbn(SampleLibraryBook.ISBN))
+                .willReturn(Optional.of(book(18L, "빵충 사육 준수 사항")));
 
         Page<BookActivityProjection> results = bookService.getMyLibraryBooks(10L, pageable, OpinionCountScope.ALL);
 
@@ -431,6 +436,8 @@ class BookServiceTest {
         Pageable pageable = PageRequest.of(0, 20);
         given(bookQueryRepository.findMyLibraryBooks(10L, pageable, OpinionCountScope.MINE))
                 .willReturn(new PageImpl<>(List.of(), pageable, 0));
+        given(bookRepository.findByIsbn(SampleLibraryBook.ISBN))
+                .willReturn(Optional.of(book(18L, "빵충 사육 준수 사항")));
 
         Page<BookActivityProjection> results = bookService.getMyLibraryBooks(10L, pageable, OpinionCountScope.MINE);
 
