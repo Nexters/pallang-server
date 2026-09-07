@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,10 +16,15 @@ import org.springframework.transaction.annotation.Transactional;
 // 없었고, 그 결과 샘플 카드를 눌러 상세로 들어가면 404가 나는 문제가 있었다(#166). 앱 시작 시 이
 // 책이 없으면 한 번 만들어 둬서, 어느 환경에서든 항상 유효한 book id를 참조하도록 한다. 이미 있으면
 // 아무 일도 하지 않으므로 재배포/재기동해도 안전하다(멱등적).
+// OpinionGuestSampleSeedRunner가 이 book row를 전제로 샘플 대목/의견을 만들기 때문에, @Order로
+// 이 러너가 먼저 실행되도록 순서를 보장한다.
 @Slf4j
 @Component
+@Order(SampleLibraryBookSeeder.ORDER)
 @RequiredArgsConstructor
 public class SampleLibraryBookSeeder implements ApplicationRunner {
+
+    public static final int ORDER = 0;
 
     private final BookRepository bookRepository;
 
