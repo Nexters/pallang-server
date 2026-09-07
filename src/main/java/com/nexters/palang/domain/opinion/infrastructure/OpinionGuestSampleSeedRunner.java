@@ -1,7 +1,9 @@
 package com.nexters.palang.domain.opinion.infrastructure;
 
 import com.nexters.palang.domain.book.domain.Book;
+import com.nexters.palang.domain.book.domain.SampleLibraryBook;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
+import com.nexters.palang.domain.book.infrastructure.SampleLibraryBookSeeder;
 import com.nexters.palang.domain.decoration.domain.Decoration;
 import com.nexters.palang.domain.decoration.domain.EffectType;
 import com.nexters.palang.domain.opinion.domain.Opinion;
@@ -16,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -24,13 +27,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 // 앱 시작 시 한 번 샘플 계정과 그 계정의 흔적 2건(대목 2개)을 만들어둔다. 이 프로젝트엔 Flyway 등
 // 마이그레이션 도구가 없어 BookTitleNormalizationBackfillRunner와 같은 방식(기동 시 자동 실행)을 따른다.
 // 샘플 계정에 이미 흔적이 있으면(=이미 씨딩됨) 아무 일도 하지 않으므로 재배포/재기동해도 안전하다(멱등적).
-// bookId=18("빵충 사육 준수 사항")이 없는 환경(로컬/테스트 DB 등)에서는 조용히 건너뛴다 — 이 도서는
-// BookService.GUEST_SAMPLE_LIBRARY_BOOK에서도 이미 같은 방식으로 하드코딩되어 있는 전제다.
+// 샘플 도서는 환경마다 로컬 PK가 달라 ISBN(SampleLibraryBook)으로 찾는다(#166) — SampleLibraryBookSeeder가
+// 먼저 그 book row를 만들어둬야 하므로 @Order로 이 러너보다 먼저 실행되게 한다. 그래도 아직 없는
+// 환경(로컬/테스트 DB 등)에서는 조용히 건너뛴다.
 @Slf4j
 @Component
+@Order(SampleLibraryBookSeeder.ORDER + 1)
 public class OpinionGuestSampleSeedRunner implements ApplicationRunner {
-
-    private static final Long SAMPLE_BOOK_ID = 18L;
 
     private static final int SAMPLE_PAGE_33 = 33;
     private static final String SAMPLE_QUOTE_33 = "이 모든 건 챗지피티 덕분이었다. 담당자가 준 자료를 복사해서 "
@@ -78,9 +81,9 @@ public class OpinionGuestSampleSeedRunner implements ApplicationRunner {
                 return false;
             }
 
-            Book book = bookRepository.findById(SAMPLE_BOOK_ID).orElse(null);
+            Book book = bookRepository.findByIsbn(SampleLibraryBook.ISBN).orElse(null);
             if (book == null) {
-                log.info("샘플 도서(id={})가 없어 비로그인 미리보기 흔적 씨딩을 건너뜁니다.", SAMPLE_BOOK_ID);
+                log.info("샘플 도서(isbn={})가 없어 비로그인 미리보기 흔적 씨딩을 건너뜁니다.", SampleLibraryBook.ISBN);
                 return false;
             }
 
