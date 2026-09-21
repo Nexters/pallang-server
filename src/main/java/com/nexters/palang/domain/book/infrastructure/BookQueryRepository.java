@@ -10,6 +10,7 @@ import com.nexters.palang.domain.book.domain.QBook;
 import com.nexters.palang.domain.book.domain.QUserBookStatus;
 import com.nexters.palang.domain.opinion.domain.QOpinion;
 import com.nexters.palang.domain.passage.domain.QPassage;
+import com.nexters.palang.domain.user.domain.GuestSampleAccount;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
@@ -200,6 +201,33 @@ public class BookQueryRepository {
 
         List<BookActivityProjection> content = fetchActivityByBookIds(pageBookIds, userId, opinionCountScope);
         return new PageImpl<>(content, pageable, sortedBookIds.size());
+    }
+
+    // 비로그인 홈의 샘플 도서 카드 집계용. 그 도서에 다른 사용자들이 남긴 대목/흔적이 섞여 있어도(dev처럼)
+    // 샘플 계정(GuestSampleAccount)이 씨딩한 것만 세어, 카드의 숫자가 실제 샘플 미리보기 내용과 일치하게 한다.
+    public long countSamplePassages(Long bookId) {
+        QPassage passage = QPassage.passage;
+        Long count = queryFactory
+                .select(passage.count())
+                .from(passage)
+                .where(passage.book.id.eq(bookId), passage.deletedAt.isNull(),
+                        passage.creator.snsProvider.eq(GuestSampleAccount.SNS_PROVIDER),
+                        passage.creator.snsId.eq(GuestSampleAccount.SNS_ID))
+                .fetchOne();
+        return count == null ? 0L : count;
+    }
+
+    public long countSampleOpinions(Long bookId) {
+        QOpinion opinion = QOpinion.opinion;
+        Long count = queryFactory
+                .select(opinion.count())
+                .from(opinion)
+                .where(opinion.passage.book.id.eq(bookId), opinion.deletedAt.isNull(),
+                        opinion.passage.deletedAt.isNull(),
+                        opinion.user.snsProvider.eq(GuestSampleAccount.SNS_PROVIDER),
+                        opinion.user.snsId.eq(GuestSampleAccount.SNS_ID))
+                .fetchOne();
+        return count == null ? 0L : count;
     }
 
     private List<BookActivityProjection> fetchActivityByBookIds(
