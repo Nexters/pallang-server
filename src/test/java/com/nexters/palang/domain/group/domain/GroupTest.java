@@ -31,7 +31,7 @@ class GroupTest {
     @DisplayName("모임을 만들면 host가 지정된 채로 생성되고 초대 코드가 발급된다")
     void createsGroup() {
         Group group = Group.create(
-                "고전 뽀개기", book(), user(1L), 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20));
+                "고전 뽀개기", book(), user(1L), 4, LocalDate.now().minusDays(10), LocalDate.now().plusDays(20));
 
         assertThat(group.getHost().getId()).isEqualTo(1L);
         assertThat(group.getInviteCode()).isNotBlank();
