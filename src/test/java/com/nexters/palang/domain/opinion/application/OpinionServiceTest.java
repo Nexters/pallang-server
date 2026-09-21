@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.book.common.error.BookException;
@@ -428,7 +429,6 @@ class OpinionServiceTest {
         Page<MyOpinionProjection> expected = new PageImpl<>(
                 List.of(new MyOpinionProjection(1L, 10L, "제목", "작가", "cover", 100L, "발췌", 5, "흔적", 0, LocalDateTime.now())),
                 pageable, 1);
-        given(opinionRepository.countByUserIdAndDeletedAtIsNull(1L)).willReturn(1L);
         given(opinionQueryRepository.findMyOpinions(1L, null, pageable)).willReturn(expected);
 
         Page<MyOpinionProjection> results = opinionService.getMyOpinions(1L, null, pageable);
@@ -460,27 +460,16 @@ class OpinionServiceTest {
     }
 
     @Test
-    @DisplayName("로그인했지만 남긴 흔적이 하나도 없는 계정이 조회하면 샘플 계정의 실제 흔적을 반환한다")
-    void getMyOpinionsReturnsSampleAccountOpinionsWhenNewAccountWithNoOpinions() {
+    @DisplayName("로그인했지만 남긴 흔적이 하나도 없는 계정이 조회해도 샘플 계정의 흔적은 노출하지 않는다")
+    void getMyOpinionsDoesNotReturnSampleForLoggedInAccountWithNoOpinions() {
         Pageable pageable = PageRequest.of(0, 20);
-        User sampleUser = User.builder()
-                .nickname(GuestSampleAccount.NICKNAME)
-                .snsProvider(GuestSampleAccount.SNS_PROVIDER)
-                .snsId(GuestSampleAccount.SNS_ID)
-                .build();
-        ReflectionTestUtils.setField(sampleUser, "id", 999L);
-        Page<MyOpinionProjection> expected = new PageImpl<>(
-                List.of(new MyOpinionProjection(1L, 18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "cover", 100L, "발췌", 33,
-                        "애증의 관계", 0, LocalDateTime.now())),
-                pageable, 1);
-        given(opinionRepository.countByUserIdAndDeletedAtIsNull(1L)).willReturn(0L);
-        given(userRepository.findBySnsProviderAndSnsId(GuestSampleAccount.SNS_PROVIDER, GuestSampleAccount.SNS_ID))
-                .willReturn(Optional.of(sampleUser));
-        given(opinionQueryRepository.findMyOpinions(999L, null, pageable)).willReturn(expected);
+        Page<MyOpinionProjection> empty = new PageImpl<>(List.of(), pageable, 0);
+        given(opinionQueryRepository.findMyOpinions(1L, null, pageable)).willReturn(empty);
 
         Page<MyOpinionProjection> results = opinionService.getMyOpinions(1L, null, pageable);
 
-        assertThat(results).isEqualTo(expected);
+        assertThat(results).isEqualTo(empty);
+        verifyNoInteractions(userRepository);
     }
 
     @Test
