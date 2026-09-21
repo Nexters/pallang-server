@@ -133,23 +133,18 @@ public class BookService {
         return Math.max(0, (total - size) / 2);
     }
 
-    // 비로그인 사용자와, 로그인했지만 서재에 책이 하나도 없는 계정은 홈에서 실제 서재 대신 고정 샘플 도서
-    // 1건을 본다 (기획 확정, 이슈 #119). opinionCountScope=MINE(마이페이지, 본인이 남긴 흔적 수)일 때 책
-    // 전체 흔적 수를 그대로 노출하면 "내가 남긴 흔적 수"가 그만큼인 것처럼 잘못 보이므로, scope별로 값이
-    // 다르다. 어느 스크린이든 이 두 값은 실제 book row와 무관한 고정 표시값이다.
-    private static final long SAMPLE_LIBRARY_BOOK_PASSAGE_COUNT = 13L;
-    private static final long SAMPLE_LIBRARY_BOOK_OPINION_COUNT = 17L;
+    // 비로그인 사용자는 홈에서 실제 서재 대신 고정 샘플 도서 1건을 본다 (기획 확정, 이슈 #119). 로그인 이후에는
+    // 서재가 비어 있어도 샘플을 노출하지 않는다(이슈 #172). 카드의 대목/흔적 수는 하드코딩하지 않고, 샘플 계정이
+    // 씨딩한 실제 대목/흔적 수를 센다(#172, 예전 하드코딩 13/17이 실제 샘플 2/2와 어긋났음).
+    // opinionCountScope=MINE(마이페이지, 본인이 남긴 흔적 수)일 때 샘플 흔적 수를 그대로 노출하면 "내가 남긴
+    // 흔적 수"가 그만큼인 것처럼 잘못 보이므로 0으로 내려준다.
 
     // 내 서재는 홈 캐러셀과 달리 가운데 기준 없이 최근 흔적 순으로 나열하며, 표준 page/size 페이지네이션을 사용한다.
     public Page<BookActivityProjection> getMyLibraryBooks(Long userId, Pageable pageable, OpinionCountScope opinionCountScope) {
         if (userId == null) {
             return sampleLibraryPage(pageable, opinionCountScope);
         }
-        Page<BookActivityProjection> myLibraryBooks = bookQueryRepository.findMyLibraryBooks(userId, pageable, opinionCountScope);
-        if (myLibraryBooks.getTotalElements() == 0) {
-            return sampleLibraryPage(pageable, opinionCountScope);
-        }
-        return myLibraryBooks;
+        return bookQueryRepository.findMyLibraryBooks(userId, pageable, opinionCountScope);
     }
 
     // 샘플 도서는 실제로는 1건뿐이므로 첫 페이지(offset 0)에서만 내려주고, 이후 페이지는 빈 목록을 반환한다.
@@ -168,10 +163,13 @@ public class BookService {
 
     private Page<BookActivityProjection> sampleLibraryPageOf(
             Book book, Pageable pageable, OpinionCountScope opinionCountScope) {
-        long opinionCount = opinionCountScope == OpinionCountScope.MINE ? 0L : SAMPLE_LIBRARY_BOOK_OPINION_COUNT;
+        long passageCount = bookQueryRepository.countSamplePassages(book.getId());
+        long opinionCount = opinionCountScope == OpinionCountScope.MINE
+                ? 0L
+                : bookQueryRepository.countSampleOpinions(book.getId());
         BookActivityProjection sample = new BookActivityProjection(
                 book.getId(), book.getTitle(), book.getAuthor(), book.getPublisher(), book.getCoverImageUrl(),
-                SAMPLE_LIBRARY_BOOK_PASSAGE_COUNT, opinionCount);
+                passageCount, opinionCount);
         return new PageImpl<>(List.of(sample), pageable, 1);
     }
 
