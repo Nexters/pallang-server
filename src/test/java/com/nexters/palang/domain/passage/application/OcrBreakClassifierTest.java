@@ -153,6 +153,82 @@ class OcrBreakClassifierTest {
     }
 
     @Test
+    @DisplayName("줄 중간 단어에 좌표가 없어도 나머지 판정은 그대로다")
+    void missingVerticesInMiddleWord_ignored() {
+        // given: 두 번째 줄 가운데 단어의 바운딩 박스가 비어 있다
+        List<OcrTextBlock> blocks = page(
+                line(120, 600, 0),
+                new OcrTextBlock[]{
+                        word("앞", 100, 300, LINE_PITCH, false),
+                        wordWithoutBox("중", false),
+                        word("뒤", 310, 600, LINE_PITCH, true)},
+                line(100, 400, 2),
+                line(120, 600, 3),
+                line(100, 600, 4)
+        );
+
+        // when
+        List<BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
+
+        // then
+        assertThat(lineEndBreakTypes(blocks, layouts)).containsExactly(
+                OcrBreakType.WRAP, OcrBreakType.WRAP, OcrBreakType.PARAGRAPH, OcrBreakType.WRAP, OcrBreakType.WRAP);
+        assertThat(layouts.get(3)).isEqualTo(new BlockLayout(OcrBreakType.NONE, false));
+    }
+
+    @Test
+    @DisplayName("줄의 첫·마지막 단어에 좌표가 없으면 그 줄의 들여쓰기·꽉 참 판정만 건너뛰고 줄 끝은 끊는다")
+    void missingVerticesAtLineEdge_skipsOnlyThatJudgement() {
+        // given: 두 번째 줄은 마지막 단어, 세 번째 줄은 첫 단어의 바운딩 박스가 비어 있다
+        List<OcrTextBlock> blocks = page(
+                line(120, 600, 0),
+                new OcrTextBlock[]{
+                        word("앞", 100, 345, LINE_PITCH, false),
+                        wordWithoutBox("뒤", true)},
+                new OcrTextBlock[]{
+                        wordWithoutBox("앞", false),
+                        word("뒤", 355, 600, LINE_PITCH * 2, true)},
+                line(100, 600, 3),
+                line(100, 300, 4)
+        );
+
+        // when
+        List<BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
+
+        // then: 오른쪽 끝을 모르는 줄은 이어 붙이지 않고 끊는다. 왼쪽 끝을 모르는 줄은 들여쓰기로 보지 않는다.
+        assertThat(lineEndBreakTypes(blocks, layouts)).containsExactly(
+                OcrBreakType.WRAP, OcrBreakType.PARAGRAPH, OcrBreakType.WRAP, OcrBreakType.WRAP, OcrBreakType.PARAGRAPH);
+        assertThat(layouts.get(4).indented()).isFalse();
+    }
+
+    @Test
+    @DisplayName("줄 전체에 좌표가 없으면 그 줄은 판정에서 빼고 줄 끝을 끊는다")
+    void missingVerticesInWholeLine_breaksLine() {
+        // given: 세 번째 줄의 모든 단어에 바운딩 박스가 없다. 본문은 사진 왼쪽 끝(x=0) 근처에서 시작한다.
+        // (좌표 없는 줄은 판정에서 명시적으로 뺀다. 0 좌표로 계산하면 폭 0인 줄이 되어 지금은 우연히 단 묶기에서 빠지지만,
+        // 그 우연에 기대지 않도록 동작을 고정한다)
+        List<OcrTextBlock> blocks = page(
+                line(20, 500, 0),
+                line(0, 500, 1),
+                new OcrTextBlock[]{wordWithoutBox("앞", false), wordWithoutBox("뒤", true)},
+                line(0, 500, 3),
+                line(20, 500, 4),
+                line(0, 200, 5)
+        );
+
+        // when
+        List<BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
+
+        // then: 좌표 없는 줄 끝은 끊고, 나머지 줄의 들여쓰기·이어 붙이기 판정은 흐트러지지 않는다.
+        assertThat(layouts.get(4)).isEqualTo(new BlockLayout(OcrBreakType.NONE, false));
+        assertThat(layouts.get(5)).isEqualTo(new BlockLayout(OcrBreakType.LINE, false));
+        assertThat(IntStream.range(0, blocks.size()).filter(i -> !blocks.get(i).lineBreak())
+                .mapToObj(i -> layouts.get(i).indented()).toList())
+                .containsExactly(true, false, false, false, true, false);
+        assertThat(layouts.get(7).breakType()).isEqualTo(OcrBreakType.PARAGRAPH);
+    }
+
+    @Test
     @DisplayName("줄이 너무 적어 산문인지 판단할 수 없으면 줄마다 끊는다")
     void fewLines_breakEveryLine() {
         // given
@@ -322,6 +398,10 @@ class OcrBreakClassifierTest {
                 new OcrTextBlock.Point(left, top), new OcrTextBlock.Point(right, top),
                 new OcrTextBlock.Point(right, bottom), new OcrTextBlock.Point(left, bottom)));
         return new OcrTextBlock(text, box, lineBreak);
+    }
+
+    private OcrTextBlock wordWithoutBox(String text, boolean lineBreak) {
+        return new OcrTextBlock(text, new OcrTextBlock.BoundingBox(List.of()), lineBreak);
     }
 
     private List<OcrTextBlock> page(OcrTextBlock[]... lines) {

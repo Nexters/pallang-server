@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 // OCR 단어 블록마다 뒤에 오는 끊김의 종류(OcrBreakType)를 바운딩 박스 좌표로 추정한다.
 // Clova는 인쇄된 줄의 끝에만 lineBreak=true를 주므로, 그 줄 끝이 "지면 폭 때문에 꺾인 줄(WRAP)"인지
@@ -46,7 +47,7 @@ public final class OcrBreakClassifier {
         Arrays.fill(breakTypes, OcrBreakType.NONE);
         boolean[] indentedBlocks = new boolean[blocks.size()];
 
-        for (List<Line> column : groupIntoColumns(groupIntoLines(deskew(blocks)))) {
+        for (List<Line> column : groupIntoColumns(groupIntoLines(deskew(blocks), breakTypes))) {
             classifyColumn(column, breakTypes, indentedBlocks);
         }
         List<BlockLayout> layouts = new ArrayList<>();
@@ -81,12 +82,19 @@ public final class OcrBreakClassifier {
     }
 
     // Clova가 준 순서대로 lineBreak=true인 단어까지를 한 줄로 묶는다. 마지막 단어는 lineBreak가 없어도 줄 끝으로 본다.
-    private static List<Line> groupIntoLines(List<OcrTextBlock> blocks) {
+    // Clova 응답은 바운딩 박스 꼭짓점 개수를 보장하지 않는다. 줄 전체에 좌표가 없으면 판정에서 빼고,
+    // 줄 끝은 책의 줄바꿈을 잃지 않도록 끊는다(LINE). 애매하면 끊는 쪽이 복구하기 쉽다.
+    private static List<Line> groupIntoLines(List<OcrTextBlock> blocks, OcrBreakType[] breakTypes) {
         List<Line> lines = new ArrayList<>();
         int start = 0;
         for (int i = 0; i < blocks.size(); i++) {
             if (blocks.get(i).lineBreak() || i == blocks.size() - 1) {
-                lines.add(Line.of(blocks, start, i));
+                Optional<Line> line = Line.of(blocks, start, i);
+                if (line.isPresent()) {
+                    lines.add(line.get());
+                } else {
+                    breakTypes[i] = OcrBreakType.LINE;
+                }
                 start = i + 1;
             }
         }
@@ -143,8 +151,12 @@ public final class OcrBreakClassifier {
         boolean[] fullLines = new boolean[column.size()];
         boolean[] indented = new boolean[column.size()];
         for (int i = 0; i < column.size(); i++) {
-            fullLines[i] = neighborRight(column, i) - column.get(i).right() < SHORT_LINE_RATIO * charHeight;
-            indented[i] = column.get(i).left() - neighborLeft(column, i, marginDrift) > INDENT_RATIO * charHeight;
+            // 끝 단어에 좌표가 없어 왼쪽·오른쪽 끝을 모르는 줄은 그 판정을 건너뛴다(꽉 참·들여쓰기 아님 → 끊는 쪽으로 기운다).
+            Line line = column.get(i);
+            fullLines[i] = line.rightKnown()
+                    && neighborRight(column, i) - line.right() < SHORT_LINE_RATIO * charHeight;
+            indented[i] = line.leftKnown()
+                    && line.left() - neighborLeft(column, i, marginDrift) > INDENT_RATIO * charHeight;
             indentedBlocks[column.get(i).firstIndex()] = indented[i];
         }
         boolean[] nextIndented = new boolean[column.size()];
@@ -215,7 +227,11 @@ public final class OcrBreakClassifier {
     }
 
     private static double neighborRight(List<Line> column, int index) {
-        return neighbors(column, index).stream().mapToDouble(Line::right).max().orElseThrow();
+        return neighbors(column, index).stream()
+                .filter(Line::rightKnown)
+                .mapToDouble(Line::right)
+                .max()
+                .orElse(column.get(index).right());
     }
 
     // 이웃 줄의 왼쪽 끝을 이 줄 위치로 옮겨 온 값(줄 간 거리 × 줄당 여백 밀림만큼 보정) 중 가장 왼쪽을 여백 기준으로 삼는다.
@@ -225,7 +241,9 @@ public final class OcrBreakClassifier {
         int to = Math.min(column.size(), index + NEIGHBOR_WINDOW + 1);
         double margin = Double.MAX_VALUE;
         for (int j = from; j < to; j++) {
-            margin = Math.min(margin, column.get(j).left() + marginDrift * (index - j));
+            if (column.get(j).leftKnown()) {
+                margin = Math.min(margin, column.get(j).left() + marginDrift * (index - j));
+            }
         }
         return margin;
     }
@@ -235,7 +253,9 @@ public final class OcrBreakClassifier {
     private static List<Double> leftMarginSteps(List<Line> column) {
         List<Double> steps = new ArrayList<>();
         for (int i = 0; i < column.size() - 1; i++) {
-            steps.add(column.get(i + 1).left() - column.get(i).left());
+            if (column.get(i).leftKnown() && column.get(i + 1).leftKnown()) {
+                steps.add(column.get(i + 1).left() - column.get(i).left());
+            }
         }
         return steps;
     }
@@ -256,15 +276,28 @@ public final class OcrBreakClassifier {
     }
 
     // 한 줄의 요약. left/top은 첫 단어, right는 마지막 단어 기준이다(기울어진 사진에서 줄 전체 범위보다 안정적).
-    private record Line(int firstIndex, int lastIndex, double left, double right, double top, List<Double> wordHeights) {
+    // 좌표가 없는 단어는 요약에서 뺀다. 첫·마지막 단어에 좌표가 없으면 그 줄의 왼쪽·오른쪽 끝은 알 수 없으므로
+    // leftKnown/rightKnown을 false로 두고, left/right에는 단 묶기용 근삿값(좌표가 있는 단어 기준)만 담는다.
+    private record Line(int firstIndex, int lastIndex, double left, boolean leftKnown, double right, boolean rightKnown,
+                        double top, List<Double> wordHeights) {
 
-        static Line of(List<OcrTextBlock> blocks, int firstIndex, int lastIndex) {
-            List<OcrTextBlock.Point> first = blocks.get(firstIndex).boundingBox().vertices();
-            List<OcrTextBlock.Point> last = blocks.get(lastIndex).boundingBox().vertices();
-            List<Double> wordHeights = blocks.subList(firstIndex, lastIndex + 1).stream()
-                    .map(block -> maxY(block.boundingBox().vertices()) - minY(block.boundingBox().vertices()))
+        static Optional<Line> of(List<OcrTextBlock> blocks, int firstIndex, int lastIndex) {
+            List<List<OcrTextBlock.Point>> located = blocks.subList(firstIndex, lastIndex + 1).stream()
+                    .map(block -> block.boundingBox().vertices())
+                    .filter(vertices -> !vertices.isEmpty())
                     .toList();
-            return new Line(firstIndex, lastIndex, minX(first), maxX(last), minY(first), wordHeights);
+            if (located.isEmpty()) {
+                return Optional.empty();
+            }
+            List<OcrTextBlock.Point> first = located.get(0);
+            List<OcrTextBlock.Point> last = located.get(located.size() - 1);
+            boolean leftKnown = !blocks.get(firstIndex).boundingBox().vertices().isEmpty();
+            boolean rightKnown = !blocks.get(lastIndex).boundingBox().vertices().isEmpty();
+            List<Double> wordHeights = located.stream()
+                    .map(vertices -> maxY(vertices) - minY(vertices))
+                    .toList();
+            return Optional.of(new Line(firstIndex, lastIndex, minX(first), leftKnown, maxX(last), rightKnown,
+                    minY(first), wordHeights));
         }
 
         private static double minX(List<OcrTextBlock.Point> points) {
