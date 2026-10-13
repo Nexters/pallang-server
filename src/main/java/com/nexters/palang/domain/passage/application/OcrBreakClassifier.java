@@ -16,8 +16,10 @@ public final class OcrBreakClassifier {
 
     // 줄 끝이 주변 줄의 오른쪽 끝보다 글자 1개 이상 모자라면 짧게 끝난 줄로 본다.
     private static final double SHORT_LINE_RATIO = 1.0;
-    // 줄 시작이 주변 줄의 왼쪽 끝보다 글자 0.7개 이상 들어가 있으면 들여쓰기로 본다.
-    private static final double INDENT_RATIO = 0.7;
+    // 줄 시작이 주변 줄의 왼쪽 끝보다 글자 높이의 0.4배 이상 들어가 있으면 들여쓰기로 본다.
+    // 책의 들여쓰기는 보통 한 글자 폭이지만 Clova 박스 높이에 여백이 포함돼 실제 들여쓰기는 박스 높이의 0.6배 안팎으로 잡힌다.
+    // 기울기 보정 후 들여쓰지 않은 줄끼리는 왼쪽 끝이 거의 일치하므로 이 정도로 낮춰도 오판하지 않는다.
+    private static final double INDENT_RATIO = 0.4;
     // 줄 사이 간격이 평소보다 글자 0.8개 이상 벌어지면 빈 줄(문단·연 구분)로 본다.
     private static final double PARAGRAPH_GAP_RATIO = 0.8;
     // 단(컬럼)의 줄 끝 중 이 비율 이상이 산문의 특징(오른쪽 끝까지 참, 또는 짧게 끝나고 다음 줄이 들여쓰기)을 보여야
