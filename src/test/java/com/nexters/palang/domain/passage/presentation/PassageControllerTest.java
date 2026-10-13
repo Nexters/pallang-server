@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -20,8 +21,10 @@ import com.nexters.palang.domain.passage.application.PassageOcrService;
 import com.nexters.palang.domain.passage.application.PassageService;
 import com.nexters.palang.domain.passage.application.SimilarPassageFinder;
 import com.nexters.palang.domain.passage.application.SimilarPassageProjection;
+import com.nexters.palang.domain.passage.application.dto.OcrResultDto;
 import com.nexters.palang.domain.passage.common.error.PassageErrorCode;
 import com.nexters.palang.domain.passage.common.error.PassageException;
+import com.nexters.palang.domain.passage.domain.OcrBreakType;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.presentation.request.PassageRequest;
 import com.nexters.palang.global.security.CurrentUserProvider;
@@ -36,6 +39,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -65,6 +69,26 @@ class PassageControllerTest {
         Passage passage = Passage.builder().pageNumber(pageNumber).quotedText("발췌 문장").isSpoiler(false).build();
         ReflectionTestUtils.setField(passage, "id", id);
         return passage;
+    }
+
+    @Test
+    @DisplayName("이미지를 업로드하면 인식한 단어와 줄바꿈 종류를 DataResponse로 감싸 반환한다")
+    void createOcrResult() throws Exception {
+        // given
+        OcrResultDto.BoundingBox box = new OcrResultDto.BoundingBox(List.of(new OcrResultDto.Point(120.5, 48.0)));
+        given(passageOcrService.recognizeText(any())).willReturn(List.of(
+                new OcrResultDto("우리는", box, false, OcrBreakType.NONE),
+                new OcrResultDto("헤맨다.", box, true, OcrBreakType.PARAGRAPH)));
+        MockMultipartFile image = new MockMultipartFile("image", "page.jpg", MediaType.IMAGE_JPEG_VALUE, new byte[]{1});
+
+        // when & then
+        mockMvc.perform(multipart("/api/passages/ocr").file(image))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.blocks[0].text").value("우리는"))
+                .andExpect(jsonPath("$.data.blocks[0].breakType").value("NONE"))
+                .andExpect(jsonPath("$.data.blocks[1].lineBreak").value(true))
+                .andExpect(jsonPath("$.data.blocks[1].breakType").value("PARAGRAPH"))
+                .andExpect(jsonPath("$.data.blocks[1].boundingBox.vertices[0].x").value(120.5));
     }
 
     @Test
