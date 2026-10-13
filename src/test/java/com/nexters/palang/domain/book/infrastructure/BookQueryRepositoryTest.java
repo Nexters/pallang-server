@@ -7,16 +7,21 @@ import com.nexters.palang.domain.book.application.BookActivityProjection;
 import com.nexters.palang.domain.book.application.BookDetailProjection;
 import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.application.BookSearchSort;
+import com.nexters.palang.domain.book.application.MyLibraryBookProjection;
 import com.nexters.palang.domain.book.application.OpinionCountScope;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.ReadingStatus;
 import com.nexters.palang.domain.book.domain.UserBookStatus;
+import com.nexters.palang.domain.group.domain.Group;
+import com.nexters.palang.domain.group.domain.GroupMember;
+import com.nexters.palang.domain.group.domain.GroupMemberRole;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.user.domain.SnsProvider;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.global.config.JpaAuditingConfig;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,6 +83,27 @@ class BookQueryRepositoryTest {
                 .passage(passage)
                 .user(user)
                 .content("흔적 내용")
+                .build());
+    }
+
+    private Group group(Book book, User host, String name) {
+        return entityManager.persistAndFlush(
+                Group.create(name, book, host, 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20)));
+    }
+
+    private void member(Group group, User user) {
+        entityManager.persistAndFlush(GroupMember.of(group, user, GroupMemberRole.MEMBER));
+    }
+
+    private Passage groupPassage(Book book, User creator, Group group, int pageNumber) {
+        return entityManager.persistAndFlush(Passage.builder()
+                .book(book)
+                .creator(creator)
+                .group(group)
+                .pageNumber(pageNumber)
+                .quotedText("모임 발췌 문장")
+                .isSpoiler(false)
+                .normalizedHash("group-hash-" + group.getId() + "-" + pageNumber)
                 .build());
     }
 
@@ -396,10 +422,10 @@ class BookQueryRepositoryTest {
         opinion(myPassage, other);
         opinion(passage(othersBook, other, 1), other);
 
-        Page<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(
+        Page<MyLibraryBookProjection> results = bookQueryRepository.findMyLibraryBooks(
                 me.getId(), PageRequest.of(0, 20), OpinionCountScope.ALL);
 
-        assertThat(results.getContent()).extracting(BookActivityProjection::bookId).containsExactly(myBook.getId());
+        assertThat(results.getContent()).extracting(MyLibraryBookProjection::bookId).containsExactly(myBook.getId());
         assertThat(results.getContent().get(0).passageCount()).isEqualTo(1);
         assertThat(results.getContent().get(0).opinionCount()).isEqualTo(2);
         assertThat(results.getTotalElements()).isEqualTo(1);
@@ -417,10 +443,10 @@ class BookQueryRepositoryTest {
         opinion(othersPassage, other);
         opinion(othersPassage, other);
 
-        Page<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(
+        Page<MyLibraryBookProjection> results = bookQueryRepository.findMyLibraryBooks(
                 me.getId(), PageRequest.of(0, 20), OpinionCountScope.ALL);
 
-        assertThat(results.getContent()).extracting(BookActivityProjection::bookId).containsExactly(myBook.getId());
+        assertThat(results.getContent()).extracting(MyLibraryBookProjection::bookId).containsExactly(myBook.getId());
         assertThat(results.getContent().get(0).passageCount()).isEqualTo(2);
         assertThat(results.getContent().get(0).opinionCount()).isEqualTo(3);
     }
@@ -436,10 +462,10 @@ class BookQueryRepositoryTest {
         opinion(myPassage, other);
         opinion(myPassage, other);
 
-        Page<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(
+        Page<MyLibraryBookProjection> results = bookQueryRepository.findMyLibraryBooks(
                 me.getId(), PageRequest.of(0, 20), OpinionCountScope.MINE);
 
-        assertThat(results.getContent()).extracting(BookActivityProjection::bookId).containsExactly(myBook.getId());
+        assertThat(results.getContent()).extracting(MyLibraryBookProjection::bookId).containsExactly(myBook.getId());
         assertThat(results.getContent().get(0).passageCount()).isEqualTo(1);
         assertThat(results.getContent().get(0).opinionCount()).isEqualTo(1);
     }
@@ -454,10 +480,10 @@ class BookQueryRepositoryTest {
         Thread.sleep(10);
         opinion(passage(newerBook, me, 1), me);
 
-        Page<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(
+        Page<MyLibraryBookProjection> results = bookQueryRepository.findMyLibraryBooks(
                 me.getId(), PageRequest.of(0, 20), OpinionCountScope.ALL);
 
-        assertThat(results.getContent()).extracting(BookActivityProjection::bookId)
+        assertThat(results.getContent()).extracting(MyLibraryBookProjection::bookId)
                 .containsExactly(newerBook.getId(), olderBook.getId());
     }
 
@@ -468,10 +494,10 @@ class BookQueryRepositoryTest {
         Book statusOnlyBook = book("읽기 상태만 설정한 책");
         userBookStatus(me, statusOnlyBook, ReadingStatus.READING);
 
-        Page<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(
+        Page<MyLibraryBookProjection> results = bookQueryRepository.findMyLibraryBooks(
                 me.getId(), PageRequest.of(0, 20), OpinionCountScope.ALL);
 
-        assertThat(results.getContent()).extracting(BookActivityProjection::bookId)
+        assertThat(results.getContent()).extracting(MyLibraryBookProjection::bookId)
                 .containsExactly(statusOnlyBook.getId());
         assertThat(results.getContent().get(0).passageCount()).isEqualTo(0);
         assertThat(results.getContent().get(0).opinionCount()).isEqualTo(0);
@@ -486,10 +512,112 @@ class BookQueryRepositoryTest {
         opinion(passage(book, me, 1), me);
         userBookStatus(me, book, ReadingStatus.FINISHED);
 
-        Page<BookActivityProjection> results = bookQueryRepository.findMyLibraryBooks(
+        Page<MyLibraryBookProjection> results = bookQueryRepository.findMyLibraryBooks(
                 me.getId(), PageRequest.of(0, 20), OpinionCountScope.ALL);
 
-        assertThat(results.getContent()).extracting(BookActivityProjection::bookId).containsExactly(book.getId());
+        assertThat(results.getContent()).extracting(MyLibraryBookProjection::bookId).containsExactly(book.getId());
+        assertThat(results.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("같은 책을 전역과 모임에서 함께 남기면 (책, 모임) 단위 항목으로 나누고, 대목/흔적 수도 항목 범위 안에서만 센다")
+    void findMyLibraryBooksSplitsEntriesByGroup() {
+        // given
+        User me = user("me-split");
+        User other = user("other-split");
+        Book book = book("면도날");
+        Group myGroup = group(book, me, "면도날 모임");
+        member(myGroup, me);
+        Group othersGroup = group(book, other, "남의 모임");
+        member(othersGroup, other);
+
+        Passage globalPassage = passage(book, me, 1);
+        opinion(globalPassage, me);
+        opinion(globalPassage, other);
+        opinion(passage(book, other, 2), other);
+        opinion(groupPassage(book, me, myGroup, 9), me);
+        Passage othersGroupPassage = groupPassage(book, other, othersGroup, 10);
+        opinion(othersGroupPassage, other);
+        opinion(othersGroupPassage, other);
+
+        // when
+        Page<MyLibraryBookProjection> results = bookQueryRepository.findMyLibraryBooks(
+                me.getId(), PageRequest.of(0, 20), OpinionCountScope.ALL);
+
+        // then
+        assertThat(results.getContent())
+                .extracting(MyLibraryBookProjection::bookId, MyLibraryBookProjection::groupId,
+                        MyLibraryBookProjection::groupName, MyLibraryBookProjection::passageCount,
+                        MyLibraryBookProjection::opinionCount)
+                .containsExactlyInAnyOrder(
+                        tuple(book.getId(), null, null, 2L, 3L),
+                        tuple(book.getId(), myGroup.getId(), "면도날 모임", 1L, 1L));
+        assertThat(results.getTotalElements()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("모임 항목은 MINE 스코프에서 그 모임 안에서 내가 남긴 흔적만 센다")
+    void findMyLibraryBooksCountsOnlyMyOpinionsInGroupWhenScopeIsMine() {
+        // given
+        User me = user("me-gmine");
+        User other = user("other-gmine");
+        Book book = book("모임 책 - mine scope");
+        Group group = group(book, me, "모임");
+        member(group, me);
+        member(group, other);
+        Passage passage = groupPassage(book, me, group, 3);
+        opinion(passage, me);
+        opinion(passage, other);
+        opinion(passage(book, me, 1), me);
+
+        // when
+        Page<MyLibraryBookProjection> results = bookQueryRepository.findMyLibraryBooks(
+                me.getId(), PageRequest.of(0, 20), OpinionCountScope.MINE);
+
+        // then
+        assertThat(results.getContent())
+                .extracting(MyLibraryBookProjection::groupId, MyLibraryBookProjection::opinionCount)
+                .containsExactlyInAnyOrder(tuple(null, 1L), tuple(group.getId(), 1L));
+    }
+
+    @Test
+    @DisplayName("내가 멤버가 아닌 모임의 대목에 남은 흔적은 내 서재에 포함하지 않는다")
+    void findMyLibraryBooksExcludesGroupsImNotMemberOf() {
+        // given
+        User me = user("me-nomem");
+        User host = user("host-nomem");
+        Book book = book("멤버가 아닌 모임의 책");
+        Group group = group(book, host, "모임");
+        member(group, host);
+        opinion(groupPassage(book, host, group, 1), me);
+
+        // when
+        Page<MyLibraryBookProjection> results = bookQueryRepository.findMyLibraryBooks(
+                me.getId(), PageRequest.of(0, 20), OpinionCountScope.ALL);
+
+        // then
+        assertThat(results.getContent()).isEmpty();
+        assertThat(results.getTotalElements()).isZero();
+    }
+
+    @Test
+    @DisplayName("모임에서만 흔적을 남긴 책에 읽기 상태를 설정해도 별도 전역 항목을 만들지 않는다")
+    void findMyLibraryBooksAttachesStatusToGroupEntryWhenNoGlobalActivity() {
+        // given
+        User me = user("me-gstat");
+        Book book = book("모임에서만 읽는 책");
+        Group group = group(book, me, "모임");
+        member(group, me);
+        opinion(groupPassage(book, me, group, 1), me);
+        userBookStatus(me, book, ReadingStatus.READING);
+
+        // when
+        Page<MyLibraryBookProjection> results = bookQueryRepository.findMyLibraryBooks(
+                me.getId(), PageRequest.of(0, 20), OpinionCountScope.ALL);
+
+        // then
+        assertThat(results.getContent()).extracting(MyLibraryBookProjection::groupId)
+                .containsExactly(group.getId());
         assertThat(results.getTotalElements()).isEqualTo(1);
     }
 

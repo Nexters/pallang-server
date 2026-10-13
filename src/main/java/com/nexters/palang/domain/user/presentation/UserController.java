@@ -4,6 +4,7 @@ import com.nexters.palang.domain.auth.application.AuthService;
 import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.opinion.application.OpinionService;
 import com.nexters.palang.domain.passage.application.PassageService;
+import com.nexters.palang.domain.passage.domain.PassageScope;
 import com.nexters.palang.domain.user.application.UserMapper;
 import com.nexters.palang.domain.user.application.UserService;
 import com.nexters.palang.domain.user.domain.BookFilterType;
@@ -102,22 +103,26 @@ public class UserController implements UserApi {
     @GetMapping("/api/users/me/opinions")
     public ResponseEntity<DataResponse<MyOpinionListResponse>> getMyOpinions(
             @RequestParam(required = false) Long bookId,
+            @RequestParam(required = false) Long groupId,
+            @RequestParam(defaultValue = "false") boolean globalOnly,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
-        return ResponseEntity.ok(DataResponse.from(UserMapper.toMyOpinionListResponse(
-                opinionService.getMyOpinions(currentUserId, bookId, pageable(page, size)))));
+        return ResponseEntity.ok(DataResponse.from(UserMapper.toMyOpinionListResponse(opinionService.getMyOpinions(
+                currentUserId, bookId, PassageScope.of(groupId, globalOnly), pageable(page, size)))));
     }
 
     @Override
     @GetMapping("/api/users/me/likes")
     public ResponseEntity<DataResponse<LikedOpinionListResponse>> getLikedOpinions(
             @RequestParam(required = false) Long bookId,
+            @RequestParam(required = false) Long groupId,
+            @RequestParam(defaultValue = "false") boolean globalOnly,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        return ResponseEntity.ok(DataResponse.from(UserMapper.toLikedOpinionListResponse(
-                opinionService.getLikedOpinions(currentUserId, bookId, pageable(page, size)))));
+        return ResponseEntity.ok(DataResponse.from(UserMapper.toLikedOpinionListResponse(opinionService.getLikedOpinions(
+                currentUserId, bookId, PassageScope.of(groupId, globalOnly), pageable(page, size)))));
     }
 
     @Override
@@ -138,11 +143,13 @@ public class UserController implements UserApi {
     public ResponseEntity<DataResponse<MyPassageListResponse>> getMyPassages(
             @RequestParam(required = false) Long bookId,
             @RequestParam(defaultValue = "false") boolean spoilerOnly,
+            @RequestParam(required = false) Long groupId,
+            @RequestParam(defaultValue = "false") boolean globalOnly,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        return ResponseEntity.ok(DataResponse.from(UserMapper.toMyPassageListResponse(
-                passageService.getMyPassages(currentUserId, bookId, spoilerOnly, pageable(page, size)))));
+        return ResponseEntity.ok(DataResponse.from(UserMapper.toMyPassageListResponse(passageService.getMyPassages(
+                currentUserId, bookId, spoilerOnly, PassageScope.of(groupId, globalOnly), pageable(page, size)))));
     }
 
     private MeResponse toMeResponse(Long userId, User user) {

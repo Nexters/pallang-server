@@ -378,11 +378,11 @@ class BookServiceTest {
     @DisplayName("내 서재 조회는 표준 page/size 페이지네이션과 opinionCountScope를 그대로 리포지토리에 위임한다")
     void getMyLibraryBooksDelegatesToRepository() {
         Pageable pageable = PageRequest.of(0, 20);
-        Page<BookActivityProjection> expected = new PageImpl<>(
-                List.of(new BookActivityProjection(1L, "책1", "작가", "출판사", "cover", 5, 10)), pageable, 1);
+        Page<MyLibraryBookProjection> expected = new PageImpl<>(
+                List.of(new MyLibraryBookProjection(1L, "책1", "작가", "출판사", "cover", null, null, 5, 10)), pageable, 1);
         given(bookQueryRepository.findMyLibraryBooks(10L, pageable, OpinionCountScope.ALL)).willReturn(expected);
 
-        Page<BookActivityProjection> results = bookService.getMyLibraryBooks(10L, pageable, OpinionCountScope.ALL);
+        Page<MyLibraryBookProjection> results = bookService.getMyLibraryBooks(10L, pageable, OpinionCountScope.ALL);
 
         assertThat(results).isEqualTo(expected);
     }
@@ -391,11 +391,11 @@ class BookServiceTest {
     @DisplayName("내 서재 조회는 opinionCountScope가 MINE이어도 그대로 리포지토리에 위임한다")
     void getMyLibraryBooksDelegatesMineScopeToRepository() {
         Pageable pageable = PageRequest.of(1, 20);
-        Page<BookActivityProjection> expected = new PageImpl<>(
-                List.of(new BookActivityProjection(1L, "책1", "작가", "출판사", "cover", 5, 0)), pageable, 21);
+        Page<MyLibraryBookProjection> expected = new PageImpl<>(
+                List.of(new MyLibraryBookProjection(1L, "책1", "작가", "출판사", "cover", null, null, 5, 0)), pageable, 21);
         given(bookQueryRepository.findMyLibraryBooks(10L, pageable, OpinionCountScope.MINE)).willReturn(expected);
 
-        Page<BookActivityProjection> results = bookService.getMyLibraryBooks(10L, pageable, OpinionCountScope.MINE);
+        Page<MyLibraryBookProjection> results = bookService.getMyLibraryBooks(10L, pageable, OpinionCountScope.MINE);
 
         assertThat(results).isEqualTo(expected);
     }
@@ -409,14 +409,15 @@ class BookServiceTest {
         given(bookQueryRepository.countSamplePassages(18L)).willReturn(2L);
         given(bookQueryRepository.countSampleOpinions(18L)).willReturn(2L);
 
-        Page<BookActivityProjection> results = bookService.getMyLibraryBooks(null, pageable, OpinionCountScope.ALL);
+        Page<MyLibraryBookProjection> results = bookService.getMyLibraryBooks(null, pageable, OpinionCountScope.ALL);
 
         assertThat(results.getTotalElements()).isEqualTo(1);
-        BookActivityProjection sample = results.getContent().get(0);
+        MyLibraryBookProjection sample = results.getContent().get(0);
         assertThat(sample.bookId()).isEqualTo(18L);
         assertThat(sample.title()).isEqualTo("빵충 사육 준수 사항");
         assertThat(sample.passageCount()).isEqualTo(2L);
         assertThat(sample.opinionCount()).isEqualTo(2L);
+        assertThat(sample.groupId()).isNull();
         verifyNoInteractions(userBookStatusRepository);
     }
 
@@ -428,7 +429,7 @@ class BookServiceTest {
                 .willReturn(Optional.of(book(18L, "빵충 사육 준수 사항")));
         given(bookQueryRepository.countSamplePassages(18L)).willReturn(2L);
 
-        Page<BookActivityProjection> results = bookService.getMyLibraryBooks(null, pageable, OpinionCountScope.MINE);
+        Page<MyLibraryBookProjection> results = bookService.getMyLibraryBooks(null, pageable, OpinionCountScope.MINE);
 
         assertThat(results.getTotalElements()).isEqualTo(1);
         assertThat(results.getContent().get(0).passageCount()).isEqualTo(2L);
@@ -439,10 +440,10 @@ class BookServiceTest {
     @DisplayName("로그인했지만 서재에 책이 하나도 없는 계정이 조회해도 샘플 도서를 반환하지 않는다")
     void getMyLibraryBooksDoesNotReturnSampleWhenAccountHasNoBooks() {
         Pageable pageable = PageRequest.of(0, 20);
-        Page<BookActivityProjection> empty = new PageImpl<>(List.of(), pageable, 0);
+        Page<MyLibraryBookProjection> empty = new PageImpl<>(List.of(), pageable, 0);
         given(bookQueryRepository.findMyLibraryBooks(10L, pageable, OpinionCountScope.ALL)).willReturn(empty);
 
-        Page<BookActivityProjection> results = bookService.getMyLibraryBooks(10L, pageable, OpinionCountScope.ALL);
+        Page<MyLibraryBookProjection> results = bookService.getMyLibraryBooks(10L, pageable, OpinionCountScope.ALL);
 
         assertThat(results.getContent()).isEmpty();
         assertThat(results.getTotalElements()).isZero();
@@ -454,7 +455,7 @@ class BookServiceTest {
     void getMyLibraryBooksDoesNotRepeatSampleOnLaterPagesWhenGuest() {
         Pageable secondPage = PageRequest.of(1, 20);
 
-        Page<BookActivityProjection> results = bookService.getMyLibraryBooks(null, secondPage, OpinionCountScope.ALL);
+        Page<MyLibraryBookProjection> results = bookService.getMyLibraryBooks(null, secondPage, OpinionCountScope.ALL);
 
         assertThat(results.getContent()).isEmpty();
         assertThat(results.getTotalElements()).isEqualTo(1);

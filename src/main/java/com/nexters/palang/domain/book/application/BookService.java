@@ -140,7 +140,7 @@ public class BookService {
     // 흔적 수"가 그만큼인 것처럼 잘못 보이므로 0으로 내려준다.
 
     // 내 서재는 홈 캐러셀과 달리 가운데 기준 없이 최근 흔적 순으로 나열하며, 표준 page/size 페이지네이션을 사용한다.
-    public Page<BookActivityProjection> getMyLibraryBooks(Long userId, Pageable pageable, OpinionCountScope opinionCountScope) {
+    public Page<MyLibraryBookProjection> getMyLibraryBooks(Long userId, Pageable pageable, OpinionCountScope opinionCountScope) {
         if (userId == null) {
             return sampleLibraryPage(pageable, opinionCountScope);
         }
@@ -149,7 +149,7 @@ public class BookService {
 
     // 샘플 도서는 실제로는 1건뿐이므로 첫 페이지(offset 0)에서만 내려주고, 이후 페이지는 빈 목록을 반환한다.
     // 그렇지 않으면 요청한 모든 페이지에서 같은 샘플 도서가 계속 반복 노출된다.
-    private Page<BookActivityProjection> sampleLibraryPage(Pageable pageable, OpinionCountScope opinionCountScope) {
+    private Page<MyLibraryBookProjection> sampleLibraryPage(Pageable pageable, OpinionCountScope opinionCountScope) {
         if (pageable.getOffset() != 0) {
             return new PageImpl<>(List.of(), pageable, 1);
         }
@@ -161,15 +161,15 @@ public class BookService {
                 .orElseGet(() -> Page.empty(pageable));
     }
 
-    private Page<BookActivityProjection> sampleLibraryPageOf(
+    private Page<MyLibraryBookProjection> sampleLibraryPageOf(
             Book book, Pageable pageable, OpinionCountScope opinionCountScope) {
         long passageCount = bookQueryRepository.countSamplePassages(book.getId());
         long opinionCount = opinionCountScope == OpinionCountScope.MINE
                 ? 0L
                 : bookQueryRepository.countSampleOpinions(book.getId());
-        BookActivityProjection sample = new BookActivityProjection(
+        MyLibraryBookProjection sample = new MyLibraryBookProjection(
                 book.getId(), book.getTitle(), book.getAuthor(), book.getPublisher(), book.getCoverImageUrl(),
-                passageCount, opinionCount);
+                null, null, passageCount, opinionCount);
         return new PageImpl<>(List.of(sample), pageable, 1);
     }
 

@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -24,6 +25,7 @@ import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.application.BookSearchSort;
 import com.nexters.palang.domain.book.application.BookService;
 import com.nexters.palang.domain.book.application.ExternalBookResult;
+import com.nexters.palang.domain.book.application.MyLibraryBookProjection;
 import com.nexters.palang.domain.book.application.OpinionCountScope;
 import com.nexters.palang.domain.book.common.error.BookErrorCode;
 import com.nexters.palang.domain.book.common.error.BookException;
@@ -196,18 +198,24 @@ class BookControllerTest {
     }
 
     @Test
-    @DisplayName("내 서재 도서 목록을 요청하면 현재 사용자 기준, opinionCountScope 기본값 ALL로 조회한다")
+    @DisplayName("내 서재 도서 목록을 요청하면 현재 사용자 기준, opinionCountScope 기본값 ALL로 조회하고 항목마다 모임 정보를 내려준다")
     void getMyLibraryBooks() throws Exception {
         given(currentUserProvider.findCurrentUserId()).willReturn(java.util.Optional.of(1L));
         given(bookService.getMyLibraryBooks(eq(1L), any(Pageable.class), eq(OpinionCountScope.ALL))).willReturn(
-                new PageImpl<>(List.of(new BookActivityProjection(1L, "제목", "작가", "출판사", "cover", 3, 7)),
-                        DEFAULT_PAGEABLE, 1));
+                new PageImpl<>(List.of(new MyLibraryBookProjection(1L, "제목", "작가", "출판사", "cover", null, null, 3, 7),
+                        new MyLibraryBookProjection(1L, "제목", "작가", "출판사", "cover", 13L, "면도날 모임", 1, 2)),
+                        DEFAULT_PAGEABLE, 2));
 
         mockMvc.perform(get("/api/books/my-library"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.books[0].bookId").value(1))
                 .andExpect(jsonPath("$.data.books[0].passageCount").value(3))
-                .andExpect(jsonPath("$.data.books[0].opinionCount").value(7));
+                .andExpect(jsonPath("$.data.books[0].opinionCount").value(7))
+                .andExpect(jsonPath("$.data.books[0].groupId").value(nullValue()))
+                .andExpect(jsonPath("$.data.books[0].groupName").value(nullValue()))
+                .andExpect(jsonPath("$.data.books[1].bookId").value(1))
+                .andExpect(jsonPath("$.data.books[1].groupId").value(13))
+                .andExpect(jsonPath("$.data.books[1].groupName").value("면도날 모임"));
     }
 
     @Test
@@ -215,7 +223,7 @@ class BookControllerTest {
     void getMyLibraryBooksWithMineScope() throws Exception {
         given(currentUserProvider.findCurrentUserId()).willReturn(java.util.Optional.of(1L));
         given(bookService.getMyLibraryBooks(eq(1L), any(Pageable.class), eq(OpinionCountScope.MINE))).willReturn(
-                new PageImpl<>(List.of(new BookActivityProjection(1L, "제목", "작가", "출판사", "cover", 3, 2)),
+                new PageImpl<>(List.of(new MyLibraryBookProjection(1L, "제목", "작가", "출판사", "cover", null, null, 3, 2)),
                         DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/my-library").param("opinionCountScope", "MINE"))
@@ -228,8 +236,8 @@ class BookControllerTest {
     void getMyLibraryBooksReturnsSampleWhenUnauthenticated() throws Exception {
         given(currentUserProvider.findCurrentUserId()).willReturn(java.util.Optional.empty());
         given(bookService.getMyLibraryBooks(isNull(), any(Pageable.class), eq(OpinionCountScope.ALL))).willReturn(
-                new PageImpl<>(List.of(new BookActivityProjection(18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "안전가옥",
-                        "cover", 13, 17)), DEFAULT_PAGEABLE, 1));
+                new PageImpl<>(List.of(new MyLibraryBookProjection(18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "안전가옥",
+                        "cover", null, null, 13, 17)), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/my-library"))
                 .andExpect(status().isOk())

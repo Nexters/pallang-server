@@ -12,6 +12,7 @@ import com.nexters.palang.domain.book.presentation.dto.BookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookSearchListResponse;
 import com.nexters.palang.domain.book.presentation.dto.CreateBookRequest;
+import com.nexters.palang.domain.book.presentation.dto.MyLibraryBookListResponse;
 import com.nexters.palang.global.common.response.DataResponse;
 import com.nexters.palang.global.security.CurrentUserProvider;
 import jakarta.validation.Valid;
@@ -81,12 +82,12 @@ public class BookController implements BookApi {
 
     @Override
     @GetMapping("/api/books/my-library")
-    public ResponseEntity<DataResponse<BookActivityListResponse>> getMyLibraryBooks(
+    public ResponseEntity<DataResponse<MyLibraryBookListResponse>> getMyLibraryBooks(
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size,
             @RequestParam(defaultValue = "ALL") OpinionCountScope opinionCountScope) {
         Long currentUserId = currentUserProvider.findCurrentUserId().orElse(null);
-        return ResponseEntity.ok(DataResponse.from(BookMapper.toActivityListResponse(
+        return ResponseEntity.ok(DataResponse.from(BookMapper.toMyLibraryListResponse(
                 bookService.getMyLibraryBooks(currentUserId, pageable(page, size), opinionCountScope))));
     }
 
