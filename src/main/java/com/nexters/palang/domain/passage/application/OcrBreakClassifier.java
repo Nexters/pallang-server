@@ -11,6 +11,7 @@ import java.util.List;
 // Clova는 인쇄된 줄의 끝에만 lineBreak=true를 주므로, 그 줄 끝이 "지면 폭 때문에 꺾인 줄(WRAP)"인지
 // "원문에서 끊는 줄(LINE/PARAGRAPH)"인지는 줄 길이·들여쓰기·줄 간격으로 판단한다.
 // 모든 기준값은 사진 해상도·촬영 거리에 흔들리지 않도록 픽셀이 아니라 글자 높이(h) 대비 비율로 둔다.
+// 사진이 기울면 줄마다 여백이 밀리고 글자 높이가 부풀려 보이므로, 판정 전에 좌표를 기울기만큼 되돌린다.
 public final class OcrBreakClassifier {
 
     // 줄 끝이 주변 줄의 오른쪽 끝보다 글자 1개 이상 모자라면 짧게 끝난 줄로 본다.
@@ -35,10 +36,34 @@ public final class OcrBreakClassifier {
         OcrBreakType[] breakTypes = new OcrBreakType[blocks.size()];
         Arrays.fill(breakTypes, OcrBreakType.NONE);
 
-        for (List<Line> column : groupIntoColumns(groupIntoLines(blocks))) {
+        for (List<Line> column : groupIntoColumns(groupIntoLines(deskew(blocks)))) {
             classifyColumn(column, breakTypes);
         }
         return List.of(breakTypes);
+    }
+
+    // Clova 바운딩 박스는 글자 방향을 따라 회전된 사각형(좌상→우상→우하→좌하)이라 윗변 각도가 곧 그 단어의 기울기다.
+    // 단어별 각도의 중앙값을 사진 기울기로 보고 모든 좌표를 반대로 돌린다. (다른 페이지 조각처럼 각도가 튀는 단어는 중앙값이 무시한다)
+    private static List<OcrTextBlock> deskew(List<OcrTextBlock> blocks) {
+        List<Double> angles = blocks.stream()
+                .map(block -> block.boundingBox().vertices())
+                .filter(vertices -> vertices.size() >= 2)
+                .map(vertices -> Math.atan2(vertices.get(1).y() - vertices.get(0).y(), vertices.get(1).x() - vertices.get(0).x()))
+                .toList();
+        double angle = median(angles);
+        if (angle == 0) {
+            return blocks;
+        }
+        double cos = Math.cos(-angle);
+        double sin = Math.sin(-angle);
+        return blocks.stream()
+                .map(block -> {
+                    List<OcrTextBlock.Point> rotated = block.boundingBox().vertices().stream()
+                            .map(p -> new OcrTextBlock.Point(p.x() * cos - p.y() * sin, p.x() * sin + p.y() * cos))
+                            .toList();
+                    return new OcrTextBlock(block.text(), new OcrTextBlock.BoundingBox(rotated), block.lineBreak());
+                })
+                .toList();
     }
 
     // Clova가 준 순서대로 lineBreak=true인 단어까지를 한 줄로 묶는다. 마지막 단어는 lineBreak가 없어도 줄 끝으로 본다.
