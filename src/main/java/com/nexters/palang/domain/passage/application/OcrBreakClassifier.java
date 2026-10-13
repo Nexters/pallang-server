@@ -20,8 +20,9 @@ public final class OcrBreakClassifier {
     private static final double INDENT_RATIO = 0.7;
     // 줄 사이 간격이 평소보다 글자 0.8개 이상 벌어지면 빈 줄(문단·연 구분)로 본다.
     private static final double PARAGRAPH_GAP_RATIO = 0.8;
-    // 단(컬럼)의 줄 중 이 비율 이상이 오른쪽 끝까지 차 있어야 양쪽 정렬된 산문으로 본다. 아니면 운문(시)으로 본다.
-    private static final double PROSE_FULL_LINE_RATIO = 0.5;
+    // 단(컬럼)의 줄 끝 중 이 비율 이상이 산문의 특징(오른쪽 끝까지 참, 또는 짧게 끝나고 다음 줄이 들여쓰기)을 보여야
+    // 산문으로 본다. 아니면 운문(시)으로 본다. 대화문이 많은 산문은 짧은 줄이 많아 "꽉 찬 줄"만으로는 운문으로 오판한다.
+    private static final double PROSE_LINE_RATIO = 0.5;
     // 줄 수가 이보다 적으면 산문인지 판단할 근거가 없으므로 운문처럼 줄마다 끊는다(잘못 끊는 쪽이 복구하기 쉽다).
     private static final int MIN_PROSE_LINES = 3;
     // 사진 기울기·책 휘어짐 때문에 단 전체의 여백이 일정하지 않으므로, 앞뒤 몇 줄만 보고 여백 기준을 잡는다.
@@ -125,16 +126,14 @@ public final class OcrBreakClassifier {
         double usualPitch = median(linePitches(column));
 
         boolean[] fullLines = new boolean[column.size()];
-        int fullLineCount = 0;
+        boolean[] nextIndented = new boolean[column.size()];
         for (int i = 0; i < column.size(); i++) {
             fullLines[i] = neighborRight(column, i) - column.get(i).right() < SHORT_LINE_RATIO * charHeight;
-            // 단의 마지막 줄은 문단 끝일 가능성이 커서 산문 판정 비율에서 뺀다.
-            if (fullLines[i] && i < column.size() - 1) {
-                fullLineCount++;
+            if (i < column.size() - 1) {
+                nextIndented[i] = column.get(i + 1).left() - neighborLeft(column, i + 1) > INDENT_RATIO * charHeight;
             }
         }
-        boolean verse = column.size() < MIN_PROSE_LINES
-                || fullLineCount < (column.size() - 1) * PROSE_FULL_LINE_RATIO;
+        boolean verse = isVerse(fullLines, nextIndented);
 
         for (int i = 0; i < column.size(); i++) {
             Line line = column.get(i);
@@ -145,9 +144,25 @@ public final class OcrBreakClassifier {
             }
             Line next = column.get(i + 1);
             boolean blankLineBetween = (next.top() - line.top()) - usualPitch > PARAGRAPH_GAP_RATIO * charHeight;
-            boolean nextIndented = next.left() - neighborLeft(column, i + 1) > INDENT_RATIO * charHeight;
-            breakTypes[line.lastIndex()] = decide(verse, fullLines[i], nextIndented, blankLineBetween);
+            breakTypes[line.lastIndex()] = decide(verse, fullLines[i], nextIndented[i], blankLineBetween);
         }
+    }
+
+    // 산문의 줄 끝은 대부분 "오른쪽 끝까지 참(지면 폭에서 꺾임)"이거나 "짧게 끝나고 다음 줄이 들여쓰기(문단 끝)"다.
+    // 시의 행은 짧게 끝나도 다음 행이 들여쓰기 없이 시작하므로 둘 다 해당하지 않는다.
+    // 단의 마지막 줄은 다음 줄 정보가 없어 판정 비율에서 뺀다.
+    private static boolean isVerse(boolean[] fullLines, boolean[] nextIndented) {
+        int lineEnds = fullLines.length - 1;
+        if (fullLines.length < MIN_PROSE_LINES) {
+            return true;
+        }
+        int proseLikeCount = 0;
+        for (int i = 0; i < lineEnds; i++) {
+            if (fullLines[i] || nextIndented[i]) {
+                proseLikeCount++;
+            }
+        }
+        return proseLikeCount < lineEnds * PROSE_LINE_RATIO;
     }
 
     private static OcrBreakType decide(boolean verse, boolean fullLine, boolean nextIndented, boolean blankLineBetween) {
