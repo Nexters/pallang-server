@@ -104,6 +104,29 @@ class OcrBreakClassifierTest {
     }
 
     @Test
+    @DisplayName("한 줄짜리 대화문이 연속돼도 가운데 줄의 들여쓰기를 놓치지 않고 산문으로 판정한다")
+    void consecutiveDialogue_detectsEveryIndent() {
+        // given: 들여쓰기 = 왼쪽 끝 120 (여백 100보다 한 글자 들어감)
+        List<OcrTextBlock> blocks = page(
+                line(120, 600, 0),   // 서술 문단 시작, 꽉 참
+                line(100, 200, 1),   // 서술 문단 끝
+                line(120, 200, 2),   // "왜?"
+                line(120, 220, 3),   // "그냥."  ← 위아래가 모두 들여쓴 줄
+                line(120, 210, 4),   // "뭐야."  ← 위아래가 모두 들여쓴 줄
+                line(120, 600, 5),   // 서술 문단 시작, 꽉 참
+                line(100, 250, 6)    // 서술 문단 끝
+        );
+
+        // when
+        List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
+
+        // then: 산문으로 판정돼 꽉 찬 서술 줄은 잇고, 대화문 줄 끝은 모두 문단 끝으로 끊는다.
+        assertThat(lineEndBreakTypes(blocks, breakTypes)).containsExactly(
+                OcrBreakType.WRAP, OcrBreakType.PARAGRAPH, OcrBreakType.PARAGRAPH,
+                OcrBreakType.PARAGRAPH, OcrBreakType.PARAGRAPH, OcrBreakType.WRAP, OcrBreakType.LINE);
+    }
+
+    @Test
     @DisplayName("줄이 너무 적어 산문인지 판단할 수 없으면 줄마다 끊는다")
     void fewLines_breakEveryLine() {
         // given
@@ -144,6 +167,26 @@ class OcrBreakClassifierTest {
                         + "육체적 행위는 구역 질 나는 자기만족일 뿐이라며 중얼거렸다.",
                 "\"수야, 옆으로 누워 봐. 알아, 오래전부터 알았어. 너를 및 기 전부터 알았어. 아니, 태어나기 전부터 알았어.\"",
                 "나는 수의 몸을 옆으로 눕혀 낱낱이 끌어안았다. 등에"));
+    }
+
+    @Test
+    @DisplayName("[실제 사진] 원근 왜곡으로 여백이 줄마다 밀려도 꽉 찬 줄을 들여쓰기로 오판하지 않는다")
+    void golden_prosePerspective() throws IOException {
+        // given: 아래로 갈수록 글자가 커지고 왼쪽 여백이 줄마다 약 4~10px씩 밀린다. 맨 아래는 다른 영역 조각.
+        List<OcrTextBlock> blocks = fixture("ocr/prose-perspective.tsv");
+
+        // when
+        List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
+
+        // then: "소비 / 의"처럼 꽉 찬 줄도 이어야 한다. ("것 까지", "어울리 는", "연 쇄"의 공백은 분류기 범위 밖)
+        assertThat(render(blocks, breakTypes, "\n")).isEqualTo(String.join("\n",
+                "디드로의 행동이 특이한 것은 아니다. 이렇게 하나를 사면 다른 것 까지 사게 되는 경향은 흔하다. "
+                        + "이런 행동을 가리켜 디드로 효과라고 한다. 디드로 효과는 새로운 것을 사게 되면 추가 구매가 일어나 "
+                        + "소비 의 소용돌이가 생겨나는 것을 말한다.14",
+                "이런 광경은 어디서나 발견할 수 있다. 옷을 사면 그 옷에 어울리 는 신발과 귀걸이를 새로 사야 한다. "
+                        + "소파를 사면 갑자기 거실 전체의 조화를 위해 다른 가구들을 사야 할 것 같다. 자녀에게 장난감을 사 "
+                        + "주면 자신을 위해서도 뭔가 사야 할 것 같은 기분이 든다. 소비의 연 쇄 반응이다.",
+                "( 따르다 우리는 종종 막 끝마친"));
     }
 
     @Test

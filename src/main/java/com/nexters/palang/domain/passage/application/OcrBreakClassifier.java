@@ -28,6 +28,7 @@ public final class OcrBreakClassifier {
     // 줄 수가 이보다 적으면 산문인지 판단할 근거가 없으므로 운문처럼 줄마다 끊는다(잘못 끊는 쪽이 복구하기 쉽다).
     private static final int MIN_PROSE_LINES = 3;
     // 사진 기울기·책 휘어짐 때문에 단 전체의 여백이 일정하지 않으므로, 앞뒤 몇 줄만 보고 여백 기준을 잡는다.
+    // 1줄만 보면 한 줄짜리 대화문(들여쓰기)이 3줄 이상 이어질 때 가운데 줄의 들여쓰기를 놓쳐 운문으로 오판할 수 있어 3줄을 본다.
     private static final int NEIGHBOR_WINDOW = 3;
     // 두 줄의 가로 범위가 이 비율 이상 겹치면 같은 단(같은 페이지)으로 묶는다.
     private static final double COLUMN_OVERLAP_RATIO = 0.5;
@@ -127,12 +128,14 @@ public final class OcrBreakClassifier {
         double charHeight = median(column.stream().flatMap(line -> line.wordHeights().stream()).toList());
         double usualPitch = median(linePitches(column));
 
+        double marginDrift = median(leftMarginSteps(column));
+
         boolean[] fullLines = new boolean[column.size()];
         boolean[] nextIndented = new boolean[column.size()];
         for (int i = 0; i < column.size(); i++) {
             fullLines[i] = neighborRight(column, i) - column.get(i).right() < SHORT_LINE_RATIO * charHeight;
             if (i < column.size() - 1) {
-                nextIndented[i] = column.get(i + 1).left() - neighborLeft(column, i + 1) > INDENT_RATIO * charHeight;
+                nextIndented[i] = column.get(i + 1).left() - neighborLeft(column, i + 1, marginDrift) > INDENT_RATIO * charHeight;
             }
         }
         boolean verse = isVerse(fullLines, nextIndented);
@@ -197,8 +200,26 @@ public final class OcrBreakClassifier {
         return neighbors(column, index).stream().mapToDouble(Line::right).max().orElseThrow();
     }
 
-    private static double neighborLeft(List<Line> column, int index) {
-        return neighbors(column, index).stream().mapToDouble(Line::left).min().orElseThrow();
+    // 이웃 줄의 왼쪽 끝을 이 줄 위치로 옮겨 온 값(줄 간 거리 × 줄당 여백 밀림만큼 보정) 중 가장 왼쪽을 여백 기준으로 삼는다.
+    // 원근 왜곡이나 책 휘어짐으로 여백이 줄마다 조금씩 밀리면, 보정 없이 3줄 떨어진 줄과 비교할 때 밀림이 쌓여 들여쓰기로 오판한다.
+    private static double neighborLeft(List<Line> column, int index, double marginDrift) {
+        int from = Math.max(0, index - NEIGHBOR_WINDOW);
+        int to = Math.min(column.size(), index + NEIGHBOR_WINDOW + 1);
+        double margin = Double.MAX_VALUE;
+        for (int j = from; j < to; j++) {
+            margin = Math.min(margin, column.get(j).left() + marginDrift * (index - j));
+        }
+        return margin;
+    }
+
+    // 이웃한 두 줄의 왼쪽 끝 차이. 대부분의 줄은 들여쓰지 않은 줄끼리 이웃하므로 중앙값이 "줄당 여백 밀림"이 된다.
+    // (들여쓰기 시작·끝, 다른 영역 조각에서 생기는 큰 차이는 중앙값이 무시한다)
+    private static List<Double> leftMarginSteps(List<Line> column) {
+        List<Double> steps = new ArrayList<>();
+        for (int i = 0; i < column.size() - 1; i++) {
+            steps.add(column.get(i + 1).left() - column.get(i).left());
+        }
+        return steps;
     }
 
     private static List<Line> neighbors(List<Line> column, int index) {
