@@ -144,7 +144,7 @@ public final class OcrBreakClassifier {
             Line line = column.get(i);
             if (i == column.size() - 1) {
                 // 다음 줄 정보가 없으므로 줄이 꽉 차 있을 때만(다음 페이지로 이어질 때만) 잇는다.
-                breakTypes[line.lastIndex()] = !verse && fullLines[i] ? OcrBreakType.WRAP : OcrBreakType.LINE;
+                breakTypes[line.lastIndex()] = lastLineBreakType(verse, fullLines[i]);
                 continue;
             }
             Line next = column.get(i + 1);
@@ -172,19 +172,24 @@ public final class OcrBreakClassifier {
 
     private static OcrBreakType decide(boolean verse, boolean fullLine, boolean nextIndented, boolean blankLineBetween) {
         if (blankLineBetween) {
-            return OcrBreakType.PARAGRAPH;
+            return OcrBreakType.BLANK_LINE;
         }
         if (verse) {
             return OcrBreakType.LINE;
         }
-        if (!fullLine && nextIndented) {
+        // 짧게 끝났거나 다음 줄이 들여쓰기면 문단 끝으로 끊는다. 산문에서 꺾인 줄(WRAP)이 아닌데 끊기는 곳은
+        // 사실상 전부 문단 끝이다(들여쓰기 없는 책의 짧은 줄 포함). 애매할 때 끊는 쪽을 택한다(잘못 합친 행은 복구가 어렵다).
+        if (!fullLine || nextIndented) {
             return OcrBreakType.PARAGRAPH;
         }
-        // 짧게 끝났거나 다음 줄이 들여쓰기면 끊는다. 애매할 때 끊는 쪽을 택한다(잘못 합친 행은 복구가 어렵다).
-        if (!fullLine || nextIndented) {
+        return OcrBreakType.WRAP;
+    }
+
+    private static OcrBreakType lastLineBreakType(boolean verse, boolean fullLine) {
+        if (verse) {
             return OcrBreakType.LINE;
         }
-        return OcrBreakType.WRAP;
+        return fullLine ? OcrBreakType.WRAP : OcrBreakType.PARAGRAPH;
     }
 
     // 줄 간격은 각 줄 첫 단어의 위쪽 y 차이로 잰다. 줄 전체의 위아래 범위를 쓰면 사진이 기울었을 때 값이 크게 흔들린다.

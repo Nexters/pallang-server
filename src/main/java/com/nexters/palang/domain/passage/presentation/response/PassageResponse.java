@@ -120,7 +120,9 @@ public class PassageResponse {
                     requiredMode = Schema.RequiredMode.REQUIRED) boolean lineBreak,
             @Schema(description = "이 단어 뒤에 오는 끊김의 종류(바운딩 박스 기반 추정). "
                     + "NONE: 줄 중간(공백), WRAP: 지면 폭 때문에 꺾인 줄 끝(공백), "
-                    + "LINE: 원문에서 끊는 줄 끝(줄바꿈), PARAGRAPH: 문단·연이 끝나는 줄 끝(빈 줄)",
+                    + "LINE: 시의 행 끝(줄바꿈), "
+                    + "PARAGRAPH: 산문의 문단 끝 - 책에는 빈 줄 없이 들여쓰기로만 표시됨(줄바꿈, 들여쓰기·간격은 프론트 선택), "
+                    + "BLANK_LINE: 다음 줄과의 사이에 실제 빈 줄이 있는 줄 끝 - 시의 연 구분, 제목 아래, 장면 전환(빈 줄)",
                     example = "LINE", requiredMode = Schema.RequiredMode.REQUIRED) OcrBreakType breakType
     ) {
         public static TextBlock from(OcrResultDto block) {

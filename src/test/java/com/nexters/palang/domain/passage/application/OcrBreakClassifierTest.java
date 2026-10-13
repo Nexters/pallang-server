@@ -18,9 +18,10 @@ class OcrBreakClassifierTest {
 
     private static final double CHAR_HEIGHT = 20;
     private static final double LINE_PITCH = 30;
+    private static final String INDENT = "\u3000";
 
     @Test
-    @DisplayName("양쪽 정렬된 산문은 꽉 찬 줄을 잇고, 짧게 끝난 뒤 들여쓰기로 시작하는 줄 앞에서 문단을 나눈다")
+    @DisplayName("양쪽 정렬된 산문은 꽉 찬 줄을 잇고, 짧게 끝나거나 다음 줄이 들여쓰기인 곳을 문단 끝으로 본다")
     void prose_wrapsFullLinesAndBreaksParagraphs() {
         // given
         List<OcrTextBlock> blocks = page(
@@ -39,7 +40,7 @@ class OcrBreakClassifierTest {
         // then
         assertThat(lineEndBreakTypes(blocks, breakTypes)).containsExactly(
                 OcrBreakType.WRAP, OcrBreakType.WRAP, OcrBreakType.PARAGRAPH,
-                OcrBreakType.WRAP, OcrBreakType.LINE, OcrBreakType.WRAP, OcrBreakType.WRAP);
+                OcrBreakType.WRAP, OcrBreakType.PARAGRAPH, OcrBreakType.WRAP, OcrBreakType.WRAP);
         assertThat(midLineBreakTypes(blocks, breakTypes)).containsOnly(OcrBreakType.NONE);
     }
 
@@ -60,7 +61,7 @@ class OcrBreakClassifierTest {
 
         // then
         assertThat(lineEndBreakTypes(blocks, breakTypes)).containsExactly(
-                OcrBreakType.LINE, OcrBreakType.LINE, OcrBreakType.PARAGRAPH,
+                OcrBreakType.LINE, OcrBreakType.LINE, OcrBreakType.BLANK_LINE,
                 OcrBreakType.LINE, OcrBreakType.LINE);
     }
 
@@ -123,7 +124,7 @@ class OcrBreakClassifierTest {
         // then: 산문으로 판정돼 꽉 찬 서술 줄은 잇고, 대화문 줄 끝은 모두 문단 끝으로 끊는다.
         assertThat(lineEndBreakTypes(blocks, breakTypes)).containsExactly(
                 OcrBreakType.WRAP, OcrBreakType.PARAGRAPH, OcrBreakType.PARAGRAPH,
-                OcrBreakType.PARAGRAPH, OcrBreakType.PARAGRAPH, OcrBreakType.WRAP, OcrBreakType.LINE);
+                OcrBreakType.PARAGRAPH, OcrBreakType.PARAGRAPH, OcrBreakType.WRAP, OcrBreakType.PARAGRAPH);
     }
 
     @Test
@@ -153,20 +154,21 @@ class OcrBreakClassifierTest {
         // when
         List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
 
-        // then: 산문은 LINE/PARAGRAPH 구분 없이 "끊었는지"만 본다.
+        // then: 문단 끝은 줄바꿈 + 들여쓰기, 제목 아래 빈 공간만 빈 줄이다.
         // "구 겨진", "구역 질"처럼 단어 안에서 꺾인 곳의 공백, OCR 오인식("및")은 분류기 범위 밖이다.
-        assertThat(render(blocks, breakTypes, "\n")).isEqualTo(String.join("\n",
+        assertThat(render(blocks, breakTypes)).isEqualTo(String.join("\n",
                 "- 대답했다.",
                 "결핍",
+                "",
                 "사랑은 외로움의 또 다른 이름일 뿐이다.",
-                "\"결핍이야. 사랑이라고 발음하면 꼭 존귀한 영역에 속하는 것처럼 들리지만 기껏해야 갈증일 뿐이야.\"",
-                "천장을 보던 수가 텁텁한 발음으로 말했다.",
-                "\"같이 잠을 자는 것도, 서로의 살을 간지럽히는 것도, 언제 보자며 약속을 잡는 것도 죄다 결핍에서 비롯된 거야. "
+                INDENT + "\"결핍이야. 사랑이라고 발음하면 꼭 존귀한 영역에 속하는 것처럼 들리지만 기껏해야 갈증일 뿐이야.\"",
+                INDENT + "천장을 보던 수가 텁텁한 발음으로 말했다.",
+                INDENT + "\"같이 잠을 자는 것도, 서로의 살을 간지럽히는 것도, 언제 보자며 약속을 잡는 것도 죄다 결핍에서 비롯된 거야. "
                         + "결핍의 본질은 결국 외로움이고.\"",
-                "나는 수의 발가벗은 가슴을 껴안으며 몸을 기댔다. 그는 구 겨진 얼굴로 우리의 모든 감정적 공유와 "
+                INDENT + "나는 수의 발가벗은 가슴을 껴안으며 몸을 기댔다. 그는 구 겨진 얼굴로 우리의 모든 감정적 공유와 "
                         + "육체적 행위는 구역 질 나는 자기만족일 뿐이라며 중얼거렸다.",
-                "\"수야, 옆으로 누워 봐. 알아, 오래전부터 알았어. 너를 및 기 전부터 알았어. 아니, 태어나기 전부터 알았어.\"",
-                "나는 수의 몸을 옆으로 눕혀 낱낱이 끌어안았다. 등에"));
+                INDENT + "\"수야, 옆으로 누워 봐. 알아, 오래전부터 알았어. 너를 및 기 전부터 알았어. 아니, 태어나기 전부터 알았어.\"",
+                INDENT + "나는 수의 몸을 옆으로 눕혀 낱낱이 끌어안았다. 등에"));
     }
 
     @Test
@@ -179,14 +181,14 @@ class OcrBreakClassifierTest {
         List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
 
         // then: "소비 / 의"처럼 꽉 찬 줄도 이어야 한다. ("것 까지", "어울리 는", "연 쇄"의 공백은 분류기 범위 밖)
-        assertThat(render(blocks, breakTypes, "\n")).isEqualTo(String.join("\n",
+        assertThat(render(blocks, breakTypes)).isEqualTo(String.join("\n",
                 "디드로의 행동이 특이한 것은 아니다. 이렇게 하나를 사면 다른 것 까지 사게 되는 경향은 흔하다. "
                         + "이런 행동을 가리켜 디드로 효과라고 한다. 디드로 효과는 새로운 것을 사게 되면 추가 구매가 일어나 "
                         + "소비 의 소용돌이가 생겨나는 것을 말한다.14",
-                "이런 광경은 어디서나 발견할 수 있다. 옷을 사면 그 옷에 어울리 는 신발과 귀걸이를 새로 사야 한다. "
+                INDENT + "이런 광경은 어디서나 발견할 수 있다. 옷을 사면 그 옷에 어울리 는 신발과 귀걸이를 새로 사야 한다. "
                         + "소파를 사면 갑자기 거실 전체의 조화를 위해 다른 가구들을 사야 할 것 같다. 자녀에게 장난감을 사 "
                         + "주면 자신을 위해서도 뭔가 사야 할 것 같은 기분이 든다. 소비의 연 쇄 반응이다.",
-                "( 따르다 우리는 종종 막 끝마친"));
+                INDENT + "( 따르다 우리는 종종 막 끝마친"));
     }
 
     @Test
@@ -199,7 +201,7 @@ class OcrBreakClassifierTest {
         List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
 
         // then
-        assertThat(render(blocks, breakTypes, "\n\n")).isEqualTo(String.join("\n",
+        assertThat(render(blocks, breakTypes)).isEqualTo(String.join("\n",
                 "축, 생일",
                 "",
                 "이목구비는 대부분의 시간을 제멋대로 존재하다가",
@@ -226,7 +228,7 @@ class OcrBreakClassifierTest {
         List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
 
         // then
-        assertThat(render(blocks, breakTypes, "\n\n")).isEqualTo(String.join("\n",
+        assertThat(render(blocks, breakTypes)).isEqualTo(String.join("\n",
                 "참담해지세요",
                 "실패가 아니라 비굴함이라고 적어두세요",
                 "",
@@ -238,15 +240,16 @@ class OcrBreakClassifierTest {
                 "내 뒤에서"));
     }
 
-    // 프론트가 할 조립을 그대로 흉내 낸다: NONE/WRAP → 공백, LINE → 줄바꿈, PARAGRAPH → paragraphSeparator.
-    private String render(List<OcrTextBlock> blocks, List<OcrBreakType> breakTypes, String paragraphSeparator) {
+    // 프론트 조립 예시: NONE/WRAP → 공백, LINE → 줄바꿈, PARAGRAPH → 줄바꿈 + 전각 공백 들여쓰기, BLANK_LINE → 빈 줄.
+    private String render(List<OcrTextBlock> blocks, List<OcrBreakType> breakTypes) {
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < blocks.size(); i++) {
             text.append(blocks.get(i).text());
             text.append(switch (breakTypes.get(i)) {
                 case NONE, WRAP -> " ";
                 case LINE -> "\n";
-                case PARAGRAPH -> paragraphSeparator;
+                case PARAGRAPH -> "\n" + INDENT;
+                case BLANK_LINE -> "\n\n";
             });
         }
         return text.toString().strip();
