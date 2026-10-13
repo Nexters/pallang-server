@@ -80,12 +80,13 @@ public final class OcrBreakClassifier {
     }
 
     // 양쪽 페이지가 함께 찍힌 사진에서 여백 기준이 섞이지 않도록, 가로 범위가 겹치는 줄끼리 같은 단으로 묶는다.
-    // 단 안의 줄 순서는 Clova가 준 순서를 그대로 유지한다.
+    // 겹치는 단이 여럿이면 마지막 줄이 세로로 가장 가까운 단을 고른다. 사진 귀퉁이에 걸린 다른 페이지 조각이
+    // 먼저 단을 차지해 본문 줄을 빼앗아 가는 것을 막는다. 단 안의 줄 순서는 Clova가 준 순서를 그대로 유지한다.
     private static List<List<Line>> groupIntoColumns(List<Line> lines) {
         List<List<Line>> columns = new ArrayList<>();
         List<double[]> spans = new ArrayList<>();
         for (Line line : lines) {
-            int columnIndex = findOverlappingColumn(spans, line);
+            int columnIndex = findNearestOverlappingColumn(columns, spans, line);
             if (columnIndex < 0) {
                 columns.add(new ArrayList<>(List.of(line)));
                 spans.add(new double[]{line.left(), line.right()});
@@ -99,16 +100,24 @@ public final class OcrBreakClassifier {
         return columns;
     }
 
-    private static int findOverlappingColumn(List<double[]> spans, Line line) {
+    private static int findNearestOverlappingColumn(List<List<Line>> columns, List<double[]> spans, Line line) {
+        int nearest = -1;
+        double nearestDistance = Double.MAX_VALUE;
         for (int i = 0; i < spans.size(); i++) {
             double[] span = spans.get(i);
             double overlap = Math.min(span[1], line.right()) - Math.max(span[0], line.left());
             double shorterWidth = Math.min(span[1] - span[0], line.right() - line.left());
-            if (overlap > 0 && overlap >= shorterWidth * COLUMN_OVERLAP_RATIO) {
-                return i;
+            if (overlap <= 0 || overlap < shorterWidth * COLUMN_OVERLAP_RATIO) {
+                continue;
+            }
+            List<Line> column = columns.get(i);
+            double distance = Math.abs(line.top() - column.get(column.size() - 1).top());
+            if (distance < nearestDistance) {
+                nearest = i;
+                nearestDistance = distance;
             }
         }
-        return -1;
+        return nearest;
     }
 
     private static void classifyColumn(List<Line> column, OcrBreakType[] breakTypes) {
