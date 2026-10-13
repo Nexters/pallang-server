@@ -10,6 +10,7 @@ import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.passage.application.MyPassageProjection;
 import com.nexters.palang.domain.passage.application.SimilarPassageProjection;
 import com.nexters.palang.domain.passage.domain.Passage;
+import com.nexters.palang.domain.passage.domain.PassageScope;
 import com.nexters.palang.domain.user.domain.SnsProvider;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.global.config.JpaAuditingConfig;
@@ -283,7 +284,7 @@ class PassageQueryRepositoryTest {
         entityManager.persistAndFlush(Opinion.builder().passage(passage).user(merger).content("병합 흔적").build());
 
         Page<MyPassageProjection> result = passageQueryRepository.findMyPassages(
-                merger.getId(), null, false, PageRequest.of(0, 10));
+                merger.getId(), null, false, PassageScope.ALL, PageRequest.of(0, 10));
 
         assertThat(result.getContent()).extracting(MyPassageProjection::passageId).containsExactly(passage.getId());
     }
@@ -298,9 +299,39 @@ class PassageQueryRepositoryTest {
         entityManager.persistAndFlush(Opinion.builder().passage(passage).user(creator).content("흔적").build());
 
         Page<MyPassageProjection> result = passageQueryRepository.findMyPassages(
-                other.getId(), null, false, PageRequest.of(0, 10));
+                other.getId(), null, false, PassageScope.ALL, PageRequest.of(0, 10));
 
         assertThat(result.getContent()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("같은 책이라도 모임을 지정하면 그 모임의 대목만, globalOnly면 전역 대목만 조회한다")
+    void findMyPassagesFiltersByPassageScope() {
+        // given
+        User me = user("me-scope");
+        Book book = book("책");
+        Group groupA = group(book, me);
+        Group groupB = group(book, me);
+        Passage globalPassage = passage(book, me, 5, "전역 문장", "hash-global");
+        Passage groupAPassage = passage(book, me, groupA, 6, "모임 A 문장", "hash-a");
+        Passage groupBPassage = passage(book, me, groupB, 7, "모임 B 문장", "hash-b");
+        for (Passage passage : List.of(globalPassage, groupAPassage, groupBPassage)) {
+            entityManager.persistAndFlush(Opinion.builder().passage(passage).user(me).content("흔적").build());
+        }
+
+        // when
+        Page<MyPassageProjection> groupAResult = passageQueryRepository.findMyPassages(
+                me.getId(), book.getId(), false, PassageScope.of(groupA.getId(), false), PageRequest.of(0, 10));
+        Page<MyPassageProjection> globalResult = passageQueryRepository.findMyPassages(
+                me.getId(), book.getId(), false, PassageScope.of(null, true), PageRequest.of(0, 10));
+
+        // then
+        assertThat(groupAResult.getContent()).extracting(MyPassageProjection::passageId)
+                .containsExactly(groupAPassage.getId());
+        assertThat(groupAResult.getTotalElements()).isEqualTo(1);
+        assertThat(globalResult.getContent()).extracting(MyPassageProjection::passageId)
+                .containsExactly(globalPassage.getId());
+        assertThat(globalResult.getTotalElements()).isEqualTo(1);
     }
 
     @Test
@@ -317,7 +348,7 @@ class PassageQueryRepositoryTest {
 
         // when
         Page<MyPassageProjection> result = passageQueryRepository.findMyPassages(
-                me.getId(), null, false, PageRequest.of(0, 10));
+                me.getId(), null, false, PassageScope.ALL, PageRequest.of(0, 10));
 
         // then
         assertThat(result.getContent())
@@ -339,7 +370,7 @@ class PassageQueryRepositoryTest {
         entityManager.persistAndFlush(Opinion.builder().passage(inOtherBook).user(writer).content("흔적2").build());
 
         Page<MyPassageProjection> result = passageQueryRepository.findMyPassages(
-                writer.getId(), targetBook.getId(), false, PageRequest.of(0, 10));
+                writer.getId(), targetBook.getId(), false, PassageScope.ALL, PageRequest.of(0, 10));
 
         assertThat(result.getContent()).extracting(MyPassageProjection::passageId)
                 .containsExactly(inTargetBook.getId());
@@ -356,7 +387,7 @@ class PassageQueryRepositoryTest {
         entityManager.persistAndFlush(Opinion.builder().passage(notSpoiler).user(writer).content("흔적2").build());
 
         Page<MyPassageProjection> result = passageQueryRepository.findMyPassages(
-                writer.getId(), null, true, PageRequest.of(0, 10));
+                writer.getId(), null, true, PassageScope.ALL, PageRequest.of(0, 10));
 
         assertThat(result.getContent()).extracting(MyPassageProjection::passageId).containsExactly(spoiler.getId());
     }
@@ -372,7 +403,7 @@ class PassageQueryRepositoryTest {
                 Opinion.builder().passage(passage).user(writer).content("흔적2").build());
 
         Page<MyPassageProjection> result = passageQueryRepository.findMyPassages(
-                writer.getId(), null, false, PageRequest.of(0, 10));
+                writer.getId(), null, false, PassageScope.ALL, PageRequest.of(0, 10));
 
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getTotalElements()).isEqualTo(1);

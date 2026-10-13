@@ -15,6 +15,7 @@ import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.opinion.domain.OpinionLike;
 import com.nexters.palang.domain.opinion.domain.OpinionSortType;
 import com.nexters.palang.domain.passage.domain.Passage;
+import com.nexters.palang.domain.passage.domain.PassageScope;
 import com.nexters.palang.domain.user.domain.SnsProvider;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.global.config.JpaAuditingConfig;
@@ -227,7 +228,7 @@ class OpinionQueryRepositoryTest {
         deleted.delete();
         opinion(other, passage(4), "다른 사람 흔적");
 
-        Page<MyOpinionProjection> results = opinionQueryRepository.findMyOpinions(me.getId(), null, PageRequest.of(0, 20));
+        Page<MyOpinionProjection> results = opinionQueryRepository.findMyOpinions(me.getId(), null, PassageScope.ALL, PageRequest.of(0, 20));
 
         assertThat(results.getContent()).extracting(MyOpinionProjection::opinionId)
                 .containsExactly(newer.getId(), older.getId());
@@ -242,7 +243,7 @@ class OpinionQueryRepositoryTest {
         Opinion inOtherBook = opinion(me, passage(other), "다른 책 흔적");
         Opinion inTargetBook = opinion(me, passage(1), "대상 책 흔적");
 
-        Page<MyOpinionProjection> results = opinionQueryRepository.findMyOpinions(me.getId(), book.getId(), PageRequest.of(0, 20));
+        Page<MyOpinionProjection> results = opinionQueryRepository.findMyOpinions(me.getId(), book.getId(), PassageScope.ALL, PageRequest.of(0, 20));
 
         assertThat(results.getContent()).extracting(MyOpinionProjection::opinionId)
                 .containsExactly(inTargetBook.getId());
@@ -262,7 +263,7 @@ class OpinionQueryRepositoryTest {
         deletedOpinion.delete();
         entityManager.persistAndFlush(deletedOpinion);
 
-        Page<LikedOpinionProjection> results = opinionQueryRepository.findLikedOpinions(me.getId(), null, PageRequest.of(0, 20));
+        Page<LikedOpinionProjection> results = opinionQueryRepository.findLikedOpinions(me.getId(), null, PassageScope.ALL, PageRequest.of(0, 20));
 
         assertThat(results.getContent()).extracting(LikedOpinionProjection::opinionId)
                 .containsExactly(opinion2.getId(), opinion1.getId());
@@ -282,7 +283,7 @@ class OpinionQueryRepositoryTest {
         entityManager.persistAndFlush(OpinionLike.builder().user(me).opinion(inTargetBook).build());
 
         Page<LikedOpinionProjection> results =
-                opinionQueryRepository.findLikedOpinions(me.getId(), book.getId(), PageRequest.of(0, 20));
+                opinionQueryRepository.findLikedOpinions(me.getId(), book.getId(), PassageScope.ALL, PageRequest.of(0, 20));
 
         assertThat(results.getContent()).extracting(LikedOpinionProjection::opinionId)
                 .containsExactly(inTargetBook.getId());
@@ -292,7 +293,7 @@ class OpinionQueryRepositoryTest {
     @Test
     @DisplayName("좋아요가 없으면 빈 목록을 반환한다")
     void findLikedOpinionsReturnsEmptyWhenNoLikes() {
-        Page<LikedOpinionProjection> results = opinionQueryRepository.findLikedOpinions(me.getId(), null, PageRequest.of(0, 20));
+        Page<LikedOpinionProjection> results = opinionQueryRepository.findLikedOpinions(me.getId(), null, PassageScope.ALL, PageRequest.of(0, 20));
 
         assertThat(results.getContent()).isEmpty();
         assertThat(results.getTotalElements()).isZero();
@@ -326,7 +327,7 @@ class OpinionQueryRepositoryTest {
         Opinion groupOpinion = opinion(me, groupPassage(group, 9), "모임 흔적");
 
         // when
-        Page<MyOpinionProjection> results = opinionQueryRepository.findMyOpinions(me.getId(), null, PageRequest.of(0, 20));
+        Page<MyOpinionProjection> results = opinionQueryRepository.findMyOpinions(me.getId(), null, PassageScope.ALL, PageRequest.of(0, 20));
 
         // then
         assertThat(results.getContent())
@@ -348,7 +349,7 @@ class OpinionQueryRepositoryTest {
         entityManager.persistAndFlush(OpinionLike.builder().user(me).opinion(groupOpinion).build());
 
         // when
-        Page<LikedOpinionProjection> results = opinionQueryRepository.findLikedOpinions(me.getId(), null, PageRequest.of(0, 20));
+        Page<LikedOpinionProjection> results = opinionQueryRepository.findLikedOpinions(me.getId(), null, PassageScope.ALL, PageRequest.of(0, 20));
 
         // then
         assertThat(results.getContent())
@@ -356,5 +357,61 @@ class OpinionQueryRepositoryTest {
                 .containsExactlyInAnyOrder(
                         tuple(globalOpinion.getId(), null, null),
                         tuple(groupOpinion.getId(), group.getId(), "면도날 모임"));
+    }
+
+    @Test
+    @DisplayName("같은 책이라도 모임을 지정하면 그 모임 대목의 흔적만, globalOnly면 전역 대목의 흔적만 조회한다")
+    void findMyOpinionsFiltersByPassageScope() {
+        // given
+        Group groupA = group("모임 A");
+        Group groupB = group("모임 B");
+        Opinion globalOpinion = opinion(me, passage(1), "전역 흔적");
+        Opinion groupAOpinion = opinion(me, groupPassage(groupA, 9), "모임 A 흔적");
+        opinion(me, groupPassage(groupB, 10), "모임 B 흔적");
+
+        // when
+        Page<MyOpinionProjection> groupAResults = opinionQueryRepository.findMyOpinions(
+                me.getId(), book.getId(), PassageScope.of(groupA.getId(), false), PageRequest.of(0, 20));
+        Page<MyOpinionProjection> globalResults = opinionQueryRepository.findMyOpinions(
+                me.getId(), book.getId(), PassageScope.of(null, true), PageRequest.of(0, 20));
+        Page<MyOpinionProjection> allResults = opinionQueryRepository.findMyOpinions(
+                me.getId(), book.getId(), PassageScope.ALL, PageRequest.of(0, 20));
+
+        // then
+        assertThat(groupAResults.getContent()).extracting(MyOpinionProjection::opinionId)
+                .containsExactly(groupAOpinion.getId());
+        assertThat(groupAResults.getTotalElements()).isEqualTo(1);
+        assertThat(globalResults.getContent()).extracting(MyOpinionProjection::opinionId)
+                .containsExactly(globalOpinion.getId());
+        assertThat(globalResults.getTotalElements()).isEqualTo(1);
+        assertThat(allResults.getTotalElements()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("좋아요 누른 흔적도 모임을 지정하면 그 모임 대목의 것만, globalOnly면 전역 대목의 것만 조회한다")
+    void findLikedOpinionsFiltersByPassageScope() {
+        // given
+        Group groupA = group("모임 A");
+        Group groupB = group("모임 B");
+        Opinion globalOpinion = opinion(other, passage(1), "전역 흔적");
+        Opinion groupAOpinion = opinion(other, groupPassage(groupA, 9), "모임 A 흔적");
+        Opinion groupBOpinion = opinion(other, groupPassage(groupB, 10), "모임 B 흔적");
+        entityManager.persistAndFlush(OpinionLike.builder().user(me).opinion(globalOpinion).build());
+        entityManager.persistAndFlush(OpinionLike.builder().user(me).opinion(groupAOpinion).build());
+        entityManager.persistAndFlush(OpinionLike.builder().user(me).opinion(groupBOpinion).build());
+
+        // when
+        Page<LikedOpinionProjection> groupBResults = opinionQueryRepository.findLikedOpinions(
+                me.getId(), book.getId(), PassageScope.of(groupB.getId(), false), PageRequest.of(0, 20));
+        Page<LikedOpinionProjection> globalResults = opinionQueryRepository.findLikedOpinions(
+                me.getId(), book.getId(), PassageScope.of(null, true), PageRequest.of(0, 20));
+
+        // then
+        assertThat(groupBResults.getContent()).extracting(LikedOpinionProjection::opinionId)
+                .containsExactly(groupBOpinion.getId());
+        assertThat(groupBResults.getTotalElements()).isEqualTo(1);
+        assertThat(globalResults.getContent()).extracting(LikedOpinionProjection::opinionId)
+                .containsExactly(globalOpinion.getId());
+        assertThat(globalResults.getTotalElements()).isEqualTo(1);
     }
 }

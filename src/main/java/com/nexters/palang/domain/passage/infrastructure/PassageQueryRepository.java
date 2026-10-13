@@ -7,6 +7,7 @@ import com.nexters.palang.domain.opinion.domain.QOpinion;
 import com.nexters.palang.domain.passage.application.MyPassageProjection;
 import com.nexters.palang.domain.passage.application.SimilarPassageProjection;
 import com.nexters.palang.domain.passage.domain.Passage;
+import com.nexters.palang.domain.passage.domain.PassageScope;
 import com.nexters.palang.domain.passage.domain.QPassage;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
@@ -94,7 +95,8 @@ public class PassageQueryRepository {
     // 같은 대목에 흔적을 여러 번 남긴 경우 카드가 이동해야 할 흔적(opinionId)이 하나로 정해져야 하므로,
     // GROUP BY 집계 대신 "이 사용자가 이 대목에 남긴 흔적 중 더 나중 것이 없다"는 NOT EXISTS로 대목당
     // 정확히 한 행(가장 최근 흔적)만 남긴다.
-    public Page<MyPassageProjection> findMyPassages(Long userId, Long bookId, boolean spoilerOnly, Pageable pageable) {
+    public Page<MyPassageProjection> findMyPassages(
+            Long userId, Long bookId, boolean spoilerOnly, PassageScope scope, Pageable pageable) {
         QOpinion opinion = QOpinion.opinion;
         QOpinion laterOpinion = new QOpinion("laterOpinion");
         QPassage passage = QPassage.passage;
@@ -120,7 +122,7 @@ public class PassageQueryRepository {
                 // 전역 공개 대목(group_id IS NULL)도 포함해야 하므로 반드시 leftJoin이다.
                 .leftJoin(passage.group, group)
                 .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(), passage.deletedAt.isNull(),
-                        bookFilter, spoilerFilter, isLatestOpinionForPassage)
+                        bookFilter, spoilerFilter, scopeFilter(passage, scope), isLatestOpinionForPassage)
                 .orderBy(opinion.createdAt.desc(), passage.id.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
@@ -131,7 +133,7 @@ public class PassageQueryRepository {
                 .from(opinion)
                 .join(opinion.passage, passage)
                 .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(), passage.deletedAt.isNull(),
-                        bookFilter, spoilerFilter)
+                        bookFilter, spoilerFilter, scopeFilter(passage, scope))
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
@@ -167,5 +169,13 @@ public class PassageQueryRepository {
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
+    }
+
+    // 대목 소속 범위 조건: 특정 모임이면 그 모임 대목만, globalOnly면 전역 공개 대목만, 그 외에는 조건 없음.
+    private BooleanExpression scopeFilter(QPassage passage, PassageScope scope) {
+        if (scope.isGroup()) {
+            return passage.group.id.eq(scope.groupId());
+        }
+        return scope.globalOnly() ? passage.group.isNull() : null;
     }
 }

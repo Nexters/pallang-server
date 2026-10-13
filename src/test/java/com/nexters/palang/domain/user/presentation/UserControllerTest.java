@@ -17,11 +17,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexters.palang.domain.auth.application.AuthService;
 import com.nexters.palang.domain.book.application.BookOptionProjection;
+import com.nexters.palang.domain.group.common.error.GroupErrorCode;
+import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.opinion.application.LikedOpinionProjection;
 import com.nexters.palang.domain.opinion.application.MyOpinionProjection;
 import com.nexters.palang.domain.opinion.application.OpinionService;
 import com.nexters.palang.domain.passage.application.MyPassageProjection;
 import com.nexters.palang.domain.passage.application.PassageService;
+import com.nexters.palang.domain.passage.domain.PassageScope;
 import com.nexters.palang.domain.user.application.UserService;
 import com.nexters.palang.domain.user.common.error.UserErrorCode;
 import com.nexters.palang.domain.user.common.error.UserException;
@@ -280,7 +283,7 @@ class UserControllerTest {
         MyOpinionProjection projection = new MyOpinionProjection(
                 1L, 10L, "책 제목", "작가", "cover", 100L, "발췌 문장", 5, "흔적 내용", 0, LocalDateTime.now(),
                 13L, "면도날 모임");
-        given(opinionService.getMyOpinions(eq(1L), isNull(), any())).willReturn(
+        given(opinionService.getMyOpinions(eq(1L), isNull(), eq(PassageScope.ALL), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/users/me/opinions"))
@@ -293,12 +296,81 @@ class UserControllerTest {
     }
 
     @Test
+    @DisplayName("groupId를 지정해 내가 남긴 흔적 목록을 조회하면 모임 범위로 서비스에 전달한다")
+    void getMyOpinionsWithGroupScope() throws Exception {
+        // given
+        given(currentUserProvider.findCurrentUserId()).willReturn(Optional.of(1L));
+        given(opinionService.getMyOpinions(eq(1L), eq(10L), eq(PassageScope.of(13L, false)), any())).willReturn(
+                new PageImpl<>(List.of(), DEFAULT_PAGEABLE, 0));
+
+        // when & then
+        mockMvc.perform(get("/api/users/me/opinions").param("bookId", "10").param("groupId", "13"))
+                .andExpect(status().isOk());
+        verify(opinionService).getMyOpinions(eq(1L), eq(10L), eq(PassageScope.of(13L, false)), any());
+    }
+
+    @Test
+    @DisplayName("groupId와 globalOnly를 함께 지정하면 400을 반환한다")
+    void getMyOpinionsFailsWhenGroupIdAndGlobalOnlyBothGiven() throws Exception {
+        // given
+        given(currentUserProvider.findCurrentUserId()).willReturn(Optional.of(1L));
+
+        // when & then
+        mockMvc.perform(get("/api/users/me/opinions").param("groupId", "13").param("globalOnly", "true"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("PASSAGE_400_4"));
+    }
+
+    @Test
+    @DisplayName("모임원이 아닌 모임을 지정해 내가 남긴 흔적 목록을 조회하면 403을 반환한다")
+    void getMyOpinionsFailsWhenNotMemberOfGroup() throws Exception {
+        // given
+        given(currentUserProvider.findCurrentUserId()).willReturn(Optional.of(1L));
+        given(opinionService.getMyOpinions(eq(1L), isNull(), eq(PassageScope.of(13L, false)), any()))
+                .willThrow(new GroupException(GroupErrorCode.NOT_MEMBER));
+
+        // when & then
+        mockMvc.perform(get("/api/users/me/opinions").param("groupId", "13"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("GROUP_403_2"));
+    }
+
+    @Test
+    @DisplayName("globalOnly=true로 좋아요 누른 흔적 목록을 조회하면 전역 범위로 서비스에 전달한다")
+    void getLikedOpinionsWithGlobalOnly() throws Exception {
+        // given
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(opinionService.getLikedOpinions(eq(1L), eq(10L), eq(PassageScope.of(null, true)), any())).willReturn(
+                new PageImpl<>(List.of(), DEFAULT_PAGEABLE, 0));
+
+        // when & then
+        mockMvc.perform(get("/api/users/me/likes").param("bookId", "10").param("globalOnly", "true"))
+                .andExpect(status().isOk());
+        verify(opinionService).getLikedOpinions(eq(1L), eq(10L), eq(PassageScope.of(null, true)), any());
+    }
+
+    @Test
+    @DisplayName("groupId를 지정해 내 대목 목록을 조회하면 모임 범위로 서비스에 전달한다")
+    void getMyPassagesWithGroupScope() throws Exception {
+        // given
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(passageService.getMyPassages(eq(1L), eq(10L), eq(true), eq(PassageScope.of(13L, false)), any()))
+                .willReturn(new PageImpl<>(List.of(), DEFAULT_PAGEABLE, 0));
+
+        // when & then
+        mockMvc.perform(get("/api/users/me/passages")
+                        .param("bookId", "10").param("spoilerOnly", "true").param("groupId", "13"))
+                .andExpect(status().isOk());
+        verify(passageService).getMyPassages(eq(1L), eq(10L), eq(true), eq(PassageScope.of(13L, false)), any());
+    }
+
+    @Test
     @DisplayName("bookId를 지정해 내가 남긴 흔적 목록을 조회한다")
     void getMyOpinionsFiltersByBookId() throws Exception {
         given(currentUserProvider.findCurrentUserId()).willReturn(Optional.of(1L));
         MyOpinionProjection projection = new MyOpinionProjection(
                 1L, 10L, "책 제목", "작가", "cover", 100L, "발췌 문장", 5, "흔적 내용", 0, LocalDateTime.now(), null, null);
-        given(opinionService.getMyOpinions(eq(1L), eq(10L), any())).willReturn(
+        given(opinionService.getMyOpinions(eq(1L), eq(10L), eq(PassageScope.ALL), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/users/me/opinions").param("bookId", "10"))
@@ -313,7 +385,7 @@ class UserControllerTest {
         MyOpinionProjection projection = new MyOpinionProjection(
                 1L, 18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "cover", 1L, "인용문", 33, "애증의 관계", 5,
                 LocalDateTime.now(), null, null);
-        given(opinionService.getMyOpinions(eq((Long) null), isNull(), any())).willReturn(
+        given(opinionService.getMyOpinions(eq((Long) null), isNull(), eq(PassageScope.ALL), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/users/me/opinions"))
@@ -328,7 +400,7 @@ class UserControllerTest {
         LikedOpinionProjection projection = new LikedOpinionProjection(
                 1L, 10L, "책 제목", "작가", "cover", 100L, "발췌 문장", 5, "흔적 내용", "닉네임", 0,
                 LocalDateTime.now(), LocalDateTime.now(), null, null);
-        given(opinionService.getLikedOpinions(eq(1L), isNull(), any())).willReturn(
+        given(opinionService.getLikedOpinions(eq(1L), isNull(), eq(PassageScope.ALL), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/users/me/likes"))
@@ -347,7 +419,7 @@ class UserControllerTest {
         LikedOpinionProjection projection = new LikedOpinionProjection(
                 1L, 10L, "책 제목", "작가", "cover", 100L, "발췌 문장", 5, "흔적 내용", "닉네임", 0,
                 LocalDateTime.now(), LocalDateTime.now(), null, null);
-        given(opinionService.getLikedOpinions(eq(1L), eq(10L), any())).willReturn(
+        given(opinionService.getLikedOpinions(eq(1L), eq(10L), eq(PassageScope.ALL), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/users/me/likes").param("bookId", "10"))
@@ -395,7 +467,7 @@ class UserControllerTest {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         MyPassageProjection projection = new MyPassageProjection(
                 1L, 10L, 100L, 5, "발췌 문장", true, LocalDateTime.now(), 13L, "면도날 모임");
-        given(passageService.getMyPassages(eq(1L), eq(10L), eq(true), any())).willReturn(
+        given(passageService.getMyPassages(eq(1L), eq(10L), eq(true), eq(PassageScope.ALL), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/users/me/passages")

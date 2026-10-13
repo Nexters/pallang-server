@@ -145,24 +145,32 @@ public interface UserApi {
     ResponseEntity<DataResponse<OnboardingCompleteResponse>> completeOnboarding();
 
     @Operation(summary = "내가 남긴 흔적 목록", description = "내가 작성한 흔적을 최신순으로 조회합니다. "
+            + "groupId를 지정하면 그 모임 대목의 것만, globalOnly=true면 전역 공개 대목의 것만 조회합니다(내 서재의 모임/전역 항목에서 들어간 책 상세용). 둘 다 생략하면 범위 구분 없이 전부 조회합니다. "
             + "모임 전용 대목이면 groupId/groupName이 채워지고(전역 공개 대목이면 null), 이동 시 groupId를 함께 넘겨야 대목이 조회됩니다. "
             + "bookId를 지정하면 해당 책의 흔적만 조회합니다(내 서재 책 상세 - 의견 탭). 생략하면 전체 책을 대상으로 합니다. "
             + "인증 불필요. Authorization: Bearer {accessToken} 헤더가 없으면(비로그인) 샘플 흔적 목록을 "
             + "반환합니다. 로그인 사용자에게는 샘플을 내려주지 않습니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
+            @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1) 또는 groupId와 globalOnly 동시 지정 (PASSAGE_400_4)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/users/me/opinions\",\"title\":\"COMMON_400_1\","
-                                    + "\"status\":400,\"detail\":\"'size' 파라미터의 값이 올바르지 않습니다.\"}")))
+                                    + "\"status\":400,\"detail\":\"'size' 파라미터의 값이 올바르지 않습니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "groupId로 지정한 모임의 모임원이 아님 (GROUP_403_2)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/users/me/opinions\",\"title\":\"GROUP_403_2\","
+                                    + "\"status\":403,\"detail\":\"모임원만 조회할 수 있습니다.\"}")))
     })
     ResponseEntity<DataResponse<MyOpinionListResponse>> getMyOpinions(
             @Parameter(description = "책 ID (생략 시 전체 책 대상)") Long bookId,
+            @Parameter(description = "모임 ID. 지정하면 그 모임 전용 대목의 것만 조회 (모임원만 가능, globalOnly와 함께 지정 불가)") Long groupId,
+            @Parameter(description = "true면 전역 공개 대목의 것만 조회 (기본값 false, groupId와 함께 지정 불가)") boolean globalOnly,
             @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,
             @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
     );
 
     @Operation(summary = "좋아요 누른 흔적 목록", description = "내가 좋아요를 누른 흔적을 좋아요 누른 순서대로(최신순) 조회합니다. "
+            + "groupId를 지정하면 그 모임 대목의 것만, globalOnly=true면 전역 공개 대목의 것만 조회합니다(내 서재의 모임/전역 항목에서 들어간 책 상세용). 둘 다 생략하면 범위 구분 없이 전부 조회합니다. "
             + "모임 전용 대목이면 groupId/groupName이 채워지고(전역 공개 대목이면 null), 이동 시 groupId를 함께 넘겨야 대목이 조회됩니다. "
             + "bookId를 지정하면 해당 책의 좋아요만 조회합니다(내 서재 책 상세 - 좋아요 탭). "
             + "생략하면 전체 책을 대상으로 합니다(마이페이지 좋아요 관리 - 전체 책 보기). "
@@ -170,17 +178,23 @@ public interface UserApi {
             + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
+            @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1) 또는 groupId와 globalOnly 동시 지정 (PASSAGE_400_4)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/users/me/likes\",\"title\":\"COMMON_400_1\","
                                     + "\"status\":400,\"detail\":\"'size' 파라미터의 값이 올바르지 않습니다.\"}"))),
             @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/users/me/likes\",\"title\":\"AUTH_401_1\","
-                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}")))
+                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "groupId로 지정한 모임의 모임원이 아님 (GROUP_403_2)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/users/me/likes\",\"title\":\"GROUP_403_2\","
+                                    + "\"status\":403,\"detail\":\"모임원만 조회할 수 있습니다.\"}")))
     })
     ResponseEntity<DataResponse<LikedOpinionListResponse>> getLikedOpinions(
             @Parameter(description = "책 ID (생략 시 전체 책 대상)") Long bookId,
+            @Parameter(description = "모임 ID. 지정하면 그 모임 전용 대목의 것만 조회 (모임원만 가능, globalOnly와 함께 지정 불가)") Long groupId,
+            @Parameter(description = "true면 전역 공개 대목의 것만 조회 (기본값 false, groupId와 함께 지정 불가)") boolean globalOnly,
             @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,
             @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
     );
@@ -208,6 +222,7 @@ public interface UserApi {
     );
 
     @Operation(summary = "내 대목 목록", description = "내가 흔적을 남긴 대목을 최신순으로 조회합니다. "
+            + "groupId를 지정하면 그 모임 대목의 것만, globalOnly=true면 전역 공개 대목의 것만 조회합니다(내 서재의 모임/전역 항목에서 들어간 책 상세용). 둘 다 생략하면 범위 구분 없이 전부 조회합니다. "
             + "모임 전용 대목이면 groupId/groupName이 채워지고(전역 공개 대목이면 null), 이동 시 groupId를 함께 넘겨야 대목이 조회됩니다. "
             + "소유 기준은 최초 작성자가 아니라 해당 대목에 흔적을 남긴 사용자이며, 병합된 대목은 흔적을 남긴 모든 사용자에게 노출됩니다. "
             + "bookId를 지정하면 해당 책으로 한정하고, 생략하면 전체 책을 대상으로 합니다. "
@@ -215,18 +230,24 @@ public interface UserApi {
             + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
-            @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
+            @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1) 또는 groupId와 globalOnly 동시 지정 (PASSAGE_400_4)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/users/me/passages\",\"title\":\"COMMON_400_1\","
                                     + "\"status\":400,\"detail\":\"'size' 파라미터의 값이 올바르지 않습니다.\"}"))),
             @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/users/me/passages\",\"title\":\"AUTH_401_1\","
-                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}")))
+                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "groupId로 지정한 모임의 모임원이 아님 (GROUP_403_2)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/users/me/passages\",\"title\":\"GROUP_403_2\","
+                                    + "\"status\":403,\"detail\":\"모임원만 조회할 수 있습니다.\"}")))
     })
     ResponseEntity<DataResponse<MyPassageListResponse>> getMyPassages(
             @Parameter(description = "책 ID (생략 시 전체 책 대상)") Long bookId,
             @Parameter(description = "스포일러 대목만 조회 여부 (기본값 false)") boolean spoilerOnly,
+            @Parameter(description = "모임 ID. 지정하면 그 모임 전용 대목의 것만 조회 (모임원만 가능, globalOnly와 함께 지정 불가)") Long groupId,
+            @Parameter(description = "true면 전역 공개 대목의 것만 조회 (기본값 false, groupId와 함께 지정 불가)") boolean globalOnly,
             @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,
             @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
     );
