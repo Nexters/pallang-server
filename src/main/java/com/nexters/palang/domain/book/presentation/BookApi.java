@@ -9,6 +9,7 @@ import com.nexters.palang.domain.book.presentation.dto.BookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookSearchListResponse;
 import com.nexters.palang.domain.book.presentation.dto.CreateBookRequest;
+import com.nexters.palang.domain.book.presentation.dto.MyLibraryBookListResponse;
 import com.nexters.palang.global.common.error.ErrorResponse;
 import com.nexters.palang.global.common.response.DataResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -110,9 +111,14 @@ public interface BookApi {
     );
 
     @Operation(summary = "내 서재 도서 목록",
-            description = "현재 로그인한 사용자가 흔적을 남긴 도서만 대상으로, 대목/흔적 수와 함께 조회합니다. "
-                    + "가장 최근에 흔적을 남긴 도서부터 내림차순으로 정렬됩니다. opinionCountScope로 흔적 수 집계 "
-                    + "기준을 선택할 수 있습니다: ALL(기본값, 도서 전체 흔적 수 - 홈 화면 노출용) 또는 "
+            description = "현재 로그인한 사용자가 흔적을 남겼거나 읽기 상태를 설정한 도서를 대목/흔적 수와 함께 조회합니다. "
+                    + "항목은 도서 단위가 아니라 (도서, 모임) 단위입니다: 같은 책이라도 전역 공개 대목에서 남긴 흔적과 "
+                    + "모임 전용 대목에서 남긴 흔적은 별도 항목으로 내려가며, 모임 항목은 groupId/groupName이 채워지고 "
+                    + "전역 항목은 null입니다(현재 소속된 모임만 포함). 모임 항목은 groupId를 붙여 대목을 조회해야 "
+                    + "내용이 보입니다. 대목/흔적 수도 항목 범위(전역 또는 그 모임) 안에서만 집계합니다. "
+                    + "가장 최근 활동 항목부터 내림차순으로 정렬됩니다. 읽기 상태는 도서 단위라, 전역 항목이 있거나 "
+                    + "모임 항목이 없으면 전역 항목에, 모임 항목만 있으면 그중 가장 최근 항목에 반영됩니다. "
+                    + "opinionCountScope로 흔적 수 집계 기준을 선택할 수 있습니다: ALL(기본값, 항목 범위의 전체 흔적 수 - 홈 화면 노출용) 또는 "
                     + "MINE(로그인 사용자 본인이 남긴 흔적 수 - 마이페이지 노출용). "
                     + "인증 불필요. Authorization: Bearer {accessToken} 헤더가 없으면(비로그인) 샘플 도서 1건을 "
                     + "반환합니다(대목/흔적 수는 샘플 데이터 기준). 로그인 사용자에게는 샘플을 내려주지 않습니다.")
@@ -121,7 +127,7 @@ public interface BookApi {
             @ApiResponse(responseCode = "400", description = "page/size 형식 오류 (COMMON_400_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    ResponseEntity<DataResponse<BookActivityListResponse>> getMyLibraryBooks(
+    ResponseEntity<DataResponse<MyLibraryBookListResponse>> getMyLibraryBooks(
             @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,
             @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size,
             @Parameter(description = "흔적 수 집계 기준 (ALL: 도서 전체, MINE: 로그인 사용자 본인, 기본값 ALL)")

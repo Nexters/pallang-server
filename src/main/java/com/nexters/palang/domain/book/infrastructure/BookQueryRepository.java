@@ -4,19 +4,22 @@ import com.nexters.palang.domain.book.application.BookActivityProjection;
 import com.nexters.palang.domain.book.application.BookDetailProjection;
 import com.nexters.palang.domain.book.application.BookSearchProjection;
 import com.nexters.palang.domain.book.application.BookSearchSort;
+import com.nexters.palang.domain.book.application.MyLibraryBookProjection;
 import com.nexters.palang.domain.book.application.OpinionCountScope;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.QBook;
 import com.nexters.palang.domain.book.domain.QUserBookStatus;
+import com.nexters.palang.domain.group.domain.QGroup;
+import com.nexters.palang.domain.group.domain.QGroupMember;
 import com.nexters.palang.domain.opinion.domain.QOpinion;
 import com.nexters.palang.domain.passage.domain.QPassage;
 import com.nexters.palang.domain.user.domain.GuestSampleAccount;
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.CaseBuilder;
-import com.querydsl.core.types.dsl.NumberExpression;
-import com.querydsl.jpa.impl.JPAQuery;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -152,28 +155,33 @@ public class BookQueryRepository {
     }
 
     // 내 서재는 로그인한 사용자가 흔적(Opinion)을 남겼거나, 읽기 상태(UserBookStatus)를 설정한 도서를 모두
-    // 대상으로 한다(PM 확인: 상태만 설정하고 흔적은 없는 책도 노출). 대목 수는 홈 캐러셀과 동일하게 도서 전체
-    // 기준으로 보여주지만, 흔적 수는 opinionCountScope에 따라 도서 전체(ALL, 홈 노출용) 또는 로그인 사용자
-    // 본인이 남긴 것(MINE, 마이페이지 노출용)만 집계한다. 정렬 기준은 "이 도서에 대한 내 최근 활동 시각"이며,
-    // 흔적을 남긴 시각(opinion.createdAt)과 읽기 상태를 설정/갱신한 시각(userBookStatus.updatedAt) 중 더
-    // 나중 것을 쓴다. 두 활동의 시각 컬럼이 서로 다른 테이블에 있어 하나의 JOIN/GROUP BY로 합쳐 정렬하기
-    // 까다로우므로, 두 후보 집합을 각각 조회해 Java에서 병합·정렬·페이지네이션한 뒤 해당 페이지의 도서만
-    // 집계 쿼리로 채운다.
-    public Page<BookActivityProjection> findMyLibraryBooks(
+    // 대상으로 한다(PM 확인: 상태만 설정하고 흔적은 없는 책도 노출). 항목은 도서가 아니라 (도서, 모임) 단위다
+    // (이슈 #177): 모임 전용 대목은 groupId를 붙여야만 조회되므로, 전역 대목에서의 활동과 모임 대목에서의
+    // 활동을 한 항목으로 합치면 프론트가 어느 화면으로 보내야 할지 알 수 없다. 모임 항목은 지금 내가 멤버인
+    // 모임만 포함한다(멤버가 아니면 들어가도 조회 권한이 없다).
+    // 대목 수/흔적 수는 그 항목의 범위(전역이면 group_id IS NULL, 모임이면 그 모임) 안에서만 집계하고, 흔적 수는
+    // opinionCountScope에 따라 범위 전체(ALL, 홈 노출용) 또는 로그인 사용자 본인이 남긴 것(MINE, 마이페이지
+    // 노출용)만 센다. 정렬 기준은 "이 항목에 대한 내 최근 활동 시각"이며, 흔적을 남긴 시각(opinion.createdAt)과
+    // 읽기 상태를 설정/갱신한 시각(userBookStatus.updatedAt) 중 더 나중 것을 쓴다. 두 활동의 시각 컬럼이 서로
+    // 다른 테이블에 있어 하나의 JOIN/GROUP BY로 합쳐 정렬하기 까다로우므로, 두 후보 집합을 각각 조회해
+    // Java에서 병합·정렬·페이지네이션한 뒤 해당 페이지의 항목만 집계 쿼리로 채운다.
+    public Page<MyLibraryBookProjection> findMyLibraryBooks(
             Long userId, Pageable pageable, OpinionCountScope opinionCountScope) {
-        Map<Long, LocalDateTime> lastActivityByBookId = new LinkedHashMap<>();
+        Map<LibraryEntryKey, LocalDateTime> lastActivityByEntry = new LinkedHashMap<>();
 
         QOpinion opinionMine = QOpinion.opinion;
         QPassage passageForActivity = QPassage.passage;
         for (Tuple row : queryFactory
-                .select(passageForActivity.book.id, opinionMine.createdAt.max())
+                .select(passageForActivity.book.id, passageForActivity.group.id, opinionMine.createdAt.max())
                 .from(opinionMine)
                 .join(opinionMine.passage, passageForActivity)
                 .where(opinionMine.user.id.eq(userId), opinionMine.deletedAt.isNull(),
-                        passageForActivity.deletedAt.isNull())
-                .groupBy(passageForActivity.book.id)
+                        passageForActivity.deletedAt.isNull(), globalOrMyGroup(passageForActivity, userId))
+                .groupBy(passageForActivity.book.id, passageForActivity.group.id)
                 .fetch()) {
-            lastActivityByBookId.put(row.get(passageForActivity.book.id), row.get(opinionMine.createdAt.max()));
+            lastActivityByEntry.put(
+                    new LibraryEntryKey(row.get(passageForActivity.book.id), row.get(passageForActivity.group.id)),
+                    row.get(opinionMine.createdAt.max()));
         }
 
         QUserBookStatus userBookStatus = QUserBookStatus.userBookStatus;
@@ -182,25 +190,51 @@ public class BookQueryRepository {
                 .from(userBookStatus)
                 .where(userBookStatus.user.id.eq(userId))
                 .fetch()) {
-            Long bookId = row.get(userBookStatus.book.id);
-            LocalDateTime updatedAt = row.get(userBookStatus.updatedAt);
-            lastActivityByBookId.merge(bookId, updatedAt, (opinionTime, statusTime) ->
-                    opinionTime.isAfter(statusTime) ? opinionTime : statusTime);
+            LibraryEntryKey key = statusEntryKey(lastActivityByEntry, row.get(userBookStatus.book.id));
+            lastActivityByEntry.merge(key, row.get(userBookStatus.updatedAt), BookQueryRepository::later);
         }
 
-        List<Long> sortedBookIds = lastActivityByBookId.entrySet().stream()
-                .sorted(Map.Entry.<Long, LocalDateTime>comparingByValue().reversed()
-                        .thenComparing(Comparator.comparing(Map.Entry::getKey, Comparator.reverseOrder())))
+        List<LibraryEntryKey> sortedEntries = lastActivityByEntry.entrySet().stream()
+                .sorted(Map.Entry.<LibraryEntryKey, LocalDateTime>comparingByValue().reversed()
+                        .thenComparing(Map.Entry::getKey, LibraryEntryKey.TIE_BREAKER))
                 .map(Map.Entry::getKey)
                 .toList();
 
-        List<Long> pageBookIds = sortedBookIds.stream()
+        List<LibraryEntryKey> pageEntries = sortedEntries.stream()
                 .skip(pageable.getOffset())
                 .limit(pageable.getPageSize())
                 .toList();
 
-        List<BookActivityProjection> content = fetchActivityByBookIds(pageBookIds, userId, opinionCountScope);
-        return new PageImpl<>(content, pageable, sortedBookIds.size());
+        List<MyLibraryBookProjection> content = fetchLibraryEntries(pageEntries, userId, opinionCountScope);
+        return new PageImpl<>(content, pageable, sortedEntries.size());
+    }
+
+    // 읽기 상태는 (도서, 모임)이 아니라 도서 단위라 어느 항목에 반영할지 정해야 한다. 전역 항목이 있거나
+    // 그 도서에 아무 항목도 없으면 전역 항목에 반영하고, 모임 항목만 있으면 그중 가장 최근 항목에 반영한다
+    // (그러지 않으면 모임에서만 읽는 책인데 대목 0개짜리 전역 항목이 하나 더 생긴다).
+    private LibraryEntryKey statusEntryKey(Map<LibraryEntryKey, LocalDateTime> lastActivityByEntry, Long bookId) {
+        LibraryEntryKey globalKey = new LibraryEntryKey(bookId, null);
+        if (lastActivityByEntry.containsKey(globalKey)) {
+            return globalKey;
+        }
+        return lastActivityByEntry.entrySet().stream()
+                .filter(entry -> entry.getKey().bookId().equals(bookId))
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(globalKey);
+    }
+
+    private static LocalDateTime later(LocalDateTime a, LocalDateTime b) {
+        return a.isAfter(b) ? a : b;
+    }
+
+    // 전역 공개 대목이거나, 내가 지금 멤버인 모임의 대목
+    private BooleanExpression globalOrMyGroup(QPassage passage, Long userId) {
+        QGroupMember groupMember = QGroupMember.groupMember;
+        return passage.group.isNull().or(JPAExpressions.selectOne()
+                .from(groupMember)
+                .where(groupMember.group.id.eq(passage.group.id), groupMember.user.id.eq(userId))
+                .exists());
     }
 
     // 비로그인 홈의 샘플 도서 카드 집계용. 그 도서에 다른 사용자들이 남긴 대목/흔적이 섞여 있어도(dev처럼)
@@ -230,47 +264,74 @@ public class BookQueryRepository {
         return count == null ? 0L : count;
     }
 
-    private List<BookActivityProjection> fetchActivityByBookIds(
-            List<Long> bookIds, Long userId, OpinionCountScope opinionCountScope) {
-        if (bookIds.isEmpty()) {
+    private List<MyLibraryBookProjection> fetchLibraryEntries(
+            List<LibraryEntryKey> entries, Long userId, OpinionCountScope opinionCountScope) {
+        if (entries.isEmpty()) {
             return List.of();
         }
 
         QBook book = QBook.book;
+        QGroup group = QGroup.group;
         QPassage passage = QPassage.passage;
-        QOpinion opinionMine = new QOpinion("opinionMine");
-        QOpinion opinionAll = new QOpinion("opinionAll");
+        QOpinion opinion = QOpinion.opinion;
 
-        NumberExpression<Long> opinionCount = opinionCountScope == OpinionCountScope.MINE
-                ? opinionMine.countDistinct()
-                : opinionAll.countDistinct();
+        List<Long> bookIds = entries.stream().map(LibraryEntryKey::bookId).distinct().toList();
+        List<Long> groupIds = entries.stream().map(LibraryEntryKey::groupId).filter(Objects::nonNull).distinct().toList();
 
-        // opinionMine/opinionAll은 passageCount 집계용 passage 조인과 별개로 passage.book을 통해 book에
-        // 직접 연결한다. 같은 passage 행을 공유해서 조인하면 opinionMine이 passage를 "내가 흔적을 남긴 대목"
-        // 으로 제한해버려서, passageCount/opinionAll(ALL)이 도서 전체가 아니라 그 대목만 집계하게 된다.
-        // 대목이 하나도 없는 도서(읽기 상태만 설정)도 대상이므로 passage는 leftJoin이다.
-        JPAQuery<BookActivityProjection> query = queryFactory
-                .select(Projections.constructor(BookActivityProjection.class,
-                        book.id, book.title, book.author, book.publisher, book.coverImageUrl,
-                        passage.countDistinct(), opinionCount))
-                .from(book)
-                .leftJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
-                .leftJoin(opinionMine).on(opinionMine.passage.book.eq(book)
-                        .and(opinionMine.user.id.eq(userId))
-                        .and(opinionMine.deletedAt.isNull()));
-        if (opinionCountScope == OpinionCountScope.ALL) {
-            query = query.leftJoin(opinionAll)
-                    .on(opinionAll.passage.book.eq(book).and(opinionAll.deletedAt.isNull()));
+        Map<Long, Book> booksById = queryFactory.selectFrom(book).where(book.id.in(bookIds)).fetch().stream()
+                .collect(Collectors.toMap(Book::getId, b -> b));
+        Map<Long, String> groupNamesById = groupIds.isEmpty() ? Map.of() : queryFactory
+                .select(group.id, group.name)
+                .from(group)
+                .where(group.id.in(groupIds))
+                .fetch().stream()
+                .collect(Collectors.toMap(row -> row.get(group.id), row -> row.get(group.name)));
+
+        // 대목 수/흔적 수를 (도서, 모임) 단위로 한 번에 집계한다. passage.group.id는 FK 컬럼을 그대로 쓰므로
+        // (group 테이블 조인 없음) 전역 대목(group_id IS NULL)도 하나의 그룹으로 묶인다. 페이지에 없는 다른
+        // 모임의 집계도 함께 나오지만 아래에서 페이지 항목만 골라 쓴다.
+        BooleanExpression opinionOnPassage = opinion.passage.eq(passage).and(opinion.deletedAt.isNull());
+        if (opinionCountScope == OpinionCountScope.MINE) {
+            opinionOnPassage = opinionOnPassage.and(opinion.user.id.eq(userId));
         }
+        Map<LibraryEntryKey, EntryCounts> countsByEntry = queryFactory
+                .select(passage.book.id, passage.group.id, passage.countDistinct(), opinion.countDistinct())
+                .from(passage)
+                .leftJoin(opinion).on(opinionOnPassage)
+                .where(passage.book.id.in(bookIds), passage.deletedAt.isNull())
+                .groupBy(passage.book.id, passage.group.id)
+                .fetch().stream()
+                .collect(Collectors.toMap(
+                        row -> new LibraryEntryKey(row.get(passage.book.id), row.get(passage.group.id)),
+                        row -> new EntryCounts(row.get(passage.countDistinct()), row.get(opinion.countDistinct()))));
 
-        List<BookActivityProjection> content = query
-                .where(book.id.in(bookIds))
-                .groupBy(book.id, book.title, book.author, book.publisher, book.coverImageUrl)
-                .fetch();
+        return entries.stream()
+                .filter(entry -> booksById.containsKey(entry.bookId()))
+                .map(entry -> {
+                    Book entryBook = booksById.get(entry.bookId());
+                    EntryCounts counts = countsByEntry.getOrDefault(entry, EntryCounts.EMPTY);
+                    return new MyLibraryBookProjection(
+                            entryBook.getId(), entryBook.getTitle(), entryBook.getAuthor(), entryBook.getPublisher(),
+                            entryBook.getCoverImageUrl(), entry.groupId(),
+                            entry.groupId() != null ? groupNamesById.get(entry.groupId()) : null,
+                            counts.passageCount(), counts.opinionCount());
+                })
+                .toList();
+    }
 
-        Map<Long, BookActivityProjection> byBookId = content.stream()
-                .collect(Collectors.toMap(BookActivityProjection::bookId, p -> p));
-        return bookIds.stream().map(byBookId::get).filter(Objects::nonNull).toList();
+    // 내 서재 항목의 식별자. groupId가 null이면 전역 공개 항목이다.
+    private record LibraryEntryKey(Long bookId, Long groupId) {
+
+        // 마지막 활동 시각이 같을 때의 정렬: 도서 ID 내림차순(기존 동작 유지), 같은 도서면 전역 항목이 먼저.
+        static final Comparator<LibraryEntryKey> TIE_BREAKER = Comparator
+                .comparing(LibraryEntryKey::bookId, Comparator.reverseOrder())
+                .thenComparing(LibraryEntryKey::groupId, Comparator.nullsFirst(Comparator.naturalOrder()));
+    }
+
+    // 읽기 상태만 설정한 도서처럼 대목이 하나도 없는 항목은 집계 결과에 없으므로 0으로 채운다.
+    private record EntryCounts(long passageCount, long opinionCount) {
+
+        static final EntryCounts EMPTY = new EntryCounts(0L, 0L);
     }
 
     public Page<BookActivityProjection> findPopularBooks(Pageable pageable) {

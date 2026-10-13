@@ -9,6 +9,8 @@ import com.nexters.palang.domain.book.presentation.dto.BookListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookSearchListResponse;
 import com.nexters.palang.domain.book.presentation.dto.BookSearchResponse;
+import com.nexters.palang.domain.book.presentation.dto.MyLibraryBookListResponse;
+import com.nexters.palang.domain.book.presentation.dto.MyLibraryBookResponse;
 import com.nexters.palang.global.common.response.CarouselPageInfo;
 import com.nexters.palang.global.common.response.PageInfo;
 import java.util.List;
@@ -50,6 +52,18 @@ public final class BookMapper {
     public static BookActivityListResponse toActivityListResponse(Page<BookActivityProjection> projections) {
         return new BookActivityListResponse(
                 projections.map(BookMapper::toActivityResponse).getContent(), PageInfo.from(projections));
+    }
+
+    public static MyLibraryBookResponse toMyLibraryResponse(MyLibraryBookProjection projection) {
+        return new MyLibraryBookResponse(
+                projection.bookId(), projection.title(), projection.author(), projection.publisher(),
+                projection.coverImageUrl(), projection.groupId(), projection.groupName(),
+                projection.passageCount(), projection.opinionCount());
+    }
+
+    public static MyLibraryBookListResponse toMyLibraryListResponse(Page<MyLibraryBookProjection> projections) {
+        return new MyLibraryBookListResponse(
+                projections.map(BookMapper::toMyLibraryResponse).getContent(), PageInfo.from(projections));
     }
 
     public static BookDetailResponse toDetailResponse(BookDetail detail) {
