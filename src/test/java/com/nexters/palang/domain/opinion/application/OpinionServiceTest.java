@@ -427,7 +427,7 @@ class OpinionServiceTest {
     void getMyOpinionsReturnsPageFromQueryRepository() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<MyOpinionProjection> expected = new PageImpl<>(
-                List.of(new MyOpinionProjection(1L, 10L, "제목", "작가", "cover", 100L, "발췌", 5, "흔적", 0, LocalDateTime.now())),
+                List.of(new MyOpinionProjection(1L, 10L, "제목", "작가", "cover", 100L, "발췌", 5, "흔적", 0, LocalDateTime.now(), null, null)),
                 pageable, 1);
         given(opinionQueryRepository.findMyOpinions(1L, null, pageable)).willReturn(expected);
 
@@ -448,7 +448,7 @@ class OpinionServiceTest {
         ReflectionTestUtils.setField(sampleUser, "id", 999L);
         Page<MyOpinionProjection> expected = new PageImpl<>(
                 List.of(new MyOpinionProjection(1L, 18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "cover", 100L, "발췌", 33,
-                        "애증의 관계", 0, LocalDateTime.now())),
+                        "애증의 관계", 0, LocalDateTime.now(), null, null)),
                 pageable, 1);
         given(userRepository.findBySnsProviderAndSnsId(GuestSampleAccount.SNS_PROVIDER, GuestSampleAccount.SNS_ID))
                 .willReturn(Optional.of(sampleUser));
@@ -490,7 +490,7 @@ class OpinionServiceTest {
         Pageable pageable = PageRequest.of(0, 20);
         Page<LikedOpinionProjection> expected = new PageImpl<>(
                 List.of(new LikedOpinionProjection(1L, 10L, "제목", "작가", "cover", 100L, "발췌", 5, "흔적", "닉네임", 0,
-                        LocalDateTime.now(), LocalDateTime.now())),
+                        LocalDateTime.now(), LocalDateTime.now(), null, null)),
                 pageable, 1);
         given(opinionQueryRepository.findLikedOpinions(1L, null, pageable)).willReturn(expected);
 

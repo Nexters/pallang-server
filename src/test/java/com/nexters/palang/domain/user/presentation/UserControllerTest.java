@@ -1,5 +1,6 @@
 package com.nexters.palang.domain.user.presentation;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -273,11 +274,12 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("내가 남긴 흔적 목록을 조회한다")
+    @DisplayName("내가 남긴 흔적 목록을 조회하면 흔적마다 대목이 속한 모임 정보를 함께 내려준다")
     void getMyOpinions() throws Exception {
         given(currentUserProvider.findCurrentUserId()).willReturn(Optional.of(1L));
         MyOpinionProjection projection = new MyOpinionProjection(
-                1L, 10L, "책 제목", "작가", "cover", 100L, "발췌 문장", 5, "흔적 내용", 0, LocalDateTime.now());
+                1L, 10L, "책 제목", "작가", "cover", 100L, "발췌 문장", 5, "흔적 내용", 0, LocalDateTime.now(),
+                13L, "면도날 모임");
         given(opinionService.getMyOpinions(eq(1L), isNull(), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
@@ -285,7 +287,9 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.opinions[0].opinionId").value(1))
                 .andExpect(jsonPath("$.data.opinions[0].bookTitle").value("책 제목"))
-                .andExpect(jsonPath("$.data.opinions[0].author").value("작가"));
+                .andExpect(jsonPath("$.data.opinions[0].author").value("작가"))
+                .andExpect(jsonPath("$.data.opinions[0].groupId").value(13))
+                .andExpect(jsonPath("$.data.opinions[0].groupName").value("면도날 모임"));
     }
 
     @Test
@@ -293,7 +297,7 @@ class UserControllerTest {
     void getMyOpinionsFiltersByBookId() throws Exception {
         given(currentUserProvider.findCurrentUserId()).willReturn(Optional.of(1L));
         MyOpinionProjection projection = new MyOpinionProjection(
-                1L, 10L, "책 제목", "작가", "cover", 100L, "발췌 문장", 5, "흔적 내용", 0, LocalDateTime.now());
+                1L, 10L, "책 제목", "작가", "cover", 100L, "발췌 문장", 5, "흔적 내용", 0, LocalDateTime.now(), null, null);
         given(opinionService.getMyOpinions(eq(1L), eq(10L), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
@@ -308,7 +312,7 @@ class UserControllerTest {
         given(currentUserProvider.findCurrentUserId()).willReturn(Optional.empty());
         MyOpinionProjection projection = new MyOpinionProjection(
                 1L, 18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "cover", 1L, "인용문", 33, "애증의 관계", 5,
-                LocalDateTime.now());
+                LocalDateTime.now(), null, null);
         given(opinionService.getMyOpinions(eq((Long) null), isNull(), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
@@ -318,12 +322,12 @@ class UserControllerTest {
     }
 
     @Test
-    @DisplayName("좋아요 누른 흔적 목록을 조회한다")
+    @DisplayName("좋아요 누른 흔적 목록을 조회하면 흔적마다 대목이 속한 모임 정보를 함께 내려준다")
     void getLikedOpinions() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         LikedOpinionProjection projection = new LikedOpinionProjection(
                 1L, 10L, "책 제목", "작가", "cover", 100L, "발췌 문장", 5, "흔적 내용", "닉네임", 0,
-                LocalDateTime.now(), LocalDateTime.now());
+                LocalDateTime.now(), LocalDateTime.now(), null, null);
         given(opinionService.getLikedOpinions(eq(1L), isNull(), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
@@ -331,7 +335,9 @@ class UserControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.opinions[0].opinionId").value(1))
                 .andExpect(jsonPath("$.data.opinions[0].nickname").value("닉네임"))
-                .andExpect(jsonPath("$.data.opinions[0].author").value("작가"));
+                .andExpect(jsonPath("$.data.opinions[0].author").value("작가"))
+                .andExpect(jsonPath("$.data.opinions[0].groupId").value(nullValue()))
+                .andExpect(jsonPath("$.data.opinions[0].groupName").value(nullValue()));
     }
 
     @Test
@@ -340,7 +346,7 @@ class UserControllerTest {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         LikedOpinionProjection projection = new LikedOpinionProjection(
                 1L, 10L, "책 제목", "작가", "cover", 100L, "발췌 문장", 5, "흔적 내용", "닉네임", 0,
-                LocalDateTime.now(), LocalDateTime.now());
+                LocalDateTime.now(), LocalDateTime.now(), null, null);
         given(opinionService.getLikedOpinions(eq(1L), eq(10L), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
@@ -388,7 +394,7 @@ class UserControllerTest {
     void getMyPassages() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         MyPassageProjection projection = new MyPassageProjection(
-                1L, 10L, 100L, 5, "발췌 문장", true, LocalDateTime.now());
+                1L, 10L, 100L, 5, "발췌 문장", true, LocalDateTime.now(), 13L, "면도날 모임");
         given(passageService.getMyPassages(eq(1L), eq(10L), eq(true), any())).willReturn(
                 new PageImpl<>(List.of(projection), DEFAULT_PAGEABLE, 1));
 
@@ -399,7 +405,9 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.data.passages[0].passageId").value(1))
                 .andExpect(jsonPath("$.data.passages[0].bookId").value(10))
                 .andExpect(jsonPath("$.data.passages[0].opinionId").value(100))
-                .andExpect(jsonPath("$.data.passages[0].isSpoiler").value(true));
+                .andExpect(jsonPath("$.data.passages[0].isSpoiler").value(true))
+                .andExpect(jsonPath("$.data.passages[0].groupId").value(13))
+                .andExpect(jsonPath("$.data.passages[0].groupName").value("면도날 모임"));
     }
 
     @Test

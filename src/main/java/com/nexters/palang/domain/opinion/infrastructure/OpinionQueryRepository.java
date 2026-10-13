@@ -4,6 +4,7 @@ import com.nexters.palang.domain.block.domain.QUserBlock;
 import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.book.domain.QBook;
 import com.nexters.palang.domain.comment.domain.QComment;
+import com.nexters.palang.domain.group.domain.QGroup;
 import com.nexters.palang.domain.opinion.application.LikedOpinionProjection;
 import com.nexters.palang.domain.opinion.application.MyOpinionProjection;
 import com.nexters.palang.domain.opinion.application.OpinionSummaryProjection;
@@ -94,17 +95,21 @@ public class OpinionQueryRepository {
         QOpinion opinion = QOpinion.opinion;
         QPassage passage = QPassage.passage;
         QBook book = QBook.book;
+        QGroup group = QGroup.group;
 
         BooleanExpression bookFilter = bookId != null ? book.id.eq(bookId) : null;
 
+        // 모임 정보는 반드시 명시적 leftJoin으로 가져온다. select에 passage.group.name을 바로 쓰면 암묵적
+        // inner join이 걸려 전역 공개 대목(group_id IS NULL)에 남긴 흔적이 결과에서 빠진다.
         List<MyOpinionProjection> content = queryFactory
                 .select(Projections.constructor(MyOpinionProjection.class,
                         opinion.id, book.id, book.title, book.author, book.coverImageUrl,
                         passage.id, passage.quotedText, passage.pageNumber,
-                        opinion.content, opinion.likeCount, opinion.createdAt))
+                        opinion.content, opinion.likeCount, opinion.createdAt, group.id, group.name))
                 .from(opinion)
                 .join(opinion.passage, passage)
                 .join(passage.book, book)
+                .leftJoin(passage.group, group)
                 .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(), bookFilter)
                 .orderBy(opinion.createdAt.desc(), opinion.id.desc())
                 .offset(pageable.getOffset())
@@ -129,6 +134,7 @@ public class OpinionQueryRepository {
         QPassage passage = QPassage.passage;
         QBook book = QBook.book;
         QUser author = QUser.user;
+        QGroup group = QGroup.group;
 
         BooleanExpression bookFilter = bookId != null ? book.id.eq(bookId) : null;
 
@@ -136,12 +142,14 @@ public class OpinionQueryRepository {
                 .select(Projections.constructor(LikedOpinionProjection.class,
                         opinion.id, book.id, book.title, book.author, book.coverImageUrl,
                         passage.id, passage.quotedText, passage.pageNumber,
-                        opinion.content, author.nickname, opinion.likeCount, opinion.createdAt, opinionLike.createdAt))
+                        opinion.content, author.nickname, opinion.likeCount, opinion.createdAt, opinionLike.createdAt,
+                        group.id, group.name))
                 .from(opinionLike)
                 .join(opinionLike.opinion, opinion)
                 .join(opinion.passage, passage)
                 .join(passage.book, book)
                 .join(opinion.user, author)
+                .leftJoin(passage.group, group)
                 .where(opinionLike.user.id.eq(userId), opinion.deletedAt.isNull(), bookFilter)
                 .orderBy(opinionLike.createdAt.desc(), opinionLike.id.desc())
                 .offset(pageable.getOffset())

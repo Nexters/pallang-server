@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.passage.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.book.domain.Book;
@@ -300,6 +301,30 @@ class PassageQueryRepositoryTest {
                 other.getId(), null, false, PageRequest.of(0, 10));
 
         assertThat(result.getContent()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("내 대목 목록은 모임 전용 대목이면 모임 ID/이름을, 전역 공개 대목이면 null을 함께 반환한다")
+    void findMyPassagesReturnsGroupOfPassage() {
+        // given
+        User me = user("me-gpsg");
+        Book book = book("책");
+        Group group = group(book, me);
+        Passage globalPassage = passage(book, me, 5, "전역 문장", "hash-global");
+        Passage groupPassage = passage(book, me, group, 6, "모임 문장", "hash-group");
+        entityManager.persistAndFlush(Opinion.builder().passage(globalPassage).user(me).content("전역 흔적").build());
+        entityManager.persistAndFlush(Opinion.builder().passage(groupPassage).user(me).content("모임 흔적").build());
+
+        // when
+        Page<MyPassageProjection> result = passageQueryRepository.findMyPassages(
+                me.getId(), null, false, PageRequest.of(0, 10));
+
+        // then
+        assertThat(result.getContent())
+                .extracting(MyPassageProjection::passageId, MyPassageProjection::groupId, MyPassageProjection::groupName)
+                .containsExactlyInAnyOrder(
+                        tuple(globalPassage.getId(), null, null),
+                        tuple(groupPassage.getId(), group.getId(), "모임"));
     }
 
     @Test

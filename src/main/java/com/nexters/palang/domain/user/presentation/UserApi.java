@@ -145,6 +145,7 @@ public interface UserApi {
     ResponseEntity<DataResponse<OnboardingCompleteResponse>> completeOnboarding();
 
     @Operation(summary = "내가 남긴 흔적 목록", description = "내가 작성한 흔적을 최신순으로 조회합니다. "
+            + "모임 전용 대목이면 groupId/groupName이 채워지고(전역 공개 대목이면 null), 이동 시 groupId를 함께 넘겨야 대목이 조회됩니다. "
             + "bookId를 지정하면 해당 책의 흔적만 조회합니다(내 서재 책 상세 - 의견 탭). 생략하면 전체 책을 대상으로 합니다. "
             + "인증 불필요. Authorization: Bearer {accessToken} 헤더가 없으면(비로그인) 샘플 흔적 목록을 "
             + "반환합니다. 로그인 사용자에게는 샘플을 내려주지 않습니다.")
@@ -162,6 +163,7 @@ public interface UserApi {
     );
 
     @Operation(summary = "좋아요 누른 흔적 목록", description = "내가 좋아요를 누른 흔적을 좋아요 누른 순서대로(최신순) 조회합니다. "
+            + "모임 전용 대목이면 groupId/groupName이 채워지고(전역 공개 대목이면 null), 이동 시 groupId를 함께 넘겨야 대목이 조회됩니다. "
             + "bookId를 지정하면 해당 책의 좋아요만 조회합니다(내 서재 책 상세 - 좋아요 탭). "
             + "생략하면 전체 책을 대상으로 합니다(마이페이지 좋아요 관리 - 전체 책 보기). "
             + "좋아요 취소는 이 API가 아니라 흔적 좋아요 토글 API가 담당합니다. "
@@ -206,6 +208,7 @@ public interface UserApi {
     );
 
     @Operation(summary = "내 대목 목록", description = "내가 흔적을 남긴 대목을 최신순으로 조회합니다. "
+            + "모임 전용 대목이면 groupId/groupName이 채워지고(전역 공개 대목이면 null), 이동 시 groupId를 함께 넘겨야 대목이 조회됩니다. "
             + "소유 기준은 최초 작성자가 아니라 해당 대목에 흔적을 남긴 사용자이며, 병합된 대목은 흔적을 남긴 모든 사용자에게 노출됩니다. "
             + "bookId를 지정하면 해당 책으로 한정하고, 생략하면 전체 책을 대상으로 합니다. "
             + "spoilerOnly=true면 스포일러 대목만 조회합니다. "

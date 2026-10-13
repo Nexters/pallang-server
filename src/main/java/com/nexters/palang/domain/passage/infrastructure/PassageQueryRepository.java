@@ -2,6 +2,7 @@ package com.nexters.palang.domain.passage.infrastructure;
 
 import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.book.domain.QBook;
+import com.nexters.palang.domain.group.domain.QGroup;
 import com.nexters.palang.domain.opinion.domain.QOpinion;
 import com.nexters.palang.domain.passage.application.MyPassageProjection;
 import com.nexters.palang.domain.passage.application.SimilarPassageProjection;
@@ -97,6 +98,7 @@ public class PassageQueryRepository {
         QOpinion opinion = QOpinion.opinion;
         QOpinion laterOpinion = new QOpinion("laterOpinion");
         QPassage passage = QPassage.passage;
+        QGroup group = QGroup.group;
 
         BooleanExpression bookFilter = bookId != null ? passage.book.id.eq(bookId) : null;
         BooleanExpression spoilerFilter = spoilerOnly ? passage.isSpoiler.isTrue() : null;
@@ -112,9 +114,11 @@ public class PassageQueryRepository {
         List<MyPassageProjection> content = queryFactory
                 .select(Projections.constructor(MyPassageProjection.class,
                         passage.id, passage.book.id, opinion.id, passage.pageNumber, passage.quotedText,
-                        passage.isSpoiler, opinion.createdAt))
+                        passage.isSpoiler, opinion.createdAt, group.id, group.name))
                 .from(opinion)
                 .join(opinion.passage, passage)
+                // 전역 공개 대목(group_id IS NULL)도 포함해야 하므로 반드시 leftJoin이다.
+                .leftJoin(passage.group, group)
                 .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(), passage.deletedAt.isNull(),
                         bookFilter, spoilerFilter, isLatestOpinionForPassage)
                 .orderBy(opinion.createdAt.desc(), passage.id.desc())

@@ -1,11 +1,13 @@
 package com.nexters.palang.domain.opinion.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import com.nexters.palang.domain.block.domain.UserBlock;
 import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.comment.domain.Comment;
+import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.domain.opinion.application.LikedOpinionProjection;
 import com.nexters.palang.domain.opinion.application.MyOpinionProjection;
 import com.nexters.palang.domain.opinion.application.OpinionSummaryProjection;
@@ -17,6 +19,7 @@ import com.nexters.palang.domain.user.domain.SnsProvider;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.global.config.JpaAuditingConfig;
 import com.querydsl.jpa.impl.JPAQueryFactory;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,6 +83,17 @@ class OpinionQueryRepositoryTest {
         Opinion opinion = Opinion.builder().passage(passage).user(writer).content(content).build();
         ReflectionTestUtils.setField(opinion, "likeCount", likeCount);
         return entityManager.persistAndFlush(opinion);
+    }
+
+    private Passage groupPassage(Group group, int pageNumber) {
+        return entityManager.persistAndFlush(Passage.builder()
+                .book(book).creator(me).group(group).pageNumber(pageNumber).quotedText("모임 발췌 문장").isSpoiler(false)
+                .normalizedHash("group-hash-" + pageNumber).build());
+    }
+
+    private Group group(String name) {
+        return entityManager.persistAndFlush(
+                Group.create(name, book, me, 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20)));
     }
 
     private Opinion opinion(User user, Passage passage, String content) {
@@ -301,5 +315,46 @@ class OpinionQueryRepositoryTest {
         assertThat(results.getContent()).extracting(BookOptionProjection::bookId)
                 .containsExactly(book.getId(), inOtherBook.getPassage().getBook().getId());
         assertThat(results.getTotalElements()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("내 흔적 목록은 모임 전용 대목이면 모임 ID/이름을, 전역 공개 대목이면 null을 함께 반환한다")
+    void findMyOpinionsReturnsGroupOfPassage() {
+        // given
+        Group group = group("면도날 모임");
+        Opinion globalOpinion = opinion(me, passage(1), "전역 흔적");
+        Opinion groupOpinion = opinion(me, groupPassage(group, 9), "모임 흔적");
+
+        // when
+        Page<MyOpinionProjection> results = opinionQueryRepository.findMyOpinions(me.getId(), null, PageRequest.of(0, 20));
+
+        // then
+        assertThat(results.getContent())
+                .extracting(MyOpinionProjection::opinionId, MyOpinionProjection::groupId, MyOpinionProjection::groupName)
+                .containsExactlyInAnyOrder(
+                        tuple(globalOpinion.getId(), null, null),
+                        tuple(groupOpinion.getId(), group.getId(), "면도날 모임"));
+        assertThat(results.getTotalElements()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("좋아요 누른 흔적 목록은 모임 전용 대목이면 모임 ID/이름을, 전역 공개 대목이면 null을 함께 반환한다")
+    void findLikedOpinionsReturnsGroupOfPassage() {
+        // given
+        Group group = group("면도날 모임");
+        Opinion globalOpinion = opinion(other, passage(1), "전역 흔적");
+        Opinion groupOpinion = opinion(other, groupPassage(group, 9), "모임 흔적");
+        entityManager.persistAndFlush(OpinionLike.builder().user(me).opinion(globalOpinion).build());
+        entityManager.persistAndFlush(OpinionLike.builder().user(me).opinion(groupOpinion).build());
+
+        // when
+        Page<LikedOpinionProjection> results = opinionQueryRepository.findLikedOpinions(me.getId(), null, PageRequest.of(0, 20));
+
+        // then
+        assertThat(results.getContent())
+                .extracting(LikedOpinionProjection::opinionId, LikedOpinionProjection::groupId, LikedOpinionProjection::groupName)
+                .containsExactlyInAnyOrder(
+                        tuple(globalOpinion.getId(), null, null),
+                        tuple(groupOpinion.getId(), group.getId(), "면도날 모임"));
     }
 }
