@@ -2,6 +2,7 @@ package com.nexters.palang.domain.passage.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.nexters.palang.domain.passage.application.OcrBreakClassifier.BlockLayout;
 import com.nexters.palang.domain.passage.domain.OcrBreakType;
 import com.nexters.palang.domain.passage.infrastructure.ocr.OcrTextBlock;
 import java.io.IOException;
@@ -35,13 +36,13 @@ class OcrBreakClassifierTest {
         );
 
         // when
-        List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
+        List<BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
 
         // then
-        assertThat(lineEndBreakTypes(blocks, breakTypes)).containsExactly(
+        assertThat(lineEndBreakTypes(blocks, layouts)).containsExactly(
                 OcrBreakType.WRAP, OcrBreakType.WRAP, OcrBreakType.PARAGRAPH,
                 OcrBreakType.WRAP, OcrBreakType.PARAGRAPH, OcrBreakType.WRAP, OcrBreakType.WRAP);
-        assertThat(midLineBreakTypes(blocks, breakTypes)).containsOnly(OcrBreakType.NONE);
+        assertThat(midLineBreakTypes(blocks, layouts)).containsOnly(OcrBreakType.NONE);
     }
 
     @Test
@@ -57,10 +58,10 @@ class OcrBreakClassifierTest {
         );
 
         // when
-        List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
+        List<BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
 
         // then
-        assertThat(lineEndBreakTypes(blocks, breakTypes)).containsExactly(
+        assertThat(lineEndBreakTypes(blocks, layouts)).containsExactly(
                 OcrBreakType.LINE, OcrBreakType.LINE, OcrBreakType.BLANK_LINE,
                 OcrBreakType.LINE, OcrBreakType.LINE);
     }
@@ -74,10 +75,10 @@ class OcrBreakClassifierTest {
                 .toArray(OcrTextBlock[][]::new));
 
         // when
-        List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
+        List<BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
 
         // then
-        assertThat(lineEndBreakTypes(blocks, breakTypes)).containsOnly(OcrBreakType.WRAP);
+        assertThat(lineEndBreakTypes(blocks, layouts)).containsOnly(OcrBreakType.WRAP);
     }
 
     @Test
@@ -96,10 +97,10 @@ class OcrBreakClassifierTest {
         );
 
         // when
-        List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
+        List<BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
 
         // then
-        assertThat(lineEndBreakTypes(blocks, breakTypes)).containsExactly(
+        assertThat(lineEndBreakTypes(blocks, layouts)).containsExactly(
                 OcrBreakType.WRAP, OcrBreakType.WRAP, OcrBreakType.WRAP, OcrBreakType.WRAP,
                 OcrBreakType.LINE, OcrBreakType.LINE, OcrBreakType.LINE, OcrBreakType.LINE);
     }
@@ -119,12 +120,36 @@ class OcrBreakClassifierTest {
         );
 
         // when
-        List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
+        List<BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
 
         // then: 산문으로 판정돼 꽉 찬 서술 줄은 잇고, 대화문 줄 끝은 모두 문단 끝으로 끊는다.
-        assertThat(lineEndBreakTypes(blocks, breakTypes)).containsExactly(
+        assertThat(lineEndBreakTypes(blocks, layouts)).containsExactly(
                 OcrBreakType.WRAP, OcrBreakType.PARAGRAPH, OcrBreakType.PARAGRAPH,
                 OcrBreakType.PARAGRAPH, OcrBreakType.PARAGRAPH, OcrBreakType.WRAP, OcrBreakType.PARAGRAPH);
+    }
+
+    @Test
+    @DisplayName("들여쓰기로 시작하는 줄은 사진의 첫 줄이어도 첫 단어에 indented를 표시한다")
+    void indentedLine_markedEvenOnFirstLine() {
+        // given: 첫 줄(앞 줄이 없음)과 4번째 줄이 들여쓰기
+        List<OcrTextBlock> blocks = page(
+                line(120, 600, 0),
+                line(100, 600, 1),
+                line(100, 300, 2),
+                line(120, 600, 3),
+                line(100, 600, 4)
+        );
+
+        // when
+        List<BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
+
+        // then: 줄의 첫 단어에만 표시된다
+        assertThat(IntStream.range(0, blocks.size()).filter(i -> !blocks.get(i).lineBreak())
+                .mapToObj(i -> layouts.get(i).indented()).toList())
+                .containsExactly(true, false, false, true, false);
+        assertThat(IntStream.range(0, blocks.size()).filter(i -> blocks.get(i).lineBreak())
+                .mapToObj(i -> layouts.get(i).indented()).toList())
+                .containsOnly(false);
     }
 
     @Test
@@ -137,10 +162,10 @@ class OcrBreakClassifierTest {
         );
 
         // when
-        List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
+        List<BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
 
         // then
-        assertThat(lineEndBreakTypes(blocks, breakTypes)).containsExactly(OcrBreakType.LINE, OcrBreakType.LINE);
+        assertThat(lineEndBreakTypes(blocks, layouts)).containsExactly(OcrBreakType.LINE, OcrBreakType.LINE);
     }
 
     // ---- 실제 사진의 Clova OCR 응답으로 만든 골든 테스트 (src/test/resources/ocr) ----
@@ -152,15 +177,16 @@ class OcrBreakClassifierTest {
         List<OcrTextBlock> blocks = fixture("ocr/prose-tilted.tsv");
 
         // when
-        List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
+        List<BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
 
         // then: 문단 끝은 줄바꿈 + 들여쓰기, 제목 아래 빈 공간만 빈 줄이다.
+        // 제목과 첫 문단도 책에서 다른 문단 시작 줄과 같은 위치(한 글자 안쪽)에 인쇄돼 있어 들여쓰기로 나온다.
         // "구 겨진", "구역 질"처럼 단어 안에서 꺾인 곳의 공백, OCR 오인식("및")은 분류기 범위 밖이다.
-        assertThat(render(blocks, breakTypes)).isEqualTo(String.join("\n",
+        assertThat(render(blocks, layouts)).isEqualTo(String.join("\n",
                 "- 대답했다.",
-                "결핍",
+                INDENT + "결핍",
                 "",
-                "사랑은 외로움의 또 다른 이름일 뿐이다.",
+                INDENT + "사랑은 외로움의 또 다른 이름일 뿐이다.",
                 INDENT + "\"결핍이야. 사랑이라고 발음하면 꼭 존귀한 영역에 속하는 것처럼 들리지만 기껏해야 갈증일 뿐이야.\"",
                 INDENT + "천장을 보던 수가 텁텁한 발음으로 말했다.",
                 INDENT + "\"같이 잠을 자는 것도, 서로의 살을 간지럽히는 것도, 언제 보자며 약속을 잡는 것도 죄다 결핍에서 비롯된 거야. "
@@ -178,11 +204,11 @@ class OcrBreakClassifierTest {
         List<OcrTextBlock> blocks = fixture("ocr/prose-perspective.tsv");
 
         // when
-        List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
+        List<BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
 
-        // then: "소비 / 의"처럼 꽉 찬 줄도 이어야 한다. ("것 까지", "어울리 는", "연 쇄"의 공백은 분류기 범위 밖)
-        assertThat(render(blocks, breakTypes)).isEqualTo(String.join("\n",
-                "디드로의 행동이 특이한 것은 아니다. 이렇게 하나를 사면 다른 것 까지 사게 되는 경향은 흔하다. "
+        // then: "소비 / 의"처럼 꽉 찬 줄도 이어야 하고, 앞 줄이 없는 첫 줄의 들여쓰기("디드로의")도 살린다. ("것 까지", "어울리 는", "연 쇄"의 공백은 분류기 범위 밖)
+        assertThat(render(blocks, layouts)).isEqualTo(String.join("\n",
+                INDENT + "디드로의 행동이 특이한 것은 아니다. 이렇게 하나를 사면 다른 것 까지 사게 되는 경향은 흔하다. "
                         + "이런 행동을 가리켜 디드로 효과라고 한다. 디드로 효과는 새로운 것을 사게 되면 추가 구매가 일어나 "
                         + "소비 의 소용돌이가 생겨나는 것을 말한다.14",
                 INDENT + "이런 광경은 어디서나 발견할 수 있다. 옷을 사면 그 옷에 어울리 는 신발과 귀걸이를 새로 사야 한다. "
@@ -198,10 +224,10 @@ class OcrBreakClassifierTest {
         List<OcrTextBlock> blocks = fixture("ocr/verse-flat.tsv");
 
         // when
-        List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
+        List<BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
 
         // then
-        assertThat(render(blocks, breakTypes)).isEqualTo(String.join("\n",
+        assertThat(render(blocks, layouts)).isEqualTo(String.join("\n",
                 "축, 생일",
                 "",
                 "이목구비는 대부분의 시간을 제멋대로 존재하다가",
@@ -225,10 +251,10 @@ class OcrBreakClassifierTest {
         List<OcrTextBlock> blocks = fixture("ocr/verse-tilted.tsv");
 
         // when
-        List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
+        List<BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
 
         // then
-        assertThat(render(blocks, breakTypes)).isEqualTo(String.join("\n",
+        assertThat(render(blocks, layouts)).isEqualTo(String.join("\n",
                 "참담해지세요",
                 "실패가 아니라 비굴함이라고 적어두세요",
                 "",
@@ -240,19 +266,23 @@ class OcrBreakClassifierTest {
                 "내 뒤에서"));
     }
 
-    // 프론트 조립 예시: NONE/WRAP → 공백, LINE → 줄바꿈, PARAGRAPH → 줄바꿈 + 전각 공백 들여쓰기, BLANK_LINE → 빈 줄.
-    private String render(List<OcrTextBlock> blocks, List<OcrBreakType> breakTypes) {
+    // 프론트 조립 규칙(기획 확정안: 문단 줄바꿈 한 번 + 들여쓰기)을 그대로 흉내 낸다.
+    // indented → 단어 앞에 전각 공백, NONE/WRAP → 공백, LINE/PARAGRAPH → 줄바꿈, BLANK_LINE → 빈 줄.
+    private String render(List<OcrTextBlock> blocks, List<BlockLayout> layouts) {
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < blocks.size(); i++) {
+            if (layouts.get(i).indented()) {
+                text.append(INDENT);
+            }
             text.append(blocks.get(i).text());
-            text.append(switch (breakTypes.get(i)) {
+            text.append(switch (layouts.get(i).breakType()) {
                 case NONE, WRAP -> " ";
-                case LINE -> "\n";
-                case PARAGRAPH -> "\n" + INDENT;
+                case LINE, PARAGRAPH -> "\n";
                 case BLANK_LINE -> "\n\n";
             });
         }
-        return text.toString().strip();
+        // 첫 줄의 들여쓰기(전각 공백)는 남겨야 하므로 뒤쪽만 지운다.
+        return text.toString().stripTrailing();
     }
 
     // 픽스처 한 줄: text<TAB>lineBreak(0|1)<TAB>x0 y0 x1 y1 x2 y2 x3 y3. '#'으로 시작하면 주석.
@@ -302,17 +332,17 @@ class OcrBreakClassifierTest {
         return blocks;
     }
 
-    private List<OcrBreakType> lineEndBreakTypes(List<OcrTextBlock> blocks, List<OcrBreakType> breakTypes) {
+    private List<OcrBreakType> lineEndBreakTypes(List<OcrTextBlock> blocks, List<BlockLayout> layouts) {
         return IntStream.range(0, blocks.size())
                 .filter(i -> blocks.get(i).lineBreak())
-                .mapToObj(breakTypes::get)
+                .mapToObj(i -> layouts.get(i).breakType())
                 .toList();
     }
 
-    private List<OcrBreakType> midLineBreakTypes(List<OcrTextBlock> blocks, List<OcrBreakType> breakTypes) {
+    private List<OcrBreakType> midLineBreakTypes(List<OcrTextBlock> blocks, List<BlockLayout> layouts) {
         return IntStream.range(0, blocks.size())
                 .filter(i -> !blocks.get(i).lineBreak())
-                .mapToObj(breakTypes::get)
+                .mapToObj(i -> layouts.get(i).breakType())
                 .toList();
     }
 }

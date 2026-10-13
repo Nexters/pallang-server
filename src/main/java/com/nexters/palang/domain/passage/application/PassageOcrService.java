@@ -3,7 +3,6 @@ package com.nexters.palang.domain.passage.application;
 import com.nexters.palang.domain.passage.application.dto.OcrResultDto;
 import com.nexters.palang.domain.passage.common.error.PassageErrorCode;
 import com.nexters.palang.domain.passage.common.error.PassageException;
-import com.nexters.palang.domain.passage.domain.OcrBreakType;
 import com.nexters.palang.domain.passage.infrastructure.ocr.OcrClient;
 import com.nexters.palang.domain.passage.infrastructure.ocr.OcrTextBlock;
 import java.io.IOException;
@@ -33,16 +32,16 @@ public class PassageOcrService {
 
         try {
             List<OcrTextBlock> blocks = ocrClient.recognize(image.getBytes(), image.getContentType());
-            List<OcrBreakType> breakTypes = OcrBreakClassifier.classify(blocks);
+            List<OcrBreakClassifier.BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
             return IntStream.range(0, blocks.size())
-                    .mapToObj(i -> toResultDto(blocks.get(i), breakTypes.get(i)))
+                    .mapToObj(i -> toResultDto(blocks.get(i), layouts.get(i)))
                     .toList();
         } catch (IOException e) {
             throw new PassageException(PassageErrorCode.INVALID_IMAGE_FILE);
         }
     }
 
-    private OcrResultDto toResultDto(OcrTextBlock block, OcrBreakType breakType) {
+    private OcrResultDto toResultDto(OcrTextBlock block, OcrBreakClassifier.BlockLayout layout) {
         List<OcrResultDto.Point> points = block.boundingBox().vertices().stream()
                 .map(p -> new OcrResultDto.Point(p.x(), p.y()))
                 .toList();
@@ -50,7 +49,8 @@ public class PassageOcrService {
                 block.text(),
                 new OcrResultDto.BoundingBox(points),
                 block.lineBreak(),
-                breakType
+                layout.breakType(),
+                layout.indented()
         );
     }
 }

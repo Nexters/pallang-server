@@ -72,13 +72,13 @@ class PassageControllerTest {
     }
 
     @Test
-    @DisplayName("이미지를 업로드하면 인식한 단어와 줄바꿈 종류를 DataResponse로 감싸 반환한다")
+    @DisplayName("이미지를 업로드하면 인식한 단어와 줄바꿈 종류·들여쓰기 여부를 DataResponse로 감싸 반환한다")
     void createOcrResult() throws Exception {
         // given
         OcrResultDto.BoundingBox box = new OcrResultDto.BoundingBox(List.of(new OcrResultDto.Point(120.5, 48.0)));
         given(passageOcrService.recognizeText(any())).willReturn(List.of(
-                new OcrResultDto("우리는", box, false, OcrBreakType.NONE),
-                new OcrResultDto("헤맨다.", box, true, OcrBreakType.PARAGRAPH)));
+                new OcrResultDto("우리는", box, false, OcrBreakType.NONE, true),
+                new OcrResultDto("헤맨다.", box, true, OcrBreakType.PARAGRAPH, false)));
         MockMultipartFile image = new MockMultipartFile("image", "page.jpg", MediaType.IMAGE_JPEG_VALUE, new byte[]{1});
 
         // when & then
@@ -86,6 +86,8 @@ class PassageControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.blocks[0].text").value("우리는"))
                 .andExpect(jsonPath("$.data.blocks[0].breakType").value("NONE"))
+                .andExpect(jsonPath("$.data.blocks[0].indented").value(true))
+                .andExpect(jsonPath("$.data.blocks[1].indented").value(false))
                 .andExpect(jsonPath("$.data.blocks[1].lineBreak").value(true))
                 .andExpect(jsonPath("$.data.blocks[1].breakType").value("PARAGRAPH"))
                 .andExpect(jsonPath("$.data.blocks[1].boundingBox.vertices[0].x").value(120.5));

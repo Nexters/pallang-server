@@ -121,12 +121,16 @@ public class PassageResponse {
             @Schema(description = "이 단어 뒤에 오는 끊김의 종류(바운딩 박스 기반 추정). "
                     + "NONE: 줄 중간(공백), WRAP: 지면 폭 때문에 꺾인 줄 끝(공백), "
                     + "LINE: 시의 행 끝(줄바꿈), "
-                    + "PARAGRAPH: 산문의 문단 끝 - 책에는 빈 줄 없이 들여쓰기로만 표시됨(줄바꿈, 들여쓰기·간격은 프론트 선택), "
+                    + "PARAGRAPH: 산문의 문단 끝 - 책에는 빈 줄 없이 다음 줄 들여쓰기로만 표시됨(줄바꿈), "
                     + "BLANK_LINE: 다음 줄과의 사이에 실제 빈 줄이 있는 줄 끝 - 시의 연 구분, 제목 아래, 장면 전환(빈 줄)",
-                    example = "LINE", requiredMode = Schema.RequiredMode.REQUIRED) OcrBreakType breakType
+                    example = "LINE", requiredMode = Schema.RequiredMode.REQUIRED) OcrBreakType breakType,
+            @Schema(description = "들여쓰기로 시작하는 줄의 첫 단어인지 여부(바운딩 박스 기반 추정). "
+                    + "true면 이 단어 앞에 들여쓰기(전각 공백)를 붙인다. 산문의 문단 첫 줄, 계단식으로 들여쓴 시의 행 등",
+                    example = "false", requiredMode = Schema.RequiredMode.REQUIRED) boolean indented
     ) {
         public static TextBlock from(OcrResultDto block) {
-            return new TextBlock(block.text(), BoundingBox.from(block.boundingBox()), block.lineBreak(), block.breakType());
+            return new TextBlock(block.text(), BoundingBox.from(block.boundingBox()), block.lineBreak(), block.breakType(),
+                    block.indented());
         }
     }
 

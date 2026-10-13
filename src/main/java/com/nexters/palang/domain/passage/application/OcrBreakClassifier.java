@@ -36,14 +36,24 @@ public final class OcrBreakClassifier {
     private OcrBreakClassifier() {
     }
 
-    public static List<OcrBreakType> classify(List<OcrTextBlock> blocks) {
+    // breakType: 이 단어 뒤의 끊김. indented: 이 단어가 들여쓰기로 시작하는 줄의 첫 단어인지.
+    // 들여쓰기는 앞 줄의 PARAGRAPH만으로는 사진의 첫 줄(앞 줄이 없음)에 전달할 수 없어 따로 표시한다.
+    public record BlockLayout(OcrBreakType breakType, boolean indented) {
+    }
+
+    public static List<BlockLayout> classify(List<OcrTextBlock> blocks) {
         OcrBreakType[] breakTypes = new OcrBreakType[blocks.size()];
         Arrays.fill(breakTypes, OcrBreakType.NONE);
+        boolean[] indentedBlocks = new boolean[blocks.size()];
 
         for (List<Line> column : groupIntoColumns(groupIntoLines(deskew(blocks)))) {
-            classifyColumn(column, breakTypes);
+            classifyColumn(column, breakTypes, indentedBlocks);
         }
-        return List.of(breakTypes);
+        List<BlockLayout> layouts = new ArrayList<>();
+        for (int i = 0; i < blocks.size(); i++) {
+            layouts.add(new BlockLayout(breakTypes[i], indentedBlocks[i]));
+        }
+        return layouts;
     }
 
     // Clova 바운딩 박스는 글자 방향을 따라 회전된 사각형(좌상→우상→우하→좌하)이라 윗변 각도가 곧 그 단어의 기울기다.
@@ -124,19 +134,22 @@ public final class OcrBreakClassifier {
         return nearest;
     }
 
-    private static void classifyColumn(List<Line> column, OcrBreakType[] breakTypes) {
+    private static void classifyColumn(List<Line> column, OcrBreakType[] breakTypes, boolean[] indentedBlocks) {
         double charHeight = median(column.stream().flatMap(line -> line.wordHeights().stream()).toList());
         double usualPitch = median(linePitches(column));
 
         double marginDrift = median(leftMarginSteps(column));
 
         boolean[] fullLines = new boolean[column.size()];
-        boolean[] nextIndented = new boolean[column.size()];
+        boolean[] indented = new boolean[column.size()];
         for (int i = 0; i < column.size(); i++) {
             fullLines[i] = neighborRight(column, i) - column.get(i).right() < SHORT_LINE_RATIO * charHeight;
-            if (i < column.size() - 1) {
-                nextIndented[i] = column.get(i + 1).left() - neighborLeft(column, i + 1, marginDrift) > INDENT_RATIO * charHeight;
-            }
+            indented[i] = column.get(i).left() - neighborLeft(column, i, marginDrift) > INDENT_RATIO * charHeight;
+            indentedBlocks[column.get(i).firstIndex()] = indented[i];
+        }
+        boolean[] nextIndented = new boolean[column.size()];
+        for (int i = 0; i < column.size() - 1; i++) {
+            nextIndented[i] = indented[i + 1];
         }
         boolean verse = isVerse(fullLines, nextIndented);
 
@@ -243,7 +256,7 @@ public final class OcrBreakClassifier {
     }
 
     // 한 줄의 요약. left/top은 첫 단어, right는 마지막 단어 기준이다(기울어진 사진에서 줄 전체 범위보다 안정적).
-    private record Line(int lastIndex, double left, double right, double top, List<Double> wordHeights) {
+    private record Line(int firstIndex, int lastIndex, double left, double right, double top, List<Double> wordHeights) {
 
         static Line of(List<OcrTextBlock> blocks, int firstIndex, int lastIndex) {
             List<OcrTextBlock.Point> first = blocks.get(firstIndex).boundingBox().vertices();
@@ -251,7 +264,7 @@ public final class OcrBreakClassifier {
             List<Double> wordHeights = blocks.subList(firstIndex, lastIndex + 1).stream()
                     .map(block -> maxY(block.boundingBox().vertices()) - minY(block.boundingBox().vertices()))
                     .toList();
-            return new Line(lastIndex, minX(first), maxX(last), minY(first), wordHeights);
+            return new Line(firstIndex, lastIndex, minX(first), maxX(last), minY(first), wordHeights);
         }
 
         private static double minX(List<OcrTextBlock.Point> points) {
