@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 
 /**
  * Firebase 서비스 계정 키(firebase.credentials-base64)가 아직 발급되지 않은 상태에서도
@@ -19,14 +20,21 @@ import org.springframework.context.annotation.Configuration;
  * NoOpFcmPushSender로 폴백한다.
  * (프로퍼티 자체는 항상 존재하고 빈 문자열만 비어있는 상태이므로 @ConditionalOnProperty로는
  * "설정 안 됨"을 정확히 구분할 수 없어, 팩토리 메서드 안에서 직접 분기한다.)
+ * 다만 prod 프로필에서는 조용한 폴백 대신 기동 자체를 실패시킨다 — 배포 사고로 값이
+ * 빠졌을 때 "앱은 뜨는데 푸시만 안 나가는" 상태를 운영 중 알아채기 어렵기 때문이다.
  */
 @Slf4j
 @Configuration
 public class FirebaseConfig {
 
     @Bean
-    public FcmPushSender fcmPushSender(@Value("${firebase.credentials-base64:}") String credentialsBase64) throws Exception {
+    public FcmPushSender fcmPushSender(
+            @Value("${firebase.credentials-base64:}") String credentialsBase64, Environment environment) throws Exception {
         if (credentialsBase64 == null || credentialsBase64.isBlank()) {
+            if (environment.matchesProfiles("prod")) {
+                throw new IllegalStateException(
+                        "firebase.credentials-base64가 설정되지 않았습니다. prod 환경에서는 FCM 자격증명이 반드시 필요합니다.");
+            }
             log.warn("firebase.credentials-base64가 설정되지 않아 FCM 푸시가 비활성화됩니다 (NoOpFcmPushSender 사용).");
             return new NoOpFcmPushSender();
         }
