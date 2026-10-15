@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.notification.presentation;
 
 import com.nexters.palang.domain.notification.application.NotificationService;
+import com.nexters.palang.domain.notification.domain.NotificationScope;
 import com.nexters.palang.domain.notification.presentation.dto.NotificationListResponse;
 import com.nexters.palang.global.common.response.DataResponse;
 import com.nexters.palang.global.security.CurrentUserProvider;
@@ -28,11 +29,12 @@ public class NotificationController implements NotificationApi {
     @Override
     @GetMapping("/api/notifications")
     public ResponseEntity<DataResponse<NotificationListResponse>> getNotifications(
+            @RequestParam(defaultValue = "ALL") NotificationScope scope,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         return ResponseEntity.ok(DataResponse.from(NotificationListResponse.from(
-                notificationService.getNotifications(currentUserId, pageable(page, size)))));
+                notificationService.getNotifications(currentUserId, scope, pageable(page, size)))));
     }
 
     @Override

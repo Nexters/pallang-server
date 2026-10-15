@@ -14,6 +14,12 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     Page<Notification> findByReceiverIdOrderByCreatedAtDesc(Long receiverId, Pageable pageable);
 
+    // 알림함 "활동" 탭: 모임에 속하지 않은(group_id IS NULL) 알림만.
+    Page<Notification> findByReceiverIdAndGroupIdIsNullOrderByCreatedAtDesc(Long receiverId, Pageable pageable);
+
+    // 알림함 "모임" 탭: 모임에 속한(group_id IS NOT NULL) 알림만.
+    Page<Notification> findByReceiverIdAndGroupIdIsNotNullOrderByCreatedAtDesc(Long receiverId, Pageable pageable);
+
     // BookNewOpinionsNotifier: 이 사용자에게 이 책에 대해 마지막으로 보낸 BOOK_NEW_OPINIONS 알림의 snapshot을 조회.
     Optional<Notification> findFirstByReceiverIdAndTypeAndBookIdOrderByCreatedAtDesc(
             Long receiverId, NotificationType type, Long bookId);

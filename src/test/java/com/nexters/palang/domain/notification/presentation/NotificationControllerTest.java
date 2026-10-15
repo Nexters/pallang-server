@@ -13,6 +13,7 @@ import com.nexters.palang.domain.notification.application.NotificationService;
 import com.nexters.palang.domain.notification.common.error.NotificationErrorCode;
 import com.nexters.palang.domain.notification.common.error.NotificationException;
 import com.nexters.palang.domain.notification.domain.Notification;
+import com.nexters.palang.domain.notification.domain.NotificationScope;
 import com.nexters.palang.domain.notification.domain.NotificationType;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.global.security.CurrentUserProvider;
@@ -62,17 +63,43 @@ class NotificationControllerTest {
         return notification;
     }
 
+    private Notification groupNotification(Long id) {
+        Notification notification = Notification.builder()
+                .receiver(user(1L))
+                .type(NotificationType.OPINION_LIKED)
+                .title("새로운 좋아요").body("책읽는고양이님이 회원님의 흔적을 좋아합니다.")
+                .opinionId(3L)
+                .groupId(9L).groupName("면도날 같이 읽기")
+                .build();
+        ReflectionTestUtils.setField(notification, "id", id);
+        return notification;
+    }
+
     @Test
     @DisplayName("알림 목록을 조회하면 알림을 반환한다")
     void getNotifications() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(notificationService.getNotifications(eq(1L), any())).willReturn(
+        given(notificationService.getNotifications(eq(1L), eq(NotificationScope.ALL), any())).willReturn(
                 new PageImpl<>(List.of(notification(1L)), DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/notifications"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.notifications[0].notificationId").value(1))
                 .andExpect(jsonPath("$.data.notifications[0].type").value("OPINION_LIKED"));
+    }
+
+    @Test
+    @DisplayName("scope=GROUP으로 알림 목록을 조회하면 모임 알림만 조회한다")
+    void getNotificationsWithGroupScope() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(notificationService.getNotifications(eq(1L), eq(NotificationScope.GROUP), any())).willReturn(
+                new PageImpl<>(List.of(groupNotification(1L)), DEFAULT_PAGEABLE, 1));
+
+        mockMvc.perform(get("/api/notifications").param("scope", "GROUP"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.notifications[0].notificationId").value(1))
+                .andExpect(jsonPath("$.data.notifications[0].groupId").value(9))
+                .andExpect(jsonPath("$.data.notifications[0].groupName").value("면도날 같이 읽기"));
     }
 
     @Test

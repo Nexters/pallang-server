@@ -51,10 +51,21 @@ class NotificationEventListenerTest {
     void onOpinionLikedCreatesNotification() {
         given(userRepository.findById(2L)).willReturn(Optional.of(user(2L)));
 
-        listener.onOpinionLiked(new OpinionLikedEvent(10L, 1L, 2L));
+        listener.onOpinionLiked(new OpinionLikedEvent(10L, 1L, 2L, null, null));
 
-        verify(notificationCreationService).create(
-                eq(1L), eq(2L), eq(NotificationType.OPINION_LIKED), any(), any(), eq(10L), eq(null), eq(null), eq(null));
+        verify(notificationCreationService).create(eq(1L), eq(2L), eq(NotificationType.OPINION_LIKED), any(), any(),
+                eq(10L), eq(null), eq(null), eq(null), eq(null), eq(null));
+    }
+
+    @Test
+    @DisplayName("모임 전용 흔적에 대한 좋아요 이벤트면 모임 정보를 그대로 알림 생성에 전달한다")
+    void onOpinionLikedPropagatesGroupInfo() {
+        given(userRepository.findById(2L)).willReturn(Optional.of(user(2L)));
+
+        listener.onOpinionLiked(new OpinionLikedEvent(10L, 1L, 2L, 9L, "모임 이름"));
+
+        verify(notificationCreationService).create(eq(1L), eq(2L), eq(NotificationType.OPINION_LIKED), any(), any(),
+                eq(10L), eq(null), eq(null), eq(9L), eq("모임 이름"), eq(null));
     }
 
     @Test
@@ -62,9 +73,10 @@ class NotificationEventListenerTest {
     void onOpinionLikedSkipsWhenActorMissing() {
         given(userRepository.findById(2L)).willReturn(Optional.empty());
 
-        listener.onOpinionLiked(new OpinionLikedEvent(10L, 1L, 2L));
+        listener.onOpinionLiked(new OpinionLikedEvent(10L, 1L, 2L, null, null));
 
-        verify(notificationCreationService, never()).create(any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(notificationCreationService, never()).create(
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -72,10 +84,10 @@ class NotificationEventListenerTest {
     void onCommentCreatedCreatesNotification() {
         given(userRepository.findById(2L)).willReturn(Optional.of(user(2L)));
 
-        listener.onCommentCreated(new CommentCreatedEvent(5L, 10L, 1L, 2L));
+        listener.onCommentCreated(new CommentCreatedEvent(5L, 10L, 1L, 2L, null, null));
 
-        verify(notificationCreationService).create(
-                eq(1L), eq(2L), eq(NotificationType.OPINION_COMMENTED), any(), any(), eq(10L), eq(null), eq(5L), eq(null));
+        verify(notificationCreationService).create(eq(1L), eq(2L), eq(NotificationType.OPINION_COMMENTED), any(),
+                any(), eq(10L), eq(null), eq(5L), eq(null), eq(null), eq(null));
     }
 
     @Test

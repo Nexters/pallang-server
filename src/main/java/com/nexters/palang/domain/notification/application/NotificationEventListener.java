@@ -35,7 +35,7 @@ public class NotificationEventListener {
         String title = "새로운 좋아요";
         String body = "%s님이 회원님의 흔적을 좋아합니다.".formatted(actor.getNickname());
         notificationCreationService.create(event.opinionOwnerId(), event.actorUserId(), NotificationType.OPINION_LIKED,
-                title, body, event.opinionId(), null, null, null);
+                title, body, event.opinionId(), null, null, event.groupId(), event.groupName(), null);
     }
 
     @Async
@@ -51,7 +51,7 @@ public class NotificationEventListener {
         String body = "%s님이 회원님의 흔적에 댓글을 남겼습니다.".formatted(actor.getNickname());
         notificationCreationService.create(
                 event.opinionOwnerId(), event.actorUserId(), NotificationType.OPINION_COMMENTED,
-                title, body, event.opinionId(), null, event.commentId(), null);
+                title, body, event.opinionId(), null, event.commentId(), event.groupId(), event.groupName(), null);
     }
 
     @Async
