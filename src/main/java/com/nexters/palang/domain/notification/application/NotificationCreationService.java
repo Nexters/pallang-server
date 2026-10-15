@@ -30,6 +30,8 @@ public class NotificationCreationService {
             Long opinionId,
             Long bookId,
             Long commentId,
+            Long groupId,
+            String groupName,
             Integer opinionCountSnapshot
     ) {
         if (actorId != null && actorId.equals(receiverId)) {
@@ -46,6 +48,8 @@ public class NotificationCreationService {
                 .opinionId(opinionId)
                 .bookId(bookId)
                 .commentId(commentId)
+                .groupId(groupId)
+                .groupName(groupName)
                 .opinionCountSnapshot(opinionCountSnapshot)
                 .build();
         notificationRepository.save(notification);

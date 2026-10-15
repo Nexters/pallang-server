@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 
 import com.nexters.palang.domain.notification.common.error.NotificationException;
 import com.nexters.palang.domain.notification.domain.Notification;
+import com.nexters.palang.domain.notification.domain.NotificationScope;
 import com.nexters.palang.domain.notification.domain.NotificationType;
 import com.nexters.palang.domain.notification.infrastructure.NotificationRepository;
 import com.nexters.palang.domain.user.domain.User;
@@ -53,13 +54,39 @@ class NotificationServiceTest {
     }
 
     @Test
-    @DisplayName("알림 목록을 조회하면 Repository 결과를 그대로 반환한다")
-    void getNotificationsReturnsPageFromRepository() {
+    @DisplayName("scope가 ALL이면 전체 알림을 조회한다")
+    void getNotificationsReturnsAllWhenScopeIsAll() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<Notification> expected = new PageImpl<>(java.util.List.of(notification(1L, user(1L))), pageable, 1);
         given(notificationRepository.findByReceiverIdOrderByCreatedAtDesc(1L, pageable)).willReturn(expected);
 
-        Page<Notification> results = notificationService.getNotifications(1L, pageable);
+        Page<Notification> results = notificationService.getNotifications(1L, NotificationScope.ALL, pageable);
+
+        assertThat(results).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("scope가 ACTIVITY면 모임에 속하지 않은 알림만 조회한다")
+    void getNotificationsReturnsActivityOnlyWhenScopeIsActivity() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<Notification> expected = new PageImpl<>(java.util.List.of(notification(1L, user(1L))), pageable, 1);
+        given(notificationRepository.findByReceiverIdAndGroupIdIsNullOrderByCreatedAtDesc(1L, pageable))
+                .willReturn(expected);
+
+        Page<Notification> results = notificationService.getNotifications(1L, NotificationScope.ACTIVITY, pageable);
+
+        assertThat(results).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("scope가 GROUP이면 모임에 속한 알림만 조회한다")
+    void getNotificationsReturnsGroupOnlyWhenScopeIsGroup() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<Notification> expected = new PageImpl<>(java.util.List.of(notification(1L, user(1L))), pageable, 1);
+        given(notificationRepository.findByReceiverIdAndGroupIdIsNotNullOrderByCreatedAtDesc(1L, pageable))
+                .willReturn(expected);
+
+        Page<Notification> results = notificationService.getNotifications(1L, NotificationScope.GROUP, pageable);
 
         assertThat(results).isEqualTo(expected);
     }

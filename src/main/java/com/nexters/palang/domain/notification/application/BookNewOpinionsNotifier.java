@@ -63,7 +63,7 @@ public class BookNewOpinionsNotifier {
 
             if (currentCount - lastSnapshot >= threshold) {
                 notificationCreationService.create(receiverId, null, NotificationType.BOOK_NEW_OPINIONS,
-                        title, body, null, bookId, null, (int) currentCount);
+                        title, body, null, bookId, null, null, null, (int) currentCount);
             }
         }
     }

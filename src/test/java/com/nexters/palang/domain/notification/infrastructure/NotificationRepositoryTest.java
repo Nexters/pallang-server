@@ -42,11 +42,17 @@ class NotificationRepositoryTest {
     }
 
     private Notification save(NotificationType type, Long bookId, Integer snapshot) {
+        return save(type, bookId, snapshot, null, null);
+    }
+
+    private Notification save(NotificationType type, Long bookId, Integer snapshot, Long groupId, String groupName) {
         Notification notification = Notification.builder()
                 .receiver(receiver)
                 .type(type)
                 .title("제목").body("내용")
                 .bookId(bookId)
+                .groupId(groupId)
+                .groupName(groupName)
                 .opinionCountSnapshot(snapshot)
                 .build();
         return entityManager.persistAndFlush(notification);
@@ -79,6 +85,30 @@ class NotificationRepositoryTest {
         assertThat(found).isPresent();
         assertThat(found.get().getId()).isEqualTo(latest.getId());
         assertThat(found.get().getOpinionCountSnapshot()).isEqualTo(10);
+    }
+
+    @Test
+    @DisplayName("ACTIVITY 스코프로 조회하면 모임에 속하지 않은 알림만 최신순으로 반환한다")
+    void findByReceiverIdAndGroupIdIsNullOrderByCreatedAtDesc() {
+        Notification activity = save(NotificationType.OPINION_LIKED, null, null, null, null);
+        save(NotificationType.OPINION_LIKED, null, null, 9L, "모임");
+
+        Page<Notification> results = notificationRepository
+                .findByReceiverIdAndGroupIdIsNullOrderByCreatedAtDesc(receiver.getId(), PageRequest.of(0, 20));
+
+        assertThat(results.getContent()).extracting(Notification::getId).containsExactly(activity.getId());
+    }
+
+    @Test
+    @DisplayName("GROUP 스코프로 조회하면 모임에 속한 알림만 최신순으로 반환한다")
+    void findByReceiverIdAndGroupIdIsNotNullOrderByCreatedAtDesc() {
+        save(NotificationType.OPINION_LIKED, null, null, null, null);
+        Notification groupNotification = save(NotificationType.OPINION_LIKED, null, null, 9L, "모임");
+
+        Page<Notification> results = notificationRepository
+                .findByReceiverIdAndGroupIdIsNotNullOrderByCreatedAtDesc(receiver.getId(), PageRequest.of(0, 20));
+
+        assertThat(results.getContent()).extracting(Notification::getId).containsExactly(groupNotification.getId());
     }
 
     @Test

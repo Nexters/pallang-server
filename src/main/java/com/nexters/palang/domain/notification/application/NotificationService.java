@@ -3,6 +3,7 @@ package com.nexters.palang.domain.notification.application;
 import com.nexters.palang.domain.notification.common.error.NotificationErrorCode;
 import com.nexters.palang.domain.notification.common.error.NotificationException;
 import com.nexters.palang.domain.notification.domain.Notification;
+import com.nexters.palang.domain.notification.domain.NotificationScope;
 import com.nexters.palang.domain.notification.infrastructure.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -17,8 +18,12 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
 
-    public Page<Notification> getNotifications(Long userId, Pageable pageable) {
-        return notificationRepository.findByReceiverIdOrderByCreatedAtDesc(userId, pageable);
+    public Page<Notification> getNotifications(Long userId, NotificationScope scope, Pageable pageable) {
+        return switch (scope) {
+            case ALL -> notificationRepository.findByReceiverIdOrderByCreatedAtDesc(userId, pageable);
+            case ACTIVITY -> notificationRepository.findByReceiverIdAndGroupIdIsNullOrderByCreatedAtDesc(userId, pageable);
+            case GROUP -> notificationRepository.findByReceiverIdAndGroupIdIsNotNullOrderByCreatedAtDesc(userId, pageable);
+        };
     }
 
     @Transactional

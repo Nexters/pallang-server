@@ -75,7 +75,7 @@ class BookNewOpinionsNotifierTest {
         notifier.notifyIfThresholdReached(1L, 99L);
 
         verify(notificationCreationService, never())
-                .create(anyLong(), any(), any(), any(), any(), any(), any(), any(), any());
+                .create(anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -90,7 +90,7 @@ class BookNewOpinionsNotifierTest {
         notifier.notifyIfThresholdReached(1L, 99L);
 
         verify(notificationCreationService).create(
-                eq(10L), eq(null), eq(NotificationType.BOOK_NEW_OPINIONS), any(), any(), eq(null), eq(1L), eq(null), eq(5));
+                eq(10L), eq(null), eq(NotificationType.BOOK_NEW_OPINIONS), any(), any(), eq(null), eq(1L), eq(null), eq(null), eq(null), eq(5));
     }
 
     @Test
@@ -104,7 +104,7 @@ class BookNewOpinionsNotifierTest {
         notifier.notifyIfThresholdReached(1L, 99L);
 
         verify(notificationCreationService, never())
-                .create(anyLong(), any(), any(), any(), any(), any(), any(), any(), any());
+                .create(anyLong(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -119,7 +119,7 @@ class BookNewOpinionsNotifierTest {
         notifier.notifyIfThresholdReached(1L, 99L);
 
         verify(notificationCreationService, times(1)).create(
-                eq(10L), eq(null), eq(NotificationType.BOOK_NEW_OPINIONS), any(), any(), eq(null), eq(1L), eq(null), eq(10));
+                eq(10L), eq(null), eq(NotificationType.BOOK_NEW_OPINIONS), any(), any(), eq(null), eq(1L), eq(null), eq(null), eq(null), eq(10));
     }
 
     @Test
@@ -134,8 +134,8 @@ class BookNewOpinionsNotifierTest {
         notifier.notifyIfThresholdReached(1L, 99L);
 
         verify(notificationCreationService, times(1)).create(
-                eq(10L), any(), eq(NotificationType.BOOK_NEW_OPINIONS), any(), any(), any(), eq(1L), any(), any());
+                eq(10L), any(), eq(NotificationType.BOOK_NEW_OPINIONS), any(), any(), any(), eq(1L), any(), any(), any(), any());
         verify(notificationCreationService, never()).create(
-                eq(99L), any(), any(), any(), any(), any(), any(), any(), any());
+                eq(99L), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 }

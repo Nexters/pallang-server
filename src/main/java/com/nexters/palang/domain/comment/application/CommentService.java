@@ -84,8 +84,11 @@ public class CommentService {
             saved = commentRepository.save(Comment.reply(parent, user, request.content()));
         }
 
-        eventPublisher.publishEvent(
-                new CommentCreatedEvent(saved.getId(), opinionId, opinion.getUser().getId(), userId));
+        Group group = opinion.getPassage().getGroup();
+        eventPublisher.publishEvent(new CommentCreatedEvent(
+                saved.getId(), opinionId, opinion.getUser().getId(), userId,
+                group != null ? group.getId() : null,
+                group != null ? group.getName() : null));
         return saved;
     }
 

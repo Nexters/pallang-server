@@ -13,6 +13,8 @@ public record NotificationResponse(
         @Schema(example = "3", nullable = true) Long opinionId,
         @Schema(example = "10", nullable = true) Long bookId,
         @Schema(example = "5", nullable = true) Long commentId,
+        @Schema(description = "모임 전용 알림이면 그 모임 ID, 전역 알림이면 null", example = "13", nullable = true) Long groupId,
+        @Schema(description = "모임 전용 알림이면 그 모임 이름, 전역 알림이면 null", example = "면도날 같이 읽기", nullable = true) String groupName,
         @Schema(example = "false", requiredMode = Schema.RequiredMode.REQUIRED) boolean isRead,
         @Schema(example = "2026-08-19T10:00:00", requiredMode = Schema.RequiredMode.REQUIRED) LocalDateTime createdAt
 ) {
@@ -25,6 +27,8 @@ public record NotificationResponse(
                 notification.getOpinionId(),
                 notification.getBookId(),
                 notification.getCommentId(),
+                notification.getGroupId(),
+                notification.getGroupName(),
                 notification.isRead(),
                 notification.getCreatedAt()
         );
