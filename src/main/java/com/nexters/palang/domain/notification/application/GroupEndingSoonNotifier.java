@@ -7,6 +7,7 @@ import com.nexters.palang.domain.notification.domain.NotificationType;
 import com.nexters.palang.domain.notification.infrastructure.NotificationRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -20,6 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class GroupEndingSoonNotifier {
 
+    // 스케줄 트리거(@Scheduled zone)와 "오늘/내일" 날짜 계산 기준을 같은 시간대로 맞춘다.
+    // JVM 기본 시간대(-Duser.timezone)에 암묵적으로 의존하면 그 설정이 바뀌거나 테스트처럼
+    // 다른 시간대에서 실행될 때 하루 밀리는 버그가 생길 수 있다.
+    private static final ZoneId ZONE = ZoneId.of("Asia/Seoul");
+
     private final GroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
     private final NotificationRepository notificationRepository;
@@ -28,9 +34,10 @@ public class GroupEndingSoonNotifier {
     @Scheduled(cron = "0 0 9 * * *", zone = "Asia/Seoul")
     @Transactional
     public void notifyGroupsEndingTomorrow() {
-        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        LocalDate today = LocalDate.now(ZONE);
+        LocalDate tomorrow = today.plusDays(1);
         List<Group> endingSoon = groupRepository.findAllByEndDate(tomorrow);
-        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+        LocalDateTime startOfToday = today.atStartOfDay();
 
         for (Group group : endingSoon) {
             String title = "모임 종료 하루 전";
