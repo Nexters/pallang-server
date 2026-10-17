@@ -3,12 +3,18 @@ package com.nexters.palang.domain.group.infrastructure;
 import com.nexters.palang.domain.group.domain.GroupMember;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> {
 
     boolean existsByGroupIdAndUserId(Long groupId, Long userId);
 
     long countByGroupId(Long groupId);
+
+    // 모임 알림 팬아웃(일정 변경/종료 임박): 이 모임의 멤버 user id 전체.
+    @Query("select m.user.id from GroupMember m where m.group.id = :groupId")
+    List<Long> findUserIdsByGroupId(@Param("groupId") Long groupId);
 
     void deleteAllByGroupId(Long groupId);
 

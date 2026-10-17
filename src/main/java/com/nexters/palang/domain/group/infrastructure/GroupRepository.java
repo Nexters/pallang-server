@@ -2,6 +2,7 @@ package com.nexters.palang.domain.group.infrastructure;
 
 import com.nexters.palang.domain.group.domain.Group;
 import jakarta.persistence.LockModeType;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
@@ -22,6 +23,9 @@ public interface GroupRepository extends JpaRepository<Group, Long> {
 
     // 관리자 도서 삭제(AdminBookService): 이 책으로 만들어진 모임 전부.
     List<Group> findAllByBookId(Long bookId);
+
+    // 종료 임박 알림(GroupEndingSoonNotifier): 이 날짜에 끝나는 모임 전부.
+    List<Group> findAllByEndDate(LocalDate endDate);
 
     // 관리자 모임 검색(AdminGroupService): 모임명에 키워드가 포함된 모임 전부.
     // open-in-view: false 환경에서 AdminGroupMapper가 컨트롤러 단(트랜잭션 밖)에서 book/host를
