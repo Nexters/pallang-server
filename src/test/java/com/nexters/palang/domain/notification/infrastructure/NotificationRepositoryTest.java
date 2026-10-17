@@ -112,6 +112,28 @@ class NotificationRepositoryTest {
     }
 
     @Test
+    @DisplayName("오늘 보낸 GROUP_ENDING_SOON 알림이 있으면 true를 반환한다")
+    void existsByReceiverIdAndTypeAndGroupIdAndCreatedAtAfterReturnsTrueWhenNotifiedToday() {
+        save(NotificationType.GROUP_ENDING_SOON, null, null, 9L, "모임");
+
+        boolean exists = notificationRepository.existsByReceiverIdAndTypeAndGroupIdAndCreatedAtAfter(
+                receiver.getId(), NotificationType.GROUP_ENDING_SOON, 9L, LocalDateTime.now().toLocalDate().atStartOfDay());
+
+        assertThat(exists).isTrue();
+    }
+
+    @Test
+    @DisplayName("다른 모임에 보낸 알림은 포함하지 않는다")
+    void existsByReceiverIdAndTypeAndGroupIdAndCreatedAtAfterExcludesOtherGroups() {
+        save(NotificationType.GROUP_ENDING_SOON, null, null, 10L, "다른 모임");
+
+        boolean exists = notificationRepository.existsByReceiverIdAndTypeAndGroupIdAndCreatedAtAfter(
+                receiver.getId(), NotificationType.GROUP_ENDING_SOON, 9L, LocalDateTime.now().toLocalDate().atStartOfDay());
+
+        assertThat(exists).isFalse();
+    }
+
+    @Test
     @DisplayName("전체 읽음 처리를 하면 안 읽은 알림만 읽음으로 바뀐다")
     void markAllAsRead() {
         Notification unread1 = save(NotificationType.OPINION_LIKED, null, null);

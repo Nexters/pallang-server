@@ -9,6 +9,8 @@ import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.domain.group.domain.GroupMember;
 import com.nexters.palang.domain.group.domain.GroupMemberRole;
+import com.nexters.palang.domain.group.domain.event.GroupJoinedEvent;
+import com.nexters.palang.domain.group.domain.event.GroupScheduleChangedEvent;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupQueryRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupRepository;
@@ -19,6 +21,7 @@ import com.nexters.palang.domain.user.common.error.UserException;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -37,6 +40,7 @@ public class GroupService {
     private final GroupQueryRepository groupQueryRepository;
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public GroupDetail createGroup(Long hostUserId, CreateGroupRequest request) {
@@ -75,7 +79,12 @@ public class GroupService {
                 .orElseThrow(() -> new GroupException(GroupErrorCode.GROUP_NOT_FOUND));
         validateHost(group, userId);
         long memberCount = groupMemberRepository.countByGroupId(groupId);
+        boolean scheduleChanged =
+                !group.getStartDate().equals(request.startDate()) || !group.getEndDate().equals(request.endDate());
         group.updateSettings(request.name(), request.capacity(), request.startDate(), request.endDate(), memberCount);
+        if (scheduleChanged) {
+            eventPublisher.publishEvent(new GroupScheduleChangedEvent(group.getId(), group.getName(), userId));
+        }
         return new GroupDetail(group, memberCount);
     }
 
@@ -132,6 +141,8 @@ public class GroupService {
 
         User user = userRepository.getReferenceById(userId);
         groupMemberRepository.save(GroupMember.of(group, user, GroupMemberRole.MEMBER));
+        eventPublisher.publishEvent(
+                new GroupJoinedEvent(group.getId(), group.getName(), userId, group.getHost().getId()));
         return new GroupDetail(group, memberCount + 1);
     }
 

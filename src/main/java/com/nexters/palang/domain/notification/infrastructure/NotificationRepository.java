@@ -2,6 +2,7 @@ package com.nexters.palang.domain.notification.infrastructure;
 
 import com.nexters.palang.domain.notification.domain.Notification;
 import com.nexters.palang.domain.notification.domain.NotificationType;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +24,12 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     // BookNewOpinionsNotifier: 이 사용자에게 이 책에 대해 마지막으로 보낸 BOOK_NEW_OPINIONS 알림의 snapshot을 조회.
     Optional<Notification> findFirstByReceiverIdAndTypeAndBookIdOrderByCreatedAtDesc(
             Long receiverId, NotificationType type, Long bookId);
+
+    // GroupEndingSoonNotifier: 스케줄러가 같은 날 여러 번(재시도 등) 돌아도 같은 모임·사용자에게
+    // GROUP_ENDING_SOON을 중복 발송하지 않도록 "오늘 이미 보냈는지"만 확인한다. 날짜 범위로 제한해야
+    // 모임의 종료일이 나중에 다시 바뀌어 임박 알림을 또 보내야 하는 경우를 영구히 막지 않는다.
+    boolean existsByReceiverIdAndTypeAndGroupIdAndCreatedAtAfter(
+            Long receiverId, NotificationType type, Long groupId, LocalDateTime createdAtAfter);
 
     @Modifying
     @Query("update Notification n set n.read = true, n.readAt = current_timestamp "
