@@ -19,6 +19,7 @@ public class NotificationCreationService {
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
     private final NotificationPushDispatcher pushDispatcher;
+    private final NotificationPreferenceService notificationPreferenceService;
 
     @Transactional
     public void create(
@@ -35,6 +36,9 @@ public class NotificationCreationService {
             Integer opinionCountSnapshot
     ) {
         if (actorId != null && actorId.equals(receiverId)) {
+            return;
+        }
+        if (!notificationPreferenceService.isEnabled(receiverId, groupId)) {
             return;
         }
 
