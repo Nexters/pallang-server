@@ -57,8 +57,9 @@ public interface BookApi {
     );
 
     @Operation(summary = "도서 내부 검색",
-            description = "서비스 DB에 등록된 도서 전체를 흔적(Opinion) 유무와 무관하게 제목으로 검색하며, "
-                    + "도서별 대목/흔적 수를 함께 반환합니다(흔적이 없으면 0). "
+            description = "서비스 DB에 등록된 도서 중 살아있는 대목이 하나라도 있는 도서만 제목으로 검색하며, "
+                    + "도서별 대목/흔적 수를 함께 반환합니다. 아직 아무도 흔적을 남기지 않은 도서(모임 생성 시 "
+                    + "등록만 되고 대목이 없는 경우 등)는 결과에서 제외됩니다. "
                     + "제목과 검색어의 띄어쓰기 차이는 무시하고 매칭합니다. keyword에 빈 문자열을 넘기면 전체 목록을 반환합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "검색 성공"),

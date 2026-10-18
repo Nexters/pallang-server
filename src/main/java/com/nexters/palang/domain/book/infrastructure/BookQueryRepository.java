@@ -44,12 +44,10 @@ public class BookQueryRepository {
     // 띄어쓰기 차이를 무시하고 검색할 수 있도록, 저장 시점에 미리 정규화(공백 제거 + 소문자)해둔
     // title_normalized 컬럼(인덱스 적용, Book#normalizeTitle 참고)을 기준으로 비교한다. 매 검색마다
     // title에 함수를 걸어 계산하지 않아도 되고, 자동완성처럼 반복 호출되는 경로에서 유리하다.
-    // 흔적(Opinion)/대목(Passage) 유무와 무관하게 DB에 저장된 도서 전부를 대상으로 하므로 leftJoin을 사용한다.
-    // 소프트 삭제된 대목/그 흔적은 leftJoin의 ON 절에서 제외한다 (WHERE에 두면 대목이 전부 삭제된
-    // 도서까지 결과에서 사라진다 — ON에 두어야 매칭 실패로 취급되어 passageCount 0인 채로 남는다).
+    // 홈 캐러셀/인기 도서와 마찬가지로 살아있는 대목이 하나도 없는 도서(모임 생성 시 등록만 되고 아직
+    // 아무도 흔적을 남기지 않은 MANUAL 도서 등)는 검색 결과에서 제외한다 — innerJoin으로 걸러낸다.
     public Page<BookSearchProjection> searchByTitle(String keyword, BookSearchSort sort, Pageable pageable) {
         List<BookSearchProjection> content = searchByTitle(keyword, sort, pageable.getOffset(), pageable.getPageSize());
-        // 흔적/대목 유무로 필터링하지 않으므로 count 쪽은 join 없이 제목 조건만으로 센다.
         return new PageImpl<>(content, pageable, countByTitle(keyword));
     }
 
@@ -69,7 +67,7 @@ public class BookQueryRepository {
                         book.isbn, book.coverImageUrl, book.source,
                         passage.countDistinct(), opinion.countDistinct()))
                 .from(book)
-                .leftJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
+                .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
                 .where(book.titleNormalized.contains(normalizedKeyword))
                 .groupBy(book.id, book.title, book.author, book.publisher, book.pageCount,
@@ -80,30 +78,36 @@ public class BookQueryRepository {
                 .fetch();
     }
 
-    // 제목으로 매칭되는 DB 도서의 전체 개수. join 없이 단순 COUNT라 자주 호출해도 부담이 적다.
+    // 제목으로 매칭되는, 살아있는 대목이 하나라도 있는 DB 도서의 전체 개수.
     // (GET /api/books/search가 알라딘 결과와 합쳐 total을 계산할 때 페이지마다 이 값을 다시 구한다.)
     public long countByTitle(String keyword) {
         QBook book = QBook.book;
+        QPassage passage = QPassage.passage;
         String normalizedKeyword = Book.normalize(keyword);
 
         Long count = queryFactory
                 .select(book.countDistinct())
                 .from(book)
+                .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .where(book.titleNormalized.contains(normalizedKeyword))
                 .fetchOne();
         return count != null ? count : 0L;
     }
 
     // GET /api/books/search에서 알라딘 결과 중 이미 DB에 등록된 도서와 ISBN이 같은 항목을 걸러내기 위한
-    // 용도다. join/groupBy 없이 isbn 컬럼만 조회하는 가벼운 쿼리라, 페이지와 무관하게 매 요청마다 호출해도
-    // 부담이 적다. searchByTitle과 달리 페이지 크기로 잘리지 않고 매칭되는 도서 전부의 ISBN을 반환한다.
+    // 용도다. searchByTitle과 똑같이 살아있는 대목이 있는 도서만 대상으로 해야 한다 — 그렇지 않으면 아직
+    // 아무도 흔적을 남기지 않아 검색 결과에서 숨겨진 도서의 ISBN 때문에, 그 책의 알라딘 결과까지 함께
+    // 숨겨져 사용자가 그 책을 전혀 찾을 수 없게 된다. 페이지와 무관하게 매칭되는 도서 전부의 ISBN을 반환한다.
     public List<String> findIsbnsByTitle(String keyword) {
         QBook book = QBook.book;
+        QPassage passage = QPassage.passage;
         String normalizedKeyword = Book.normalize(keyword);
 
         return queryFactory
                 .select(book.isbn)
+                .distinct()
                 .from(book)
+                .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .where(book.titleNormalized.contains(normalizedKeyword), book.isbn.isNotNull(), book.isbn.ne(""))
                 .fetch();
     }
