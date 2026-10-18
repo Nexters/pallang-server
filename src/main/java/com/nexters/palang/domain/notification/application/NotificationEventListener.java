@@ -5,7 +5,6 @@ import com.nexters.palang.domain.group.domain.event.GroupJoinedEvent;
 import com.nexters.palang.domain.group.domain.event.GroupScheduleChangedEvent;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.notification.domain.NotificationType;
-import com.nexters.palang.domain.opinion.domain.event.OpinionCreatedEvent;
 import com.nexters.palang.domain.opinion.domain.event.OpinionLikedEvent;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
@@ -24,7 +23,6 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class NotificationEventListener {
 
     private final NotificationCreationService notificationCreationService;
-    private final BookNewOpinionsNotifier bookNewOpinionsNotifier;
     private final UserRepository userRepository;
     private final GroupMemberRepository groupMemberRepository;
 
@@ -57,12 +55,6 @@ public class NotificationEventListener {
         notificationCreationService.create(
                 event.opinionOwnerId(), event.actorUserId(), NotificationType.OPINION_COMMENTED,
                 title, body, event.opinionId(), null, event.commentId(), event.groupId(), event.groupName(), null);
-    }
-
-    @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onOpinionCreated(OpinionCreatedEvent event) {
-        bookNewOpinionsNotifier.notifyIfThresholdReached(event.bookId(), event.actorUserId());
     }
 
     @Async

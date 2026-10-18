@@ -3,6 +3,7 @@ package com.nexters.palang.domain.notification.domain;
 public enum NotificationType {
     OPINION_LIKED,
     OPINION_COMMENTED,
+    // 더 이상 새로 발송하지 않는다(이슈 #193). 과거에 쌓인 알림을 그대로 보여주기 위해서만 남겨둔다.
     BOOK_NEW_OPINIONS,
     // 모임 가입 완료(가입자 본인에게).
     GROUP_JOINED,

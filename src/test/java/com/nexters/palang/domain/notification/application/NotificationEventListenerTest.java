@@ -11,7 +11,6 @@ import com.nexters.palang.domain.group.domain.event.GroupJoinedEvent;
 import com.nexters.palang.domain.group.domain.event.GroupScheduleChangedEvent;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.notification.domain.NotificationType;
-import com.nexters.palang.domain.opinion.domain.event.OpinionCreatedEvent;
 import com.nexters.palang.domain.opinion.domain.event.OpinionLikedEvent;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
@@ -32,9 +31,6 @@ class NotificationEventListenerTest {
     private NotificationCreationService notificationCreationService;
 
     @Mock
-    private BookNewOpinionsNotifier bookNewOpinionsNotifier;
-
-    @Mock
     private UserRepository userRepository;
 
     @Mock
@@ -44,8 +40,7 @@ class NotificationEventListenerTest {
 
     @BeforeEach
     void setUp() {
-        listener = new NotificationEventListener(
-                notificationCreationService, bookNewOpinionsNotifier, userRepository, groupMemberRepository);
+        listener = new NotificationEventListener(notificationCreationService, userRepository, groupMemberRepository);
     }
 
     private User user(Long id) {
@@ -96,14 +91,6 @@ class NotificationEventListenerTest {
 
         verify(notificationCreationService).create(eq(1L), eq(2L), eq(NotificationType.OPINION_COMMENTED), any(),
                 any(), eq(10L), eq(null), eq(5L), eq(null), eq(null), eq(null));
-    }
-
-    @Test
-    @DisplayName("의견 생성 이벤트를 받으면 BookNewOpinionsNotifier에 위임한다")
-    void onOpinionCreatedDelegatesToBookNewOpinionsNotifier() {
-        listener.onOpinionCreated(new OpinionCreatedEvent(20L, 3L, 2L));
-
-        verify(bookNewOpinionsNotifier).notifyIfThresholdReached(3L, 2L);
     }
 
     @Test
