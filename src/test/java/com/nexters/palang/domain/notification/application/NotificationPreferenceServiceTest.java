@@ -3,6 +3,8 @@ package com.nexters.palang.domain.notification.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -19,7 +21,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationPreferenceServiceTest {
@@ -30,11 +35,19 @@ class NotificationPreferenceServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
+    @Mock
+    private TransactionStatus transactionStatus;
+
     private NotificationPreferenceService notificationPreferenceService;
 
     @BeforeEach
     void setUp() {
-        notificationPreferenceService = new NotificationPreferenceService(notificationPreferenceRepository, userRepository);
+        lenient().when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
+        notificationPreferenceService = new NotificationPreferenceService(
+                notificationPreferenceRepository, userRepository, transactionManager);
     }
 
     private User user(Long id) {
@@ -93,6 +106,24 @@ class NotificationPreferenceServiceTest {
         assertThat(preference.isActivityEnabled()).isFalse();
         assertThat(preference.isGroupEnabled()).isFalse();
         verify(notificationPreferenceRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("최초 PUT이 동시에 들어와 유니크 제약 위반이 나면, 상대방이 만든 row를 다시 조회해 갱신한다")
+    void updateSettingsRetriesWhenConcurrentInsertConflicts() {
+        NotificationPreference createdByOtherRequest = NotificationPreference.builder()
+                .user(user(1L)).activityEnabled(true).groupEnabled(true).build();
+        given(notificationPreferenceRepository.findByUserId(1L))
+                .willReturn(Optional.empty())
+                .willReturn(Optional.of(createdByOtherRequest));
+        given(userRepository.getReferenceById(1L)).willReturn(user(1L));
+        willThrow(new DataIntegrityViolationException("duplicate key"))
+                .given(notificationPreferenceRepository).save(any());
+
+        notificationPreferenceService.updateSettings(1L, false, true);
+
+        assertThat(createdByOtherRequest.isActivityEnabled()).isFalse();
+        assertThat(createdByOtherRequest.isGroupEnabled()).isTrue();
     }
 
     @Test
