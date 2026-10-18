@@ -40,13 +40,6 @@ public interface OpinionRepository extends JpaRepository<Opinion, Long> {
             + "left join fetch o.passage p left join fetch p.group where o.id = :id")
     Optional<Opinion> findDetailById(@Param("id") Long id);
 
-    // "책에 새 의견 N개" 알림(BookNewOpinionsNotifier)의 현재 카운트 기준값.
-    long countByPassage_Book_IdAndDeletedAtIsNull(Long bookId);
-
-    // 위 알림의 수신 대상 후보: 이 책에 살아있는 의견을 남긴 적 있는 사용자 목록(작성자 본인 제외는 호출부 책임).
-    @Query("select distinct o.user.id from Opinion o where o.passage.book.id = :bookId and o.deletedAt is null")
-    List<Long> findDistinctUserIdsByBookId(@Param("bookId") Long bookId);
-
     // 관리자 유저 삭제(AdminUserService): 삭제 대상 대목들에 달린 의견 id 전부. 소프트 삭제 여부와 무관하게
     // 물리적으로 존재하는 행을 전부 대상으로 해야 대목을 지울 때 FK 위반이 나지 않는다.
     @Query("select o.id from Opinion o where o.passage.id in :passageIds")

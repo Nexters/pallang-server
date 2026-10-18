@@ -26,7 +26,8 @@ import lombok.NoArgsConstructor;
         name = "notifications",
         indexes = {
                 @Index(name = "idx_notifications_receiver", columnList = "receiver_id, created_at"),
-                // BookNewOpinionsNotifier가 (receiver, book) 기준 가장 최근 알림의 snapshot을 조회하는 데 사용.
+                // 더 이상 조회에 쓰이지 않지만(이슈 #193으로 BOOK_NEW_OPINIONS 트리거 제거), 기존 인덱스를
+                // DB에서 임의로 지우지 않기 위해 엔티티 선언은 그대로 둔다.
                 @Index(name = "idx_notifications_receiver_book", columnList = "receiver_id, book_id, created_at")
         }
 )

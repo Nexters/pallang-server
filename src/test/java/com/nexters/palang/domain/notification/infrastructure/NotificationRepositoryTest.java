@@ -8,7 +8,6 @@ import com.nexters.palang.domain.user.domain.SnsProvider;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.global.config.JpaAuditingConfig;
 import java.time.LocalDateTime;
-import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -69,22 +68,6 @@ class NotificationRepositoryTest {
 
         assertThat(results.getContent()).extracting(Notification::getId)
                 .containsExactly(newer.getId(), older.getId());
-    }
-
-    @Test
-    @DisplayName("같은 책에 대해 가장 최근 BOOK_NEW_OPINIONS 알림의 snapshot을 조회한다")
-    void findFirstByReceiverIdAndTypeAndBookIdOrderByCreatedAtDesc() {
-        save(NotificationType.BOOK_NEW_OPINIONS, 1L, 5);
-        Notification latest = save(NotificationType.BOOK_NEW_OPINIONS, 1L, 10);
-        save(NotificationType.BOOK_NEW_OPINIONS, 2L, 99);
-
-        Optional<Notification> found = notificationRepository
-                .findFirstByReceiverIdAndTypeAndBookIdOrderByCreatedAtDesc(
-                        receiver.getId(), NotificationType.BOOK_NEW_OPINIONS, 1L);
-
-        assertThat(found).isPresent();
-        assertThat(found.get().getId()).isEqualTo(latest.getId());
-        assertThat(found.get().getOpinionCountSnapshot()).isEqualTo(10);
     }
 
     @Test
