@@ -2,6 +2,7 @@ package com.nexters.palang.domain.notification.presentation;
 
 import com.nexters.palang.domain.notification.application.NotificationService;
 import com.nexters.palang.domain.notification.domain.NotificationScope;
+import com.nexters.palang.domain.notification.presentation.dto.HasUnreadResponse;
 import com.nexters.palang.domain.notification.presentation.dto.NotificationListResponse;
 import com.nexters.palang.global.common.response.DataResponse;
 import com.nexters.palang.global.security.CurrentUserProvider;
@@ -33,8 +34,16 @@ public class NotificationController implements NotificationApi {
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        return ResponseEntity.ok(DataResponse.from(NotificationListResponse.from(
-                notificationService.getNotifications(currentUserId, scope, pageable(page, size)))));
+        var notifications = notificationService.getNotifications(currentUserId, scope, pageable(page, size));
+        long unreadCount = notificationService.countUnread(currentUserId, scope);
+        return ResponseEntity.ok(DataResponse.from(NotificationListResponse.from(notifications, unreadCount)));
+    }
+
+    @Override
+    @GetMapping("/api/notifications/unread")
+    public ResponseEntity<DataResponse<HasUnreadResponse>> getHasUnread() {
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        return ResponseEntity.ok(DataResponse.from(new HasUnreadResponse(notificationService.hasUnread(currentUserId))));
     }
 
     @Override

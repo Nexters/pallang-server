@@ -26,6 +26,20 @@ public class NotificationService {
         };
     }
 
+    // 알림함 탭([전체|활동|모임])에 표시할 안 읽은 개수. 조회한 scope와 동일한 범위로 집계한다.
+    public long countUnread(Long userId, NotificationScope scope) {
+        return switch (scope) {
+            case ALL -> notificationRepository.countByReceiverIdAndReadFalse(userId);
+            case ACTIVITY -> notificationRepository.countByReceiverIdAndGroupIdIsNullAndReadFalse(userId);
+            case GROUP -> notificationRepository.countByReceiverIdAndGroupIdIsNotNullAndReadFalse(userId);
+        };
+    }
+
+    // 홈 화면 벨 아이콘: scope와 무관하게 안 읽은 알림이 하나라도 있는지만 확인.
+    public boolean hasUnread(Long userId) {
+        return notificationRepository.existsByReceiverIdAndReadFalse(userId);
+    }
+
     @Transactional
     public void markAsRead(Long userId, Long notificationId) {
         Notification notification = notificationRepository.findById(notificationId)

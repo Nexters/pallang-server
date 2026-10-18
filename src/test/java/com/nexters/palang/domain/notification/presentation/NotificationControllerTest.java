@@ -76,30 +76,55 @@ class NotificationControllerTest {
     }
 
     @Test
-    @DisplayName("알림 목록을 조회하면 알림을 반환한다")
+    @DisplayName("알림 목록을 조회하면 알림과 scope 기준 안 읽은 개수를 반환한다")
     void getNotifications() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         given(notificationService.getNotifications(eq(1L), eq(NotificationScope.ALL), any())).willReturn(
                 new PageImpl<>(List.of(notification(1L)), DEFAULT_PAGEABLE, 1));
+        given(notificationService.countUnread(1L, NotificationScope.ALL)).willReturn(4L);
 
         mockMvc.perform(get("/api/notifications"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.notifications[0].notificationId").value(1))
-                .andExpect(jsonPath("$.data.notifications[0].type").value("OPINION_LIKED"));
+                .andExpect(jsonPath("$.data.notifications[0].type").value("OPINION_LIKED"))
+                .andExpect(jsonPath("$.data.unreadCount").value(4));
     }
 
     @Test
-    @DisplayName("scope=GROUP으로 알림 목록을 조회하면 모임 알림만 조회한다")
+    @DisplayName("scope=GROUP으로 알림 목록을 조회하면 모임 알림과 모임 탭 기준 안 읽은 개수만 조회한다")
     void getNotificationsWithGroupScope() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         given(notificationService.getNotifications(eq(1L), eq(NotificationScope.GROUP), any())).willReturn(
                 new PageImpl<>(List.of(groupNotification(1L)), DEFAULT_PAGEABLE, 1));
+        given(notificationService.countUnread(1L, NotificationScope.GROUP)).willReturn(1L);
 
         mockMvc.perform(get("/api/notifications").param("scope", "GROUP"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.notifications[0].notificationId").value(1))
                 .andExpect(jsonPath("$.data.notifications[0].groupId").value(9))
-                .andExpect(jsonPath("$.data.notifications[0].groupName").value("면도날 같이 읽기"));
+                .andExpect(jsonPath("$.data.notifications[0].groupName").value("면도날 같이 읽기"))
+                .andExpect(jsonPath("$.data.unreadCount").value(1));
+    }
+
+    @Test
+    @DisplayName("안 읽은 알림이 있으면 hasUnread가 true로 반환된다")
+    void getHasUnreadReturnsTrue() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(notificationService.hasUnread(1L)).willReturn(true);
+
+        mockMvc.perform(get("/api/notifications/unread"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.hasUnread").value(true));
+    }
+
+    @Test
+    @DisplayName("인증 없이 안 읽음 여부를 조회하면 401 에러가 발생한다")
+    void getHasUnreadFailsWhenUnauthenticated() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willThrow(new LoginRequiredException());
+
+        mockMvc.perform(get("/api/notifications/unread"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("AUTH_401_1"));
     }
 
     @Test

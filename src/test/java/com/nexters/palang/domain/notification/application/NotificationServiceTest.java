@@ -92,6 +92,44 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("scope가 ALL이면 전체 안 읽은 개수를 집계한다")
+    void countUnreadCountsAllWhenScopeIsAll() {
+        given(notificationRepository.countByReceiverIdAndReadFalse(1L)).willReturn(5L);
+
+        long count = notificationService.countUnread(1L, NotificationScope.ALL);
+
+        assertThat(count).isEqualTo(5L);
+    }
+
+    @Test
+    @DisplayName("scope가 ACTIVITY면 모임에 속하지 않은 안 읽은 개수만 집계한다")
+    void countUnreadCountsActivityWhenScopeIsActivity() {
+        given(notificationRepository.countByReceiverIdAndGroupIdIsNullAndReadFalse(1L)).willReturn(3L);
+
+        long count = notificationService.countUnread(1L, NotificationScope.ACTIVITY);
+
+        assertThat(count).isEqualTo(3L);
+    }
+
+    @Test
+    @DisplayName("scope가 GROUP이면 모임에 속한 안 읽은 개수만 집계한다")
+    void countUnreadCountsGroupWhenScopeIsGroup() {
+        given(notificationRepository.countByReceiverIdAndGroupIdIsNotNullAndReadFalse(1L)).willReturn(2L);
+
+        long count = notificationService.countUnread(1L, NotificationScope.GROUP);
+
+        assertThat(count).isEqualTo(2L);
+    }
+
+    @Test
+    @DisplayName("안 읽은 알림이 하나라도 있으면 true를 반환한다")
+    void hasUnreadDelegatesToRepository() {
+        given(notificationRepository.existsByReceiverIdAndReadFalse(1L)).willReturn(true);
+
+        assertThat(notificationService.hasUnread(1L)).isTrue();
+    }
+
+    @Test
     @DisplayName("본인이 받은 알림을 읽음 처리하면 읽음 상태가 된다")
     void markAsReadUpdatesNotification() {
         Notification notification = notification(1L, user(10L));
