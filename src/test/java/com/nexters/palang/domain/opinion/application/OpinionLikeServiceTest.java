@@ -102,7 +102,7 @@ class OpinionLikeServiceTest {
 
         assertThat(result.liked()).isTrue();
         assertThat(opinion.getLikeCount()).isEqualTo(1);
-        verify(eventPublisher).publishEvent(new OpinionLikedEvent(10L, 1L, 2L));
+        verify(eventPublisher).publishEvent(new OpinionLikedEvent(10L, 1L, 2L, null, null));
     }
 
     @Test
@@ -182,5 +182,6 @@ class OpinionLikeServiceTest {
 
         assertThat(result.liked()).isTrue();
         verify(groupAccessValidator).validateMember(9L, 10L);
+        verify(eventPublisher).publishEvent(new OpinionLikedEvent(1L, writer.getId(), 10L, 9L, "모임"));
     }
 }

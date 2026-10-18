@@ -13,6 +13,7 @@ import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
 import com.nexters.palang.domain.passage.common.error.PassageErrorCode;
 import com.nexters.palang.domain.passage.common.error.PassageException;
 import com.nexters.palang.domain.passage.domain.Passage;
+import com.nexters.palang.domain.passage.domain.PassageScope;
 import com.nexters.palang.domain.passage.infrastructure.PassageQueryRepository;
 import com.nexters.palang.domain.passage.infrastructure.PassageRepository;
 import java.util.LinkedHashMap;
@@ -57,9 +58,14 @@ public class PassageService {
         return passageQueryRepository.findPassagesByPage(bookId, groupId, pageNumber);
     }
 
-    // 내가 남긴 대목 목록: bookId 미지정 시 전체 도서, spoilerOnly=true 시 스포일러 대목만.
-    public Page<MyPassageProjection> getMyPassages(Long userId, Long bookId, boolean spoilerOnly, Pageable pageable) {
-        return passageQueryRepository.findMyPassages(userId, bookId, spoilerOnly, pageable);
+    // 내가 남긴 대목 목록: bookId 미지정 시 전체 도서, spoilerOnly=true 시 스포일러 대목만,
+    // scope로 대목 소속(전역/특정 모임)을 좁힐 수 있다. 특정 모임이면 그 모임의 멤버인지 먼저 확인한다.
+    public Page<MyPassageProjection> getMyPassages(
+            Long userId, Long bookId, boolean spoilerOnly, PassageScope scope, Pageable pageable) {
+        if (scope.isGroup()) {
+            groupAccessValidator.validateMember(scope.groupId(), userId);
+        }
+        return passageQueryRepository.findMyPassages(userId, bookId, spoilerOnly, scope, pageable);
     }
 
     // 스포일러 관리 화면의 "전체 책 보기" 드롭다운: 내가 스포일러로 남긴 대목이 있는 도서 목록.

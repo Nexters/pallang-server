@@ -23,7 +23,6 @@ import com.nexters.palang.domain.group.infrastructure.GroupRepository;
 import com.nexters.palang.domain.opinion.common.error.OpinionException;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.opinion.domain.OpinionSortType;
-import com.nexters.palang.domain.opinion.domain.event.OpinionCreatedEvent;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionQueryRepository;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
 import com.nexters.palang.domain.opinion.presentation.dto.CreateOpinionRequest;
@@ -31,6 +30,7 @@ import com.nexters.palang.domain.opinion.presentation.dto.CreateOpinionRequest.D
 import com.nexters.palang.domain.opinion.presentation.dto.UpdateOpinionRequest;
 import com.nexters.palang.domain.passage.common.error.PassageException;
 import com.nexters.palang.domain.passage.domain.Passage;
+import com.nexters.palang.domain.passage.domain.PassageScope;
 import com.nexters.palang.domain.passage.infrastructure.PassageRepository;
 import com.nexters.palang.domain.user.domain.GuestSampleAccount;
 import com.nexters.palang.domain.user.domain.User;
@@ -45,7 +45,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -71,9 +70,6 @@ class OpinionServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private ApplicationEventPublisher eventPublisher;
-
-    @Mock
     private GroupRepository groupRepository;
 
     @Mock
@@ -85,7 +81,7 @@ class OpinionServiceTest {
     void setUp() {
         opinionService = new OpinionService(
                 opinionRepository, opinionQueryRepository, passageRepository, bookRepository, userRepository,
-                eventPublisher, groupRepository, groupAccessValidator);
+                groupRepository, groupAccessValidator);
     }
 
     private User user(Long id) {
@@ -149,7 +145,6 @@ class OpinionServiceTest {
 
         assertThat(opinion.getPassage().getBook().getId()).isEqualTo(10L);
         assertThat(opinion.getDecorations()).hasSize(1);
-        verify(eventPublisher).publishEvent(any(OpinionCreatedEvent.class));
     }
 
     @Test
@@ -427,11 +422,11 @@ class OpinionServiceTest {
     void getMyOpinionsReturnsPageFromQueryRepository() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<MyOpinionProjection> expected = new PageImpl<>(
-                List.of(new MyOpinionProjection(1L, 10L, "제목", "작가", "cover", 100L, "발췌", 5, "흔적", 0, LocalDateTime.now())),
+                List.of(new MyOpinionProjection(1L, 10L, "제목", "작가", "cover", 100L, "발췌", 5, "흔적", 0, LocalDateTime.now(), null, null)),
                 pageable, 1);
-        given(opinionQueryRepository.findMyOpinions(1L, null, pageable)).willReturn(expected);
+        given(opinionQueryRepository.findMyOpinions(1L, null, PassageScope.ALL, pageable)).willReturn(expected);
 
-        Page<MyOpinionProjection> results = opinionService.getMyOpinions(1L, null, pageable);
+        Page<MyOpinionProjection> results = opinionService.getMyOpinions(1L, null, PassageScope.ALL, pageable);
 
         assertThat(results).isEqualTo(expected);
     }
@@ -448,13 +443,13 @@ class OpinionServiceTest {
         ReflectionTestUtils.setField(sampleUser, "id", 999L);
         Page<MyOpinionProjection> expected = new PageImpl<>(
                 List.of(new MyOpinionProjection(1L, 18L, "빵충 사육 준수 사항", "김혜영 (지은이)", "cover", 100L, "발췌", 33,
-                        "애증의 관계", 0, LocalDateTime.now())),
+                        "애증의 관계", 0, LocalDateTime.now(), null, null)),
                 pageable, 1);
         given(userRepository.findBySnsProviderAndSnsId(GuestSampleAccount.SNS_PROVIDER, GuestSampleAccount.SNS_ID))
                 .willReturn(Optional.of(sampleUser));
-        given(opinionQueryRepository.findMyOpinions(999L, null, pageable)).willReturn(expected);
+        given(opinionQueryRepository.findMyOpinions(999L, null, PassageScope.ALL, pageable)).willReturn(expected);
 
-        Page<MyOpinionProjection> results = opinionService.getMyOpinions(null, null, pageable);
+        Page<MyOpinionProjection> results = opinionService.getMyOpinions(null, null, PassageScope.ALL, pageable);
 
         assertThat(results).isEqualTo(expected);
     }
@@ -464,9 +459,9 @@ class OpinionServiceTest {
     void getMyOpinionsDoesNotReturnSampleForLoggedInAccountWithNoOpinions() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<MyOpinionProjection> empty = new PageImpl<>(List.of(), pageable, 0);
-        given(opinionQueryRepository.findMyOpinions(1L, null, pageable)).willReturn(empty);
+        given(opinionQueryRepository.findMyOpinions(1L, null, PassageScope.ALL, pageable)).willReturn(empty);
 
-        Page<MyOpinionProjection> results = opinionService.getMyOpinions(1L, null, pageable);
+        Page<MyOpinionProjection> results = opinionService.getMyOpinions(1L, null, PassageScope.ALL, pageable);
 
         assertThat(results).isEqualTo(empty);
         verifyNoInteractions(userRepository);
@@ -479,7 +474,7 @@ class OpinionServiceTest {
         given(userRepository.findBySnsProviderAndSnsId(GuestSampleAccount.SNS_PROVIDER, GuestSampleAccount.SNS_ID))
                 .willReturn(Optional.empty());
 
-        Page<MyOpinionProjection> results = opinionService.getMyOpinions(null, null, pageable);
+        Page<MyOpinionProjection> results = opinionService.getMyOpinions(null, null, PassageScope.ALL, pageable);
 
         assertThat(results.getTotalElements()).isZero();
     }
@@ -490,13 +485,39 @@ class OpinionServiceTest {
         Pageable pageable = PageRequest.of(0, 20);
         Page<LikedOpinionProjection> expected = new PageImpl<>(
                 List.of(new LikedOpinionProjection(1L, 10L, "제목", "작가", "cover", 100L, "발췌", 5, "흔적", "닉네임", 0,
-                        LocalDateTime.now(), LocalDateTime.now())),
+                        LocalDateTime.now(), LocalDateTime.now(), null, null)),
                 pageable, 1);
-        given(opinionQueryRepository.findLikedOpinions(1L, null, pageable)).willReturn(expected);
+        given(opinionQueryRepository.findLikedOpinions(1L, null, PassageScope.ALL, pageable)).willReturn(expected);
 
-        Page<LikedOpinionProjection> results = opinionService.getLikedOpinions(1L, null, pageable);
+        Page<LikedOpinionProjection> results = opinionService.getLikedOpinions(1L, null, PassageScope.ALL, pageable);
 
         assertThat(results).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("모임을 지정해 내 흔적 목록을 조회할 때 그 모임의 모임원이 아니면 예외가 발생한다")
+    void getMyOpinionsFailsWhenNotMemberOfScopeGroup() {
+        // given
+        Pageable pageable = PageRequest.of(0, 20);
+        doThrow(new GroupException(GroupErrorCode.NOT_MEMBER)).when(groupAccessValidator).validateMember(9L, 1L);
+
+        // when & then
+        assertThatThrownBy(() -> opinionService.getMyOpinions(1L, 10L, PassageScope.of(9L, false), pageable))
+                .isInstanceOf(GroupException.class);
+        verifyNoInteractions(opinionQueryRepository);
+    }
+
+    @Test
+    @DisplayName("모임을 지정해 좋아요 누른 흔적 목록을 조회할 때 그 모임의 모임원이 아니면 예외가 발생한다")
+    void getLikedOpinionsFailsWhenNotMemberOfScopeGroup() {
+        // given
+        Pageable pageable = PageRequest.of(0, 20);
+        doThrow(new GroupException(GroupErrorCode.NOT_MEMBER)).when(groupAccessValidator).validateMember(9L, 1L);
+
+        // when & then
+        assertThatThrownBy(() -> opinionService.getLikedOpinions(1L, 10L, PassageScope.of(9L, false), pageable))
+                .isInstanceOf(GroupException.class);
+        verifyNoInteractions(opinionQueryRepository);
     }
 
     @Test

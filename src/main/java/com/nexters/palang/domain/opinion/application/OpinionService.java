@@ -15,7 +15,6 @@ import com.nexters.palang.domain.opinion.common.error.OpinionErrorCode;
 import com.nexters.palang.domain.opinion.common.error.OpinionException;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.opinion.domain.OpinionSortType;
-import com.nexters.palang.domain.opinion.domain.event.OpinionCreatedEvent;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionQueryRepository;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
 import com.nexters.palang.domain.opinion.presentation.dto.CreateOpinionRequest;
@@ -25,6 +24,7 @@ import com.nexters.palang.domain.passage.common.error.PassageErrorCode;
 import com.nexters.palang.domain.passage.common.error.PassageException;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.infrastructure.PassageRepository;
+import com.nexters.palang.domain.passage.domain.PassageScope;
 import com.nexters.palang.domain.user.common.error.UserErrorCode;
 import com.nexters.palang.domain.user.common.error.UserException;
 import com.nexters.palang.domain.user.domain.GuestSampleAccount;
@@ -33,7 +33,6 @@ import com.nexters.palang.domain.user.infrastructure.UserRepository;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -50,7 +49,6 @@ public class OpinionService {
     private final PassageRepository passageRepository;
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
-    private final ApplicationEventPublisher eventPublisher;
     private final GroupRepository groupRepository;
     private final GroupAccessValidator groupAccessValidator;
 
@@ -145,7 +143,6 @@ public class OpinionService {
 
         Opinion opinion = Opinion.createWithDecorations(passage, user, request.content(), decorations);
         opinionRepository.save(opinion);
-        eventPublisher.publishEvent(new OpinionCreatedEvent(opinion.getId(), passage.getBook().getId(), userId));
         return opinion;
     }
 
@@ -172,18 +169,27 @@ public class OpinionService {
     // 그 계정의 흔적/꾸밈은 OpinionGuestSampleSeedRunner가 앱 기동 시 미리 만들어둔다 — 하드코딩 대신
     // 실데이터를 재사용해야 상세 화면의 Decoration(밑줄/동그라미 등)도 자연스럽게 함께 보인다. 씨딩 전이거나
     // 실패한 환경(로컬 등)에서는 빈 목록을 반환한다.
-    public Page<MyOpinionProjection> getMyOpinions(Long userId, Long bookId, Pageable pageable) {
+    // scope로 특정 모임을 지정하면 그 모임의 멤버인지 먼저 확인한다(비로그인이면 곧바로 거절).
+    public Page<MyOpinionProjection> getMyOpinions(Long userId, Long bookId, PassageScope scope, Pageable pageable) {
+        validateScopeAccess(scope, userId);
         if (userId == null) {
             return userRepository
                     .findBySnsProviderAndSnsId(GuestSampleAccount.SNS_PROVIDER, GuestSampleAccount.SNS_ID)
-                    .map(sampleUser -> opinionQueryRepository.findMyOpinions(sampleUser.getId(), bookId, pageable))
+                    .map(sampleUser -> opinionQueryRepository.findMyOpinions(sampleUser.getId(), bookId, scope, pageable))
                     .orElseGet(() -> new PageImpl<>(List.of(), pageable, 0));
         }
-        return opinionQueryRepository.findMyOpinions(userId, bookId, pageable);
+        return opinionQueryRepository.findMyOpinions(userId, bookId, scope, pageable);
     }
 
-    public Page<LikedOpinionProjection> getLikedOpinions(Long userId, Long bookId, Pageable pageable) {
-        return opinionQueryRepository.findLikedOpinions(userId, bookId, pageable);
+    public Page<LikedOpinionProjection> getLikedOpinions(Long userId, Long bookId, PassageScope scope, Pageable pageable) {
+        validateScopeAccess(scope, userId);
+        return opinionQueryRepository.findLikedOpinions(userId, bookId, scope, pageable);
+    }
+
+    private void validateScopeAccess(PassageScope scope, Long userId) {
+        if (scope.isGroup()) {
+            groupAccessValidator.validateMember(scope.groupId(), userId);
+        }
     }
 
     // 좋아요 관리 화면의 "전체 책 보기" 드롭다운: 내가 좋아요를 누른 흔적이 있는 도서 목록.

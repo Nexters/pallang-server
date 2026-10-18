@@ -14,6 +14,10 @@ public record MyOpinionResponse(
         @Schema(example = "87", requiredMode = Schema.RequiredMode.REQUIRED) int pageNumber,
         @Schema(example = "이 문장에서 작가의 의도가 느껴져서 좋았어요.", requiredMode = Schema.RequiredMode.REQUIRED) String content,
         @Schema(example = "5", requiredMode = Schema.RequiredMode.REQUIRED) int likeCount,
-        @Schema(example = "2026-07-20T14:32:00", requiredMode = Schema.RequiredMode.REQUIRED) LocalDateTime createdAt
+        @Schema(example = "2026-07-20T14:32:00", requiredMode = Schema.RequiredMode.REQUIRED) LocalDateTime createdAt,
+        @Schema(description = "모임 전용 대목이면 그 모임 ID, 전역 공개 대목이면 null", example = "13", nullable = true)
+        Long groupId,
+        @Schema(description = "모임 전용 대목이면 그 모임 이름, 전역 공개 대목이면 null", example = "면도날 같이 읽기", nullable = true)
+        String groupName
 ) {
 }

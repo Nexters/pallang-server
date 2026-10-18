@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -35,11 +36,16 @@ class NotificationCreationServiceTest {
     @Mock
     private NotificationPushDispatcher pushDispatcher;
 
+    @Mock
+    private NotificationPreferenceService notificationPreferenceService;
+
     private NotificationCreationService notificationCreationService;
 
     @BeforeEach
     void setUp() {
-        notificationCreationService = new NotificationCreationService(notificationRepository, userRepository, pushDispatcher);
+        lenient().when(notificationPreferenceService.isEnabled(any(), any())).thenReturn(true);
+        notificationCreationService = new NotificationCreationService(
+                notificationRepository, userRepository, pushDispatcher, notificationPreferenceService);
     }
 
     private User user(Long id) {
@@ -52,7 +58,19 @@ class NotificationCreationServiceTest {
     @DisplayName("본인이 유발한 알림(actorId == receiverId)이면 생성/발송하지 않는다")
     void doesNotCreateSelfNotification() {
         notificationCreationService.create(
-                1L, 1L, NotificationType.OPINION_LIKED, "제목", "내용", 10L, null, null, null);
+                1L, 1L, NotificationType.OPINION_LIKED, "제목", "내용", 10L, null, null, null, null, null);
+
+        verify(notificationRepository, never()).save(any());
+        verify(pushDispatcher, never()).dispatch(anyLong(), any(), any(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("수신자가 해당 카테고리 알림을 꺼두었으면 생성/발송하지 않는다")
+    void doesNotCreateWhenPreferenceDisabled() {
+        given(notificationPreferenceService.isEnabled(1L, null)).willReturn(false);
+
+        notificationCreationService.create(
+                1L, 2L, NotificationType.OPINION_LIKED, "제목", "내용", 10L, null, null, null, null, null);
 
         verify(notificationRepository, never()).save(any());
         verify(pushDispatcher, never()).dispatch(anyLong(), any(), any(), any(), anyLong());
@@ -69,7 +87,7 @@ class NotificationCreationServiceTest {
         });
 
         notificationCreationService.create(
-                1L, 2L, NotificationType.OPINION_LIKED, "제목", "내용", 10L, null, null, null);
+                1L, 2L, NotificationType.OPINION_LIKED, "제목", "내용", 10L, null, null, null, null, null);
 
         ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository).save(captor.capture());
@@ -89,7 +107,7 @@ class NotificationCreationServiceTest {
         });
 
         notificationCreationService.create(
-                3L, null, NotificationType.BOOK_NEW_OPINIONS, "새 의견", "내용", null, 5L, null, 7);
+                3L, null, NotificationType.BOOK_NEW_OPINIONS, "새 의견", "내용", null, 5L, null, null, null, 7);
 
         verify(notificationRepository).save(any(Notification.class));
         verify(pushDispatcher).dispatch(3L, NotificationType.BOOK_NEW_OPINIONS, "새 의견", "내용", 200L);
@@ -108,7 +126,7 @@ class NotificationCreationServiceTest {
                 .given(pushDispatcher).dispatch(anyLong(), any(), any(), any(), anyLong());
 
         assertThatCode(() -> notificationCreationService.create(
-                1L, 2L, NotificationType.OPINION_LIKED, "제목", "내용", 10L, null, null, null))
+                1L, 2L, NotificationType.OPINION_LIKED, "제목", "내용", 10L, null, null, null, null, null))
                 .doesNotThrowAnyException();
 
         verify(notificationRepository).save(any(Notification.class));

@@ -26,7 +26,8 @@ import lombok.NoArgsConstructor;
         name = "notifications",
         indexes = {
                 @Index(name = "idx_notifications_receiver", columnList = "receiver_id, created_at"),
-                // BookNewOpinionsNotifier가 (receiver, book) 기준 가장 최근 알림의 snapshot을 조회하는 데 사용.
+                // 더 이상 조회에 쓰이지 않지만(이슈 #193으로 BOOK_NEW_OPINIONS 트리거 제거), 기존 인덱스를
+                // DB에서 임의로 지우지 않기 위해 엔티티 선언은 그대로 둔다.
                 @Index(name = "idx_notifications_receiver_book", columnList = "receiver_id, book_id, created_at")
         }
 )
@@ -66,6 +67,14 @@ public class Notification extends BaseEntity {
     @Column(name = "comment_id")
     private Long commentId;
 
+    // 모임 전용 알림(또는 모임 전용 흔적에 달린 알림)이면 그 모임, 전역 알림이면 null.
+    // 조인 없이 바로 렌더링하도록 title/body와 같은 방식으로 생성 시점에 스냅샷한다.
+    @Column(name = "group_id")
+    private Long groupId;
+
+    @Column(name = "group_name")
+    private String groupName;
+
     // BOOK_NEW_OPINIONS 전용: 알림 생성 시점의 책 전체(살아있는) 의견 수. 다음 알림 발송 여부 판단 기준값.
     @Column(name = "opinion_count_snapshot")
     private Integer opinionCountSnapshot;
@@ -86,6 +95,8 @@ public class Notification extends BaseEntity {
             Long opinionId,
             Long bookId,
             Long commentId,
+            Long groupId,
+            String groupName,
             Integer opinionCountSnapshot
     ) {
         this.receiver = receiver;
@@ -96,6 +107,8 @@ public class Notification extends BaseEntity {
         this.opinionId = opinionId;
         this.bookId = bookId;
         this.commentId = commentId;
+        this.groupId = groupId;
+        this.groupName = groupName;
         this.opinionCountSnapshot = opinionCountSnapshot;
         this.read = false;
     }

@@ -21,4 +21,13 @@ class FirebaseConfigTest {
             assertThat(context.getBean(FcmPushSender.class)).isInstanceOf(NoOpFcmPushSender.class);
         });
     }
+
+    @Test
+    @DisplayName("prod 프로필에서 firebase.credentials-base64가 비어 있으면 기동에 실패한다")
+    void failsFastWhenCredentialsMissingInProd() {
+        contextRunner.withInitializer(context -> context.getEnvironment().addActiveProfile("prod")).run(context -> {
+            assertThat(context).hasFailed();
+            assertThat(context.getStartupFailure()).rootCause().isInstanceOf(IllegalStateException.class);
+        });
+    }
 }

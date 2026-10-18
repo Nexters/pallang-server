@@ -8,6 +8,7 @@ import com.nexters.palang.domain.passage.infrastructure.ocr.OcrTextBlock;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -31,22 +32,25 @@ public class PassageOcrService {
 
         try {
             List<OcrTextBlock> blocks = ocrClient.recognize(image.getBytes(), image.getContentType());
-            return blocks.stream()
-                    .map(this::toResultDto)
+            List<OcrBreakClassifier.BlockLayout> layouts = OcrBreakClassifier.classify(blocks);
+            return IntStream.range(0, blocks.size())
+                    .mapToObj(i -> toResultDto(blocks.get(i), layouts.get(i)))
                     .toList();
         } catch (IOException e) {
             throw new PassageException(PassageErrorCode.INVALID_IMAGE_FILE);
         }
     }
 
-    private OcrResultDto toResultDto(OcrTextBlock block) {
+    private OcrResultDto toResultDto(OcrTextBlock block, OcrBreakClassifier.BlockLayout layout) {
         List<OcrResultDto.Point> points = block.boundingBox().vertices().stream()
                 .map(p -> new OcrResultDto.Point(p.x(), p.y()))
                 .toList();
         return new OcrResultDto(
                 block.text(),
                 new OcrResultDto.BoundingBox(points),
-                block.lineBreak()
+                block.lineBreak(),
+                layout.breakType(),
+                layout.indented()
         );
     }
 }

@@ -32,7 +32,8 @@ public final class UserMapper {
         return new MyOpinionResponse(
                 projection.opinionId(), projection.bookId(), projection.bookTitle(), projection.author(),
                 projection.bookCoverImageUrl(), projection.passageId(), projection.quotedText(), projection.pageNumber(),
-                projection.content(), projection.likeCount(), projection.createdAt());
+                projection.content(), projection.likeCount(), projection.createdAt(),
+                projection.groupId(), projection.groupName());
     }
 
     public static MyOpinionListResponse toMyOpinionListResponse(Page<MyOpinionProjection> projections) {
@@ -45,7 +46,7 @@ public final class UserMapper {
                 projection.opinionId(), projection.bookId(), projection.bookTitle(), projection.author(),
                 projection.bookCoverImageUrl(), projection.passageId(), projection.quotedText(), projection.pageNumber(),
                 projection.content(), projection.nickname(), projection.likeCount(), projection.createdAt(),
-                projection.likedAt());
+                projection.likedAt(), projection.groupId(), projection.groupName());
     }
 
     public static LikedOpinionListResponse toLikedOpinionListResponse(Page<LikedOpinionProjection> projections) {
@@ -65,7 +66,8 @@ public final class UserMapper {
     public static MyPassageResponse toMyPassageResponse(MyPassageProjection projection) {
         return new MyPassageResponse(
                 projection.passageId(), projection.bookId(), projection.opinionId(), projection.pageNumber(),
-                projection.quotedText(), projection.isSpoiler(), projection.createdAt());
+                projection.quotedText(), projection.isSpoiler(), projection.createdAt(),
+                projection.groupId(), projection.groupName());
     }
 
     public static MyPassageListResponse toMyPassageListResponse(Page<MyPassageProjection> projections) {

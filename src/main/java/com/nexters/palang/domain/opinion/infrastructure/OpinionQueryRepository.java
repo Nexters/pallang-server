@@ -4,12 +4,14 @@ import com.nexters.palang.domain.block.domain.QUserBlock;
 import com.nexters.palang.domain.book.application.BookOptionProjection;
 import com.nexters.palang.domain.book.domain.QBook;
 import com.nexters.palang.domain.comment.domain.QComment;
+import com.nexters.palang.domain.group.domain.QGroup;
 import com.nexters.palang.domain.opinion.application.LikedOpinionProjection;
 import com.nexters.palang.domain.opinion.application.MyOpinionProjection;
 import com.nexters.palang.domain.opinion.application.OpinionSummaryProjection;
 import com.nexters.palang.domain.opinion.domain.OpinionSortType;
 import com.nexters.palang.domain.opinion.domain.QOpinion;
 import com.nexters.palang.domain.opinion.domain.QOpinionLike;
+import com.nexters.palang.domain.passage.domain.PassageScope;
 import com.nexters.palang.domain.passage.domain.QPassage;
 import com.nexters.palang.domain.user.domain.QUser;
 import com.querydsl.core.types.Expression;
@@ -90,22 +92,27 @@ public class OpinionQueryRepository {
         return new OrderSpecifier<?>[]{opinion.createdAt.desc(), opinion.id.desc()};
     }
 
-    public Page<MyOpinionProjection> findMyOpinions(Long userId, Long bookId, Pageable pageable) {
+    public Page<MyOpinionProjection> findMyOpinions(
+            Long userId, Long bookId, PassageScope scope, Pageable pageable) {
         QOpinion opinion = QOpinion.opinion;
         QPassage passage = QPassage.passage;
         QBook book = QBook.book;
+        QGroup group = QGroup.group;
 
         BooleanExpression bookFilter = bookId != null ? book.id.eq(bookId) : null;
 
+        // 모임 정보는 반드시 명시적 leftJoin으로 가져온다. select에 passage.group.name을 바로 쓰면 암묵적
+        // inner join이 걸려 전역 공개 대목(group_id IS NULL)에 남긴 흔적이 결과에서 빠진다.
         List<MyOpinionProjection> content = queryFactory
                 .select(Projections.constructor(MyOpinionProjection.class,
                         opinion.id, book.id, book.title, book.author, book.coverImageUrl,
                         passage.id, passage.quotedText, passage.pageNumber,
-                        opinion.content, opinion.likeCount, opinion.createdAt))
+                        opinion.content, opinion.likeCount, opinion.createdAt, group.id, group.name))
                 .from(opinion)
                 .join(opinion.passage, passage)
                 .join(passage.book, book)
-                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(), bookFilter)
+                .leftJoin(passage.group, group)
+                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(), bookFilter, scopeFilter(passage, scope))
                 .orderBy(opinion.createdAt.desc(), opinion.id.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
@@ -116,19 +123,21 @@ public class OpinionQueryRepository {
                 .from(opinion)
                 .join(opinion.passage, passage)
                 .join(passage.book, book)
-                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(), bookFilter)
+                .where(opinion.user.id.eq(userId), opinion.deletedAt.isNull(), bookFilter, scopeFilter(passage, scope))
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
     }
 
     // liked_at(=OpinionLike.createdAt) 최신순. idx_likes_user_created(user_id, created_at) 인덱스와 정합.
-    public Page<LikedOpinionProjection> findLikedOpinions(Long userId, Long bookId, Pageable pageable) {
+    public Page<LikedOpinionProjection> findLikedOpinions(
+            Long userId, Long bookId, PassageScope scope, Pageable pageable) {
         QOpinionLike opinionLike = QOpinionLike.opinionLike;
         QOpinion opinion = QOpinion.opinion;
         QPassage passage = QPassage.passage;
         QBook book = QBook.book;
         QUser author = QUser.user;
+        QGroup group = QGroup.group;
 
         BooleanExpression bookFilter = bookId != null ? book.id.eq(bookId) : null;
 
@@ -136,13 +145,15 @@ public class OpinionQueryRepository {
                 .select(Projections.constructor(LikedOpinionProjection.class,
                         opinion.id, book.id, book.title, book.author, book.coverImageUrl,
                         passage.id, passage.quotedText, passage.pageNumber,
-                        opinion.content, author.nickname, opinion.likeCount, opinion.createdAt, opinionLike.createdAt))
+                        opinion.content, author.nickname, opinion.likeCount, opinion.createdAt, opinionLike.createdAt,
+                        group.id, group.name))
                 .from(opinionLike)
                 .join(opinionLike.opinion, opinion)
                 .join(opinion.passage, passage)
                 .join(passage.book, book)
                 .join(opinion.user, author)
-                .where(opinionLike.user.id.eq(userId), opinion.deletedAt.isNull(), bookFilter)
+                .leftJoin(passage.group, group)
+                .where(opinionLike.user.id.eq(userId), opinion.deletedAt.isNull(), bookFilter, scopeFilter(passage, scope))
                 .orderBy(opinionLike.createdAt.desc(), opinionLike.id.desc())
                 .offset(pageable.getOffset())
                 .limit(pageable.getPageSize())
@@ -154,7 +165,7 @@ public class OpinionQueryRepository {
                 .join(opinionLike.opinion, opinion)
                 .join(opinion.passage, passage)
                 .join(passage.book, book)
-                .where(opinionLike.user.id.eq(userId), opinion.deletedAt.isNull(), bookFilter)
+                .where(opinionLike.user.id.eq(userId), opinion.deletedAt.isNull(), bookFilter, scopeFilter(passage, scope))
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
@@ -190,5 +201,13 @@ public class OpinionQueryRepository {
                 .fetchOne();
 
         return new PageImpl<>(content, pageable, total != null ? total : 0L);
+    }
+
+    // 대목 소속 범위 조건: 특정 모임이면 그 모임 대목만, globalOnly면 전역 공개 대목만, 그 외에는 조건 없음.
+    private BooleanExpression scopeFilter(QPassage passage, PassageScope scope) {
+        if (scope.isGroup()) {
+            return passage.group.id.eq(scope.groupId());
+        }
+        return scope.globalOnly() ? passage.group.isNull() : null;
     }
 }

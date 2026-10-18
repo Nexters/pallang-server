@@ -15,6 +15,8 @@ import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.domain.group.domain.GroupMember;
+import com.nexters.palang.domain.group.domain.event.GroupJoinedEvent;
+import com.nexters.palang.domain.group.domain.event.GroupScheduleChangedEvent;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupQueryRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupRepository;
@@ -30,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -50,6 +53,9 @@ class GroupServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private GroupService groupService;
 
     private Book book;
@@ -58,7 +64,8 @@ class GroupServiceTest {
 
     @BeforeEach
     void setUp() {
-        groupService = new GroupService(groupRepository, groupMemberRepository, groupQueryRepository, bookRepository, userRepository);
+        groupService = new GroupService(
+                groupRepository, groupMemberRepository, groupQueryRepository, bookRepository, userRepository, eventPublisher);
         book = book(1L);
         host = user(1L);
         other = user(2L);
@@ -179,6 +186,20 @@ class GroupServiceTest {
 
         assertThat(detail.group().getName()).isEqualTo("주말 독서 모임");
         assertThat(detail.group().getCapacity()).isEqualTo(6);
+        verify(eventPublisher).publishEvent(new GroupScheduleChangedEvent(1L, "주말 독서 모임", host.getId()));
+    }
+
+    @Test
+    @DisplayName("일정이 바뀌지 않으면 일정 변경 알림 이벤트를 발행하지 않는다")
+    void updateGroupDoesNotPublishEventWhenScheduleUnchanged() {
+        Group group = group(1L, host);
+        given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group));
+        given(groupMemberRepository.countByGroupId(1L)).willReturn(1L);
+
+        groupService.updateGroup(1L, host.getId(),
+                new UpdateGroupRequest("주말 독서 모임", 6, group.getStartDate(), group.getEndDate()));
+
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -345,5 +366,7 @@ class GroupServiceTest {
 
         assertThat(detail.memberCount()).isEqualTo(2L);
         verify(groupMemberRepository).save(any(GroupMember.class));
+        verify(eventPublisher).publishEvent(
+                new GroupJoinedEvent(1L, "고전 뽀개기", other.getId(), host.getId()));
     }
 }

@@ -21,7 +21,13 @@ import org.springframework.web.multipart.MultipartFile;
 @Tag(name = "대목(Passage)", description = "대목 및 OCR 관련 API")
 public interface PassageControllerDocs {
 
-    @Operation(summary = "이미지 OCR 텍스트 추출", description = "도서의 특정 페이지 이미지를 업로드하여 텍스트를 추출(인식)합니다.")
+    @Operation(summary = "이미지 OCR 텍스트 추출", description = "도서의 특정 페이지 이미지를 업로드하여 텍스트를 추출(인식)합니다.\n\n"
+            + "인식 결과는 단어 단위 블록 목록입니다. 사용자가 고른 블록을 순서대로 이어 붙일 때 아래 규칙으로 줄바꿈·들여쓰기를 살립니다. "
+            + "(시는 책의 행·연 그대로, 산문은 화면 폭에 맞춰 이어 쓰고 문단에서만 줄바꿈 + 들여쓰기)\n\n"
+            + "① indented가 true면 → 단어 앞에 들여쓰기(전각 공백 U+3000)\n\n"
+            + "② breakType에 따라 단어 뒤에 → NONE, WRAP: 공백 / LINE, PARAGRAPH: 줄바꿈(\\n) / BLANK_LINE: 빈 줄(\\n\\n)\n\n"
+            + "③ 마지막 단어 뒤의 공백·줄바꿈은 제거 (첫 줄 앞의 들여쓰기는 유지)\n\n"
+            + "예) 디드로의(indented) + 말한다.(PARAGRAPH) + 이런(indented) + 광경은 → [들여쓰기]디드로의 말한다.[줄바꿈][들여쓰기]이런 광경은")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "텍스트 추출 성공"),
             @ApiResponse(
