@@ -134,6 +134,59 @@ class NotificationRepositoryTest {
     }
 
     @Test
+    @DisplayName("안 읽은 전체 개수를 집계한다")
+    void countByReceiverIdAndReadFalse() {
+        save(NotificationType.OPINION_LIKED, null, null, null, null);
+        Notification groupNotification = save(NotificationType.OPINION_LIKED, null, null, 9L, "모임");
+        groupNotification.markAsRead();
+        entityManager.persistAndFlush(groupNotification);
+
+        long count = notificationRepository.countByReceiverIdAndReadFalse(receiver.getId());
+
+        assertThat(count).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("활동 탭의 안 읽은 개수만 집계한다")
+    void countByReceiverIdAndGroupIdIsNullAndReadFalse() {
+        save(NotificationType.OPINION_LIKED, null, null, null, null);
+        save(NotificationType.OPINION_LIKED, null, null, 9L, "모임");
+
+        long count = notificationRepository.countByReceiverIdAndGroupIdIsNullAndReadFalse(receiver.getId());
+
+        assertThat(count).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("모임 탭의 안 읽은 개수만 집계한다")
+    void countByReceiverIdAndGroupIdIsNotNullAndReadFalse() {
+        save(NotificationType.OPINION_LIKED, null, null, null, null);
+        save(NotificationType.OPINION_LIKED, null, null, 9L, "모임");
+
+        long count = notificationRepository.countByReceiverIdAndGroupIdIsNotNullAndReadFalse(receiver.getId());
+
+        assertThat(count).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("안 읽은 알림이 하나라도 있으면 true를 반환한다")
+    void existsByReceiverIdAndReadFalseReturnsTrue() {
+        save(NotificationType.OPINION_LIKED, null, null, null, null);
+
+        assertThat(notificationRepository.existsByReceiverIdAndReadFalse(receiver.getId())).isTrue();
+    }
+
+    @Test
+    @DisplayName("안 읽은 알림이 없으면 false를 반환한다")
+    void existsByReceiverIdAndReadFalseReturnsFalse() {
+        Notification notification = save(NotificationType.OPINION_LIKED, null, null, null, null);
+        notification.markAsRead();
+        entityManager.persistAndFlush(notification);
+
+        assertThat(notificationRepository.existsByReceiverIdAndReadFalse(receiver.getId())).isFalse();
+    }
+
+    @Test
     @DisplayName("전체 읽음 처리를 하면 안 읽은 알림만 읽음으로 바뀐다")
     void markAllAsRead() {
         Notification unread1 = save(NotificationType.OPINION_LIKED, null, null);

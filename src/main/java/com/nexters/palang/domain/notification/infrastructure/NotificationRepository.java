@@ -21,6 +21,16 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     // 알림함 "모임" 탭: 모임에 속한(group_id IS NOT NULL) 알림만.
     Page<Notification> findByReceiverIdAndGroupIdIsNotNullOrderByCreatedAtDesc(Long receiverId, Pageable pageable);
 
+    // 알림함 탭별 안 읽은 개수 뱃지.
+    long countByReceiverIdAndReadFalse(Long receiverId);
+
+    long countByReceiverIdAndGroupIdIsNullAndReadFalse(Long receiverId);
+
+    long countByReceiverIdAndGroupIdIsNotNullAndReadFalse(Long receiverId);
+
+    // 홈 화면 벨 아이콘: scope와 무관하게 안 읽은 알림이 하나라도 있는지만 확인.
+    boolean existsByReceiverIdAndReadFalse(Long receiverId);
+
     // BookNewOpinionsNotifier: 이 사용자에게 이 책에 대해 마지막으로 보낸 BOOK_NEW_OPINIONS 알림의 snapshot을 조회.
     Optional<Notification> findFirstByReceiverIdAndTypeAndBookIdOrderByCreatedAtDesc(
             Long receiverId, NotificationType type, Long bookId);
