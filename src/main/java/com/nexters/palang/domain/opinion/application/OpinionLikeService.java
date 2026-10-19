@@ -46,7 +46,8 @@ public class OpinionLikeService {
         eventPublisher.publishEvent(new OpinionLikedEvent(
                 opinion.getId(), opinion.getUser().getId(), userId,
                 group != null ? group.getId() : null,
-                group != null ? group.getName() : null));
+                group != null ? group.getName() : null,
+                opinion.getLikeCount(), opinion.getPassage().getBook().getTitle(), opinion.getPassage().getPageNumber()));
         return new OpinionLikeResult(opinion.getId(), true, opinion.getLikeCount());
     }
 

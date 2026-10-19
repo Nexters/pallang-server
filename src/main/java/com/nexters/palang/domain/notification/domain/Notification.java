@@ -120,4 +120,12 @@ public class Notification extends BaseEntity {
         this.read = true;
         this.readAt = LocalDateTime.now();
     }
+
+    // OPINION_LIKED 전용: 좋아요는 Figma 기준 "N명이 좋아해요"로 집계 표시하므로, 아직 안 읽은 좋아요
+    // 알림이 있으면 새로 만들지 않고 이 알림의 제목(인원수)/행위자만 최신 값으로 덮어쓴다.
+    public void refreshLikeAggregation(Long actorId, String title, String body) {
+        this.actorId = actorId;
+        this.title = title;
+        this.body = body;
+    }
 }
