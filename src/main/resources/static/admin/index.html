@@ -16,6 +16,28 @@
     --danger: #d73a4a;
     --danger-dark: #b3212f;
     --accent: #3366ff;
+    --row-stripe: rgba(0, 0, 0, 0.025);
+    --row-hover: rgba(51, 102, 255, 0.06);
+    --expand-bg: #f7f8fc;
+    --expand-border: #c7cdf5;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181c;
+      --card: #222327;
+      --border: #34353b;
+      --text: #ececee;
+      --muted: #9a9aa2;
+      --danger: #ff6b7a;
+      --danger-dark: #ff8894;
+      --accent: #6e8bff;
+      --row-stripe: rgba(255, 255, 255, 0.03);
+      --row-hover: rgba(110, 139, 255, 0.1);
+      --expand-bg: #1c1e2a;
+      --expand-border: #3a3f6b;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
+    }
   }
   * { box-sizing: border-box; }
   body {
@@ -24,6 +46,7 @@
     background: var(--bg);
     color: var(--text);
     padding: 24px;
+    line-height: 1.5;
   }
   h1 { font-size: 20px; margin: 0 0 4px; }
   p.subtitle { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
@@ -33,12 +56,13 @@
     border-radius: 12px;
     padding: 16px;
     margin-bottom: 16px;
+    box-shadow: var(--shadow);
   }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   input[type="text"], input[type="password"], input[type="number"], input[type="date"], textarea {
     flex: 1;
     min-width: 200px;
-    padding: 8px 10px;
+    padding: 9px 11px;
     border: 1px solid var(--border);
     border-radius: 8px;
     font-size: 14px;
@@ -53,38 +77,50 @@
     border: 1px solid var(--border);
     background: var(--accent);
     color: #fff;
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
+    transition: opacity 0.1s ease;
   }
-  button.secondary { background: #fff; color: var(--text); }
-  button.danger { background: var(--danger); border-color: var(--danger); }
+  button:hover { opacity: 0.88; }
+  button.secondary { background: var(--card); color: var(--text); }
+  button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
   button.danger:hover { background: var(--danger-dark); }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
-  th { color: var(--muted); font-weight: 600; }
+  .table-scroll { overflow: auto; max-height: 72vh; border-radius: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th {
+    color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.02em;
+    position: sticky; top: 0; background: var(--card); box-shadow: 0 1px 0 var(--border); z-index: 1;
+  }
+  tbody tr:nth-child(4n+1), tbody tr:nth-child(4n+2) { background: var(--row-stripe); }
+  tbody tr:hover { background: var(--row-hover); }
+  tr.expand-row:hover { background: inherit; }
   td.actions { white-space: nowrap; }
   td.actions button { margin-right: 4px; }
   .badge {
     display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
     background: #eef0ff; color: var(--accent);
   }
+  @media (prefers-color-scheme: dark) { .badge { background: rgba(110, 139, 255, 0.18); } }
   .badge.warn { background: #fff3e0; color: #b3620a; }
+  @media (prefers-color-scheme: dark) { .badge.warn { background: rgba(255, 180, 60, 0.18); color: #ffb43c; } }
   #status { font-size: 13px; margin-top: 8px; white-space: pre-wrap; }
   #status.error { color: var(--danger); }
   #status.ok { color: #1a7f37; }
+  @media (prefers-color-scheme: dark) { #status.ok { color: #5fd576; } }
   .pager { display: flex; gap: 8px; align-items: center; margin-top: 12px; font-size: 13px; }
   .tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
-  .tabs button { background: #fff; color: var(--text); }
+  .tabs button { background: var(--card); color: var(--text); }
   .tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   .modal-backdrop {
-    display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4);
+    display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45);
     align-items: center; justify-content: center; z-index: 10;
   }
   .modal-backdrop.open { display: flex; }
   .modal {
     background: var(--card); border-radius: 12px; padding: 20px; width: 420px; max-width: calc(100vw - 32px);
-    max-height: calc(100vh - 32px); overflow-y: auto;
+    max-height: calc(100vh - 32px); overflow-y: auto; box-shadow: var(--shadow);
   }
   .modal h2 { font-size: 16px; margin: 0 0 12px; }
   .modal .field { margin-bottom: 10px; }
@@ -92,6 +128,21 @@
   .modal .field.checkbox { display: flex; align-items: center; gap: 6px; }
   .modal .field.checkbox label { margin: 0; }
   .modal .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+  /* 대목 행 펼치기(의견 세트 보기) */
+  .expand-toggle { background: var(--card); color: var(--accent); border-color: var(--accent); }
+  tr.expand-row > td {
+    padding: 0; border-bottom: 2px solid var(--expand-border);
+  }
+  .expand-panel { background: var(--expand-bg); padding: 10px 10px 14px 28px; border-left: 3px solid var(--expand-border); }
+  .expand-panel .expand-heading {
+    font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin: 4px 0 8px;
+  }
+  .expand-panel table { font-size: 12.5px; background: transparent; }
+  .expand-panel th, .expand-panel td { padding: 6px 8px; border-bottom: 1px solid var(--border); position: static; }
+  .expand-panel tbody tr:nth-child(4n+1), .expand-panel tbody tr:nth-child(4n+2) { background: rgba(0, 0, 0, 0.02); }
+  .expand-loading, .expand-error, .expand-empty { padding: 10px 10px 10px 28px; font-size: 12.5px; color: var(--muted); }
+  .expand-error { color: var(--danger); }
 </style>
 </head>
 <body>
@@ -124,10 +175,12 @@
     </div>
 
     <div class="card">
-      <table>
-        <thead id="thead"></thead>
-        <tbody id="rows"></tbody>
-      </table>
+      <div class="table-scroll">
+        <table>
+          <thead id="thead"></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
       <div class="pager">
         <button id="prevBtn" class="secondary">이전</button>
         <span id="pageLabel"></span>
@@ -148,6 +201,16 @@
   </div>
 
 <script>
+  // 대목 행을 펼쳤을 때 보여줄 의견 컬럼. 이미 어느 대목 밑인지 알고 있으므로 "대목" 컬럼은 뺀다.
+  const TAB_OPINION_NESTED_COLUMNS = [
+    { label: "ID", render: r => r.opinionId },
+    { label: "작성자", render: r => escapeHtml(r.userNickname) },
+    { label: "내용", render: r => escapeHtml(truncate(r.content, 60)) },
+    { label: "좋아요", render: r => r.likeCount },
+    { label: "작성일", render: r => fmtDate(r.createdAt) },
+    { label: "상태", render: r => r.deleted ? '<span class="badge warn">삭제됨</span>' : "" },
+  ];
+
   // 탭마다 목록/수정/삭제 API 경로와 표에 보여줄 컬럼, 수정 폼에 쓸 필드를 정의한다. 탭을 늘릴 때는
   // 이 설정 객체만 추가하면 되고, 검색·페이징·수정 모달·삭제 확인 로직은 공용으로 재사용된다.
   const TABS = {
@@ -175,6 +238,7 @@
         { label: "작성자", render: r => escapeHtml(r.creatorNickname) },
         { label: "페이지", render: r => r.pageNumber },
         { label: "인용문", render: r => escapeHtml(truncate(r.quotedText, 40)) },
+        { label: "작성일", render: r => fmtDate(r.createdAt) },
         { label: "상태", render: r => (r.deleted ? '<span class="badge warn">삭제됨</span> ' : "") + (r.isSpoiler ? '<span class="badge">스포일러</span>' : "") },
       ],
       editFields: [
@@ -185,6 +249,15 @@
       updateUrl: r => `/api/admin/passages/${r.passageId}`,
       deleteUrl: r => `/api/admin/passages/${r.passageId}`,
       deleteConfirmText: r => `대목(id: ${r.passageId})을(를) 삭제할까요?\n달린 의견/댓글/데코/좋아요까지 함께 사라지며 되돌릴 수 없습니다.`,
+      // 대목과 의견은 늘 세트로 다뤄지므로, 대목 행을 펼치면 바로 그 대목에 달린 의견을 읽기
+      // 순서(작성 순)대로 보여준다 — ID로 일일이 교차 확인하지 않아도 되게 한다.
+      expandable: {
+        fetchUrl: r => `/api/admin/opinions?passageId=${r.passageId}&page=0&size=100`,
+        listKey: "opinions",
+        emptyText: "이 대목에 달린 의견이 없습니다.",
+        columns: TAB_OPINION_NESTED_COLUMNS,
+        rowTab: "opinions",
+      },
     },
     opinions: {
       label: "의견", listUrl: "/api/admin/opinions", listKey: "opinions", idKey: "opinionId",
@@ -195,6 +268,7 @@
         { label: "작성자", render: r => escapeHtml(r.userNickname) },
         { label: "내용", render: r => escapeHtml(truncate(r.content, 40)) },
         { label: "좋아요", render: r => r.likeCount },
+        { label: "작성일", render: r => fmtDate(r.createdAt) },
         { label: "상태", render: r => r.deleted ? '<span class="badge warn">삭제됨</span>' : "" },
       ],
       editFields: [
@@ -213,6 +287,7 @@
         { label: "구분", render: r => r.parentCommentId ? `답글(→${r.parentCommentId})` : "원댓글" },
         { label: "작성자", render: r => escapeHtml(r.userNickname) },
         { label: "내용", render: r => escapeHtml(truncate(r.content, 40)) },
+        { label: "작성일", render: r => fmtDate(r.createdAt) },
         { label: "상태", render: r => r.deleted ? '<span class="badge warn">삭제됨</span>' : "" },
       ],
       editFields: [
@@ -446,24 +521,31 @@
       const tr = document.createElement("tr");
       tr.innerHTML = tab.columns.map(c => `<td>${c.render(row)}</td>`).join("") + '<td class="actions"></td>';
       const actionsCell = tr.lastElementChild;
+      if (tab.expandable) {
+        const toggleBtn = document.createElement("button");
+        toggleBtn.className = "secondary expand-toggle";
+        toggleBtn.textContent = "펼치기 ▾";
+        toggleBtn.addEventListener("click", () => toggleExpandRow(tab, row, tr, toggleBtn));
+        actionsCell.appendChild(toggleBtn);
+      }
       if (tab.editFields) {
         const editBtn = document.createElement("button");
         editBtn.className = "secondary";
         editBtn.textContent = "수정";
-        editBtn.addEventListener("click", () => openEditModal(row));
+        editBtn.addEventListener("click", () => openEditModal(row, currentTabKey));
         actionsCell.appendChild(editBtn);
       }
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "danger";
       deleteBtn.textContent = "삭제";
-      deleteBtn.addEventListener("click", () => deleteRow(row, deleteBtn));
+      deleteBtn.addEventListener("click", () => deleteRow(row, deleteBtn, currentTabKey));
       actionsCell.appendChild(deleteBtn);
       rowsEl.appendChild(tr);
     }
   }
 
-  async function deleteRow(row, button) {
-    const tab = TABS[currentTabKey];
+  async function deleteRow(row, button, tabKey, onSuccess) {
+    const tab = TABS[tabKey];
     const confirmed = confirm(tab.deleteConfirmText(row));
     if (!confirmed) return;
 
@@ -472,11 +554,82 @@
     try {
       await callApi(tab.deleteUrl(row), { method: "DELETE" });
       setStatus(`id: ${row[tab.idKey]} 삭제 완료.`, "ok");
-      search(tabState[currentTabKey].page);
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        search(tabState[currentTabKey].page);
+      }
     } catch (e) {
       setStatus("삭제 실패: " + e.message, "error");
       button.disabled = false;
     }
+  }
+
+  // --- 대목 ↔ 의견 세트 보기(펼치기) ---
+  // 대목 행을 펼치면 바로 아래에 그 대목의 의견을 작성 순서대로 넣은 작은 표를 끼워 넣는다.
+  // 다시 누르면 접힌다. 한 번 불러온 뒤에는 수정/삭제 시에만 그 패널만 다시 불러온다(전체 목록 재검색 불필요).
+  async function toggleExpandRow(tab, row, tr, toggleBtn) {
+    const existing = tr.nextElementSibling;
+    if (existing && existing.classList.contains("expand-row")) {
+      existing.remove();
+      toggleBtn.textContent = "펼치기 ▾";
+      return;
+    }
+    toggleBtn.textContent = "접기 ▴";
+    const expandTr = document.createElement("tr");
+    expandTr.className = "expand-row";
+    const td = document.createElement("td");
+    td.colSpan = tab.columns.length + 1;
+    expandTr.appendChild(td);
+    tr.after(expandTr);
+    await loadExpandPanel(tab, row, td);
+  }
+
+  async function loadExpandPanel(tab, row, container) {
+    container.innerHTML = '<div class="expand-loading">불러오는 중...</div>';
+    try {
+      const result = await callApi(tab.expandable.fetchUrl(row), { method: "GET" });
+      renderExpandPanel(tab, row, container, result.data[tab.expandable.listKey]);
+    } catch (e) {
+      container.innerHTML = `<div class="expand-error">불러오기 실패: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  function renderExpandPanel(tab, parentRow, container, list) {
+    const exp = tab.expandable;
+    if (!list.length) {
+      container.innerHTML = `<div class="expand-empty">${escapeHtml(exp.emptyText)}</div>`;
+      return;
+    }
+    const nestedTab = TABS[exp.rowTab];
+    const refresh = () => loadExpandPanel(tab, parentRow, container);
+    const panel = document.createElement("div");
+    panel.className = "expand-panel";
+    panel.innerHTML = `<div class="expand-heading">${escapeHtml(nestedTab.label)} ${list.length}건</div>`;
+    const table = document.createElement("table");
+    table.innerHTML = "<thead><tr>" + exp.columns.map(c => `<th>${c.label}</th>`).join("") + "<th></th></tr></thead><tbody></tbody>";
+    const tbody = table.querySelector("tbody");
+    for (const row of list) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = exp.columns.map(c => `<td>${c.render(row)}</td>`).join("") + '<td class="actions"></td>';
+      const actionsCell = tr.lastElementChild;
+      if (nestedTab.editFields) {
+        const editBtn = document.createElement("button");
+        editBtn.className = "secondary";
+        editBtn.textContent = "수정";
+        editBtn.addEventListener("click", () => openEditModal(row, exp.rowTab, refresh));
+        actionsCell.appendChild(editBtn);
+      }
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "danger";
+      deleteBtn.textContent = "삭제";
+      deleteBtn.addEventListener("click", () => deleteRow(row, deleteBtn, exp.rowTab, refresh));
+      actionsCell.appendChild(deleteBtn);
+      tbody.appendChild(tr);
+    }
+    panel.appendChild(table);
+    container.innerHTML = "";
+    container.appendChild(panel);
   }
 
   function renderPager() {
@@ -497,10 +650,14 @@
   const modalTitle = document.getElementById("modalTitle");
   const modalFields = document.getElementById("modalFields");
   let editingRow = null;
+  let editingTabKey = null;
+  let editingOnSaved = null;
 
-  function openEditModal(row) {
-    const tab = TABS[currentTabKey];
+  function openEditModal(row, tabKey, onSaved) {
+    const tab = TABS[tabKey];
     editingRow = row;
+    editingTabKey = tabKey;
+    editingOnSaved = onSaved || null;
     modalTitle.textContent = `${tab.label} 수정 (id: ${row[tab.idKey]})`;
     modalFields.innerHTML = "";
     for (const field of tab.editFields) {
@@ -527,6 +684,8 @@
   function closeEditModal() {
     modalBackdrop.classList.remove("open");
     editingRow = null;
+    editingTabKey = null;
+    editingOnSaved = null;
   }
 
   document.getElementById("modalCancel").addEventListener("click", closeEditModal);
@@ -535,8 +694,9 @@
   });
 
   document.getElementById("modalSave").addEventListener("click", async () => {
-    const tab = TABS[currentTabKey];
+    const tab = TABS[editingTabKey];
     const row = editingRow;
+    const onSaved = editingOnSaved;
     if (!row) return;
 
     const body = {};
@@ -556,7 +716,11 @@
       await callApi(tab.updateUrl(row), { method: "PATCH", body: JSON.stringify(body) });
       setStatus(`id: ${row[tab.idKey]} 수정 완료.`, "ok");
       closeEditModal();
-      search(tabState[currentTabKey].page);
+      if (onSaved) {
+        onSaved();
+      } else {
+        search(tabState[currentTabKey].page);
+      }
     } catch (e) {
       setStatus("수정 실패: " + e.message, "error");
     }

@@ -15,13 +15,15 @@ import org.springframework.http.ResponseEntity;
 public interface AdminOpinionApi {
 
     @Operation(summary = "관리자 의견 검색", description = "내용에 키워드가 포함된 의견을 검색합니다. "
-            + "소프트 삭제된 의견도 함께 조회됩니다.")
+            + "passageId를 주면 키워드 검색 대신 그 대목에 달린 의견 전부를 작성 순서(오래된 순)로 반환합니다 "
+            + "— 관리자 페이지에서 대목 행을 펼쳐볼 때 사용합니다. 소프트 삭제된 의견도 함께 조회됩니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "403", description = "관리자 권한 없음 (ADMIN_403_1)")
     })
     ResponseEntity<DataResponse<AdminOpinionListResponse>> searchOpinions(
-            @Parameter(description = "내용 검색어") String keyword,
+            @Parameter(description = "이 대목의 의견만 작성 순서대로 조회 (주어지면 keyword 무시)") Long passageId,
+            @Parameter(description = "내용 검색어 (passageId가 없을 때만 사용)") String keyword,
             @Parameter(hidden = true) int page,
             @Parameter(hidden = true) int size
     );
