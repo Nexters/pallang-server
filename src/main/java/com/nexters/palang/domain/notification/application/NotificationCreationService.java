@@ -38,7 +38,7 @@ public class NotificationCreationService {
         if (actorId != null && actorId.equals(receiverId)) {
             return;
         }
-        if (!notificationPreferenceService.isEnabled(receiverId, groupId)) {
+        if (!notificationPreferenceService.isEnabled(receiverId, type, groupId)) {
             return;
         }
 

@@ -31,7 +31,7 @@ public class NotificationPreferenceController implements NotificationPreferenceA
     @PutMapping("/api/notifications/settings")
     public ResponseEntity<DataResponse<Void>> updateSettings(@RequestBody @Valid UpdateNotificationPreferenceRequest request) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        notificationPreferenceService.updateSettings(currentUserId, request.activityEnabled(), request.groupEnabled());
+        notificationPreferenceService.updateSettings(currentUserId, request);
         return ResponseEntity.ok(DataResponse.from(null));
     }
 }
