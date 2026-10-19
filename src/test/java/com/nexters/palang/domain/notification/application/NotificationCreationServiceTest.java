@@ -43,7 +43,7 @@ class NotificationCreationServiceTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(notificationPreferenceService.isEnabled(any(), any())).thenReturn(true);
+        lenient().when(notificationPreferenceService.isEnabled(any(), any(), any())).thenReturn(true);
         notificationCreationService = new NotificationCreationService(
                 notificationRepository, userRepository, pushDispatcher, notificationPreferenceService);
     }
@@ -67,7 +67,7 @@ class NotificationCreationServiceTest {
     @Test
     @DisplayName("수신자가 해당 카테고리 알림을 꺼두었으면 생성/발송하지 않는다")
     void doesNotCreateWhenPreferenceDisabled() {
-        given(notificationPreferenceService.isEnabled(1L, null)).willReturn(false);
+        given(notificationPreferenceService.isEnabled(1L, NotificationType.OPINION_LIKED, null)).willReturn(false);
 
         notificationCreationService.create(
                 1L, 2L, NotificationType.OPINION_LIKED, "제목", "내용", 10L, null, null, null, null, null);
