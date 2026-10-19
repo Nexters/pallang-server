@@ -3,6 +3,7 @@ package com.nexters.palang.domain.notification.infrastructure;
 import com.nexters.palang.domain.notification.domain.Notification;
 import com.nexters.palang.domain.notification.domain.NotificationType;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -35,6 +36,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     // 모임의 종료일이 나중에 다시 바뀌어 임박 알림을 또 보내야 하는 경우를 영구히 막지 않는다.
     boolean existsByReceiverIdAndTypeAndGroupIdAndCreatedAtAfter(
             Long receiverId, NotificationType type, Long groupId, LocalDateTime createdAtAfter);
+
+    // OPINION_LIKED 집계: 같은 흔적에 대해 아직 안 읽은 좋아요 알림이 있으면 새로 만들지 않고 그 알림을 갱신한다.
+    Optional<Notification> findFirstByReceiverIdAndTypeAndOpinionIdAndReadFalseOrderByCreatedAtDesc(
+            Long receiverId, NotificationType type, Long opinionId);
 
     @Modifying
     @Query("update Notification n set n.read = true, n.readAt = current_timestamp "

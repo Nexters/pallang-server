@@ -35,10 +35,12 @@ public class NotificationEventListener {
             return;
         }
 
-        String title = "새로운 좋아요";
-        String body = "%s님이 회원님의 흔적을 좋아합니다.".formatted(actor.getNickname());
-        notificationCreationService.create(event.opinionOwnerId(), event.actorUserId(), NotificationType.OPINION_LIKED,
-                title, body, event.opinionId(), null, null, event.groupId(), event.groupName(), null);
+        // Figma 기준: 좋아요가 눌릴 때마다 새 알림을 만들지 않고 "N명이 좋아해요"로 집계한다.
+        String title = "회원님의 의견을 %d명이 좋아해요".formatted(event.likeCount());
+        String body = "%s · %dp".formatted(event.bookTitle(), event.pageNumber());
+        notificationCreationService.createOrUpdateOpinionLiked(
+                event.opinionOwnerId(), event.actorUserId(), title, body,
+                event.opinionId(), event.groupId(), event.groupName());
     }
 
     @Async
@@ -50,8 +52,9 @@ public class NotificationEventListener {
             return;
         }
 
-        String title = "새로운 댓글";
-        String body = "%s님이 회원님의 흔적에 댓글을 남겼습니다.".formatted(actor.getNickname());
+        // Figma 기준: 제목에는 행위자 닉네임을 넣지 않고, 본문에 발췌 문장을 그대로 보여준다.
+        String title = "회원님의 의견에 댓글이 달렸어요";
+        String body = "“%s”".formatted(event.quotedText());
         notificationCreationService.create(
                 event.opinionOwnerId(), event.actorUserId(), NotificationType.OPINION_COMMENTED,
                 title, body, event.opinionId(), null, event.commentId(), event.groupId(), event.groupName(), null);

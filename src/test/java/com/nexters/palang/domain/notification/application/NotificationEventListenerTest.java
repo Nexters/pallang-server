@@ -50,14 +50,14 @@ class NotificationEventListenerTest {
     }
 
     @Test
-    @DisplayName("좋아요 이벤트를 받으면 흔적 작성자에게 OPINION_LIKED 알림 생성을 요청한다")
+    @DisplayName("좋아요 이벤트를 받으면 흔적 작성자에게 OPINION_LIKED 알림 집계 생성을 요청한다")
     void onOpinionLikedCreatesNotification() {
         given(userRepository.findById(2L)).willReturn(Optional.of(user(2L)));
 
-        listener.onOpinionLiked(new OpinionLikedEvent(10L, 1L, 2L, null, null));
+        listener.onOpinionLiked(new OpinionLikedEvent(10L, 1L, 2L, null, null, 5, "책 제목", 30));
 
-        verify(notificationCreationService).create(eq(1L), eq(2L), eq(NotificationType.OPINION_LIKED), any(), any(),
-                eq(10L), eq(null), eq(null), eq(null), eq(null), eq(null));
+        verify(notificationCreationService).createOrUpdateOpinionLiked(eq(1L), eq(2L),
+                eq("회원님의 의견을 5명이 좋아해요"), eq("책 제목 · 30p"), eq(10L), eq(null), eq(null));
     }
 
     @Test
@@ -65,10 +65,10 @@ class NotificationEventListenerTest {
     void onOpinionLikedPropagatesGroupInfo() {
         given(userRepository.findById(2L)).willReturn(Optional.of(user(2L)));
 
-        listener.onOpinionLiked(new OpinionLikedEvent(10L, 1L, 2L, 9L, "모임 이름"));
+        listener.onOpinionLiked(new OpinionLikedEvent(10L, 1L, 2L, 9L, "모임 이름", 3, "책 제목", 12));
 
-        verify(notificationCreationService).create(eq(1L), eq(2L), eq(NotificationType.OPINION_LIKED), any(), any(),
-                eq(10L), eq(null), eq(null), eq(9L), eq("모임 이름"), eq(null));
+        verify(notificationCreationService).createOrUpdateOpinionLiked(eq(1L), eq(2L),
+                eq("회원님의 의견을 3명이 좋아해요"), eq("책 제목 · 12p"), eq(10L), eq(9L), eq("모임 이름"));
     }
 
     @Test
@@ -76,10 +76,10 @@ class NotificationEventListenerTest {
     void onOpinionLikedSkipsWhenActorMissing() {
         given(userRepository.findById(2L)).willReturn(Optional.empty());
 
-        listener.onOpinionLiked(new OpinionLikedEvent(10L, 1L, 2L, null, null));
+        listener.onOpinionLiked(new OpinionLikedEvent(10L, 1L, 2L, null, null, 1, "책 제목", 1));
 
-        verify(notificationCreationService, never()).create(
-                any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+        verify(notificationCreationService, never()).createOrUpdateOpinionLiked(
+                any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -87,10 +87,10 @@ class NotificationEventListenerTest {
     void onCommentCreatedCreatesNotification() {
         given(userRepository.findById(2L)).willReturn(Optional.of(user(2L)));
 
-        listener.onCommentCreated(new CommentCreatedEvent(5L, 10L, 1L, 2L, null, null));
+        listener.onCommentCreated(new CommentCreatedEvent(5L, 10L, 1L, 2L, null, null, "발췌 문장"));
 
-        verify(notificationCreationService).create(eq(1L), eq(2L), eq(NotificationType.OPINION_COMMENTED), any(),
-                any(), eq(10L), eq(null), eq(5L), eq(null), eq(null), eq(null));
+        verify(notificationCreationService).create(eq(1L), eq(2L), eq(NotificationType.OPINION_COMMENTED),
+                eq("회원님의 의견에 댓글이 달렸어요"), eq("“발췌 문장”"), eq(10L), eq(null), eq(5L), eq(null), eq(null), eq(null));
     }
 
     @Test
