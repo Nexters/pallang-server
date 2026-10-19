@@ -15,6 +15,7 @@ import com.nexters.palang.domain.notification.domain.NotificationType;
 import com.nexters.palang.domain.notification.infrastructure.NotificationRepository;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -43,7 +44,7 @@ class NotificationCreationServiceTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(notificationPreferenceService.isEnabled(any(), any())).thenReturn(true);
+        lenient().when(notificationPreferenceService.isEnabled(any(), any(), any())).thenReturn(true);
         notificationCreationService = new NotificationCreationService(
                 notificationRepository, userRepository, pushDispatcher, notificationPreferenceService);
     }
@@ -67,7 +68,7 @@ class NotificationCreationServiceTest {
     @Test
     @DisplayName("수신자가 해당 카테고리 알림을 꺼두었으면 생성/발송하지 않는다")
     void doesNotCreateWhenPreferenceDisabled() {
-        given(notificationPreferenceService.isEnabled(1L, null)).willReturn(false);
+        given(notificationPreferenceService.isEnabled(1L, NotificationType.OPINION_LIKED, null)).willReturn(false);
 
         notificationCreationService.create(
                 1L, 2L, NotificationType.OPINION_LIKED, "제목", "내용", 10L, null, null, null, null, null);
@@ -130,5 +131,71 @@ class NotificationCreationServiceTest {
                 .doesNotThrowAnyException();
 
         verify(notificationRepository).save(any(Notification.class));
+    }
+
+    @Test
+    @DisplayName("좋아요 집계: 본인이 유발한 알림이면 생성/갱신/발송하지 않는다")
+    void createOrUpdateOpinionLikedSkipsSelfNotification() {
+        notificationCreationService.createOrUpdateOpinionLiked(1L, 1L, "제목", "내용", 10L, null, null);
+
+        verify(notificationRepository, never())
+                .findFirstByReceiverIdAndTypeAndOpinionIdAndReadFalseOrderByCreatedAtDesc(any(), any(), any());
+        verify(notificationRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("좋아요 집계: 해당 카테고리 알림을 꺼두었으면 생성/갱신/발송하지 않는다")
+    void createOrUpdateOpinionLikedSkipsWhenPreferenceDisabled() {
+        given(notificationPreferenceService.isEnabled(1L, NotificationType.OPINION_LIKED, null)).willReturn(false);
+
+        notificationCreationService.createOrUpdateOpinionLiked(1L, 2L, "제목", "내용", 10L, null, null);
+
+        verify(notificationRepository, never()).save(any());
+        verify(pushDispatcher, never()).dispatch(anyLong(), any(), any(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("좋아요 집계: 안 읽은 기존 알림이 없으면 새로 생성한다")
+    void createOrUpdateOpinionLikedCreatesWhenNoneExists() {
+        given(notificationRepository.findFirstByReceiverIdAndTypeAndOpinionIdAndReadFalseOrderByCreatedAtDesc(
+                1L, NotificationType.OPINION_LIKED, 10L)).willReturn(Optional.empty());
+        given(userRepository.getReferenceById(1L)).willReturn(user(1L));
+        given(notificationRepository.save(any(Notification.class))).willAnswer(invocation -> {
+            Notification notification = invocation.getArgument(0);
+            ReflectionTestUtils.setField(notification, "id", 300L);
+            return notification;
+        });
+
+        notificationCreationService.createOrUpdateOpinionLiked(
+                1L, 2L, "회원님의 의견을 1명이 좋아해요", "책 제목 · 10p", 10L, null, null);
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(captor.capture());
+        assertThat(captor.getValue().getTitle()).isEqualTo("회원님의 의견을 1명이 좋아해요");
+        assertThat(captor.getValue().getOpinionId()).isEqualTo(10L);
+        verify(pushDispatcher).dispatch(1L, NotificationType.OPINION_LIKED,
+                "회원님의 의견을 1명이 좋아해요", "책 제목 · 10p", 300L);
+    }
+
+    @Test
+    @DisplayName("좋아요 집계: 안 읽은 기존 알림이 있으면 새로 만들지 않고 제목/행위자만 갱신한다")
+    void createOrUpdateOpinionLikedUpdatesExisting() {
+        User receiver = user(1L);
+        Notification existing = Notification.builder()
+                .receiver(receiver).type(NotificationType.OPINION_LIKED)
+                .title("회원님의 의견을 1명이 좋아해요").body("책 제목 · 10p")
+                .actorId(2L).opinionId(10L).build();
+        ReflectionTestUtils.setField(existing, "id", 300L);
+        given(notificationRepository.findFirstByReceiverIdAndTypeAndOpinionIdAndReadFalseOrderByCreatedAtDesc(
+                1L, NotificationType.OPINION_LIKED, 10L)).willReturn(Optional.of(existing));
+
+        notificationCreationService.createOrUpdateOpinionLiked(
+                1L, 3L, "회원님의 의견을 2명이 좋아해요", "책 제목 · 10p", 10L, null, null);
+
+        assertThat(existing.getTitle()).isEqualTo("회원님의 의견을 2명이 좋아해요");
+        assertThat(existing.getActorId()).isEqualTo(3L);
+        verify(notificationRepository, never()).save(any());
+        verify(pushDispatcher).dispatch(1L, NotificationType.OPINION_LIKED,
+                "회원님의 의견을 2명이 좋아해요", "책 제목 · 10p", 300L);
     }
 }

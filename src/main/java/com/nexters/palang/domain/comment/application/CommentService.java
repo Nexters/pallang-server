@@ -88,7 +88,8 @@ public class CommentService {
         eventPublisher.publishEvent(new CommentCreatedEvent(
                 saved.getId(), opinionId, opinion.getUser().getId(), userId,
                 group != null ? group.getId() : null,
-                group != null ? group.getName() : null));
+                group != null ? group.getName() : null,
+                opinion.getPassage().getQuotedText()));
         return saved;
     }
 

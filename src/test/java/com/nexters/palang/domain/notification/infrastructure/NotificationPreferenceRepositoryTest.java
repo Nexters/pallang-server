@@ -36,15 +36,28 @@ class NotificationPreferenceRepositoryTest {
     @DisplayName("userId로 저장된 알림 설정을 조회한다")
     void findByUserId() {
         User user = user("user1");
-        NotificationPreference preference = entityManager.persistAndFlush(
-                NotificationPreference.builder().user(user).activityEnabled(false).groupEnabled(true).build());
+        NotificationPreference preference = entityManager.persistAndFlush(NotificationPreference.builder()
+                .user(user)
+                .pushEnabled(true)
+                .activityCommentEnabled(false)
+                .activityLikeEnabled(true)
+                .groupInviteJoinEnabled(false)
+                .groupCommentEnabled(true)
+                .groupLikeEnabled(false)
+                .groupScheduleEnabled(true)
+                .build());
 
         Optional<NotificationPreference> found = notificationPreferenceRepository.findByUserId(user.getId());
 
         assertThat(found).isPresent();
         assertThat(found.get().getId()).isEqualTo(preference.getId());
-        assertThat(found.get().isActivityEnabled()).isFalse();
-        assertThat(found.get().isGroupEnabled()).isTrue();
+        assertThat(found.get().isPushEnabled()).isTrue();
+        assertThat(found.get().isActivityCommentEnabled()).isFalse();
+        assertThat(found.get().isActivityLikeEnabled()).isTrue();
+        assertThat(found.get().isGroupInviteJoinEnabled()).isFalse();
+        assertThat(found.get().isGroupCommentEnabled()).isTrue();
+        assertThat(found.get().isGroupLikeEnabled()).isFalse();
+        assertThat(found.get().isGroupScheduleEnabled()).isTrue();
     }
 
     @Test

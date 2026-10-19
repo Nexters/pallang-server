@@ -68,15 +68,19 @@ class OpinionLikeServiceTest {
         return built;
     }
 
+    private Book book() {
+        return Book.builder().title("책 제목").author("작가").publisher("출판사").pageCount(300).build();
+    }
+
     private Opinion opinion(Long id, User owner) {
-        Passage passage = Passage.builder().build();
+        Passage passage = Passage.builder().book(book()).pageNumber(30).build();
         Opinion opinion = Opinion.builder().user(owner).passage(passage).content("흔적 내용").build();
         ReflectionTestUtils.setField(opinion, "id", id);
         return opinion;
     }
 
     private Opinion opinion(Long id, Group group) {
-        Passage passage = Passage.builder().group(group).build();
+        Passage passage = Passage.builder().book(book()).group(group).pageNumber(12).build();
         Opinion built = Opinion.builder().user(writer).passage(passage).content("흔적 내용").build();
         ReflectionTestUtils.setField(built, "id", id);
         return built;
@@ -102,7 +106,7 @@ class OpinionLikeServiceTest {
 
         assertThat(result.liked()).isTrue();
         assertThat(opinion.getLikeCount()).isEqualTo(1);
-        verify(eventPublisher).publishEvent(new OpinionLikedEvent(10L, 1L, 2L, null, null));
+        verify(eventPublisher).publishEvent(new OpinionLikedEvent(10L, 1L, 2L, null, null, 1, "책 제목", 30));
     }
 
     @Test
@@ -182,6 +186,6 @@ class OpinionLikeServiceTest {
 
         assertThat(result.liked()).isTrue();
         verify(groupAccessValidator).validateMember(9L, 10L);
-        verify(eventPublisher).publishEvent(new OpinionLikedEvent(1L, writer.getId(), 10L, 9L, "모임"));
+        verify(eventPublisher).publishEvent(new OpinionLikedEvent(1L, writer.getId(), 10L, 9L, "모임", 1, "책 제목", 12));
     }
 }

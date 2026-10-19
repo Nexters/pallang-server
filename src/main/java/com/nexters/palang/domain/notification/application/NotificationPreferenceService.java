@@ -1,8 +1,10 @@
 package com.nexters.palang.domain.notification.application;
 
 import com.nexters.palang.domain.notification.domain.NotificationPreference;
+import com.nexters.palang.domain.notification.domain.NotificationType;
 import com.nexters.palang.domain.notification.infrastructure.NotificationPreferenceRepository;
 import com.nexters.palang.domain.notification.presentation.dto.NotificationPreferenceResponse;
+import com.nexters.palang.domain.notification.presentation.dto.UpdateNotificationPreferenceRequest;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -39,36 +41,65 @@ public class NotificationPreferenceService {
                 .orElseGet(NotificationPreferenceResponse::defaultSettings);
     }
 
-    public void updateSettings(Long userId, boolean activityEnabled, boolean groupEnabled) {
+    public void updateSettings(Long userId, UpdateNotificationPreferenceRequest request) {
         try {
-            newTransactionTemplate.executeWithoutResult(
-                    status -> upsert(userId, activityEnabled, groupEnabled));
+            newTransactionTemplate.executeWithoutResult(status -> upsert(userId, request));
         } catch (DataIntegrityViolationException e) {
             // 동시에 들어온 최초 PUT끼리 경합해 유니크 제약을 위반한 경우: 상대방이 만든 row를 다시 조회해 갱신한다.
             newTransactionTemplate.executeWithoutResult(
                     status -> notificationPreferenceRepository.findByUserId(userId)
-                            .ifPresent(preference -> preference.update(activityEnabled, groupEnabled)));
+                            .ifPresent(preference -> applyUpdate(preference, request)));
         }
     }
 
-    private void upsert(Long userId, boolean activityEnabled, boolean groupEnabled) {
+    private void upsert(Long userId, UpdateNotificationPreferenceRequest request) {
         notificationPreferenceRepository.findByUserId(userId)
                 .ifPresentOrElse(
-                        preference -> preference.update(activityEnabled, groupEnabled),
+                        preference -> applyUpdate(preference, request),
                         () -> {
                             User user = userRepository.getReferenceById(userId);
                             notificationPreferenceRepository.save(NotificationPreference.builder()
                                     .user(user)
-                                    .activityEnabled(activityEnabled)
-                                    .groupEnabled(groupEnabled)
+                                    .pushEnabled(request.pushEnabled())
+                                    .activityCommentEnabled(request.activityCommentEnabled())
+                                    .activityLikeEnabled(request.activityLikeEnabled())
+                                    .groupInviteJoinEnabled(request.groupInviteJoinEnabled())
+                                    .groupCommentEnabled(request.groupCommentEnabled())
+                                    .groupLikeEnabled(request.groupLikeEnabled())
+                                    .groupScheduleEnabled(request.groupScheduleEnabled())
                                     .build());
                         });
     }
 
-    // groupId가 있으면 모임(GROUP) 알림, 없으면 활동(ACTIVITY) 알림으로 간주한다 — NotificationScope와 동일한 기준.
-    public boolean isEnabled(Long userId, Long groupId) {
+    private void applyUpdate(NotificationPreference preference, UpdateNotificationPreferenceRequest request) {
+        preference.update(
+                request.pushEnabled(),
+                request.activityCommentEnabled(),
+                request.activityLikeEnabled(),
+                request.groupInviteJoinEnabled(),
+                request.groupCommentEnabled(),
+                request.groupLikeEnabled(),
+                request.groupScheduleEnabled());
+    }
+
+    // 푸시 마스터가 꺼져 있으면 무조건 차단한다. 켜져 있으면 (type, groupId) 조합으로 세부 카테고리를 판단한다
+    // — groupId 유무는 NotificationScope와 동일한 기준(활동=전역, 모임=groupId 있음).
+    public boolean isEnabled(Long userId, NotificationType type, Long groupId) {
         return notificationPreferenceRepository.findByUserId(userId)
-                .map(preference -> groupId != null ? preference.isGroupEnabled() : preference.isActivityEnabled())
+                .map(preference -> preference.isPushEnabled() && isCategoryEnabled(preference, type, groupId))
                 .orElse(true);
+    }
+
+    private boolean isCategoryEnabled(NotificationPreference preference, NotificationType type, Long groupId) {
+        return switch (type) {
+            case OPINION_COMMENTED -> groupId != null
+                    ? preference.isGroupCommentEnabled() : preference.isActivityCommentEnabled();
+            case OPINION_LIKED -> groupId != null
+                    ? preference.isGroupLikeEnabled() : preference.isActivityLikeEnabled();
+            case GROUP_JOINED, GROUP_MEMBER_JOINED -> preference.isGroupInviteJoinEnabled();
+            case GROUP_SCHEDULE_CHANGED, GROUP_ENDING_SOON -> preference.isGroupScheduleEnabled();
+            // 더 이상 새로 발송하지 않는다(이슈 #193) — 대응하는 토글이 없으므로 차단하지 않는다.
+            case BOOK_NEW_OPINIONS -> true;
+        };
     }
 }

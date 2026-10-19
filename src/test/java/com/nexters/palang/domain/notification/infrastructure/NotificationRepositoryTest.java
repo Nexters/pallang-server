@@ -57,6 +57,16 @@ class NotificationRepositoryTest {
         return entityManager.persistAndFlush(notification);
     }
 
+    private Notification saveLiked(Long opinionId) {
+        Notification notification = Notification.builder()
+                .receiver(receiver)
+                .type(NotificationType.OPINION_LIKED)
+                .title("제목").body("내용")
+                .opinionId(opinionId)
+                .build();
+        return entityManager.persistAndFlush(notification);
+    }
+
     @Test
     @DisplayName("알림 목록을 조회하면 최신순으로 반환한다")
     void findByReceiverIdOrderByCreatedAtDesc() {
@@ -114,6 +124,30 @@ class NotificationRepositoryTest {
                 receiver.getId(), NotificationType.GROUP_ENDING_SOON, 9L, LocalDateTime.now().toLocalDate().atStartOfDay());
 
         assertThat(exists).isFalse();
+    }
+
+    @Test
+    @DisplayName("좋아요 집계: 같은 흔적에 안 읽은 좋아요 알림이 있으면 조회된다")
+    void findFirstByReceiverIdAndTypeAndOpinionIdAndReadFalseOrderByCreatedAtDescReturnsUnread() {
+        Notification unread = saveLiked(10L);
+
+        var found = notificationRepository.findFirstByReceiverIdAndTypeAndOpinionIdAndReadFalseOrderByCreatedAtDesc(
+                receiver.getId(), NotificationType.OPINION_LIKED, 10L);
+
+        assertThat(found).contains(unread);
+    }
+
+    @Test
+    @DisplayName("좋아요 집계: 이미 읽은 알림은 조회되지 않는다")
+    void findFirstByReceiverIdAndTypeAndOpinionIdAndReadFalseOrderByCreatedAtDescExcludesRead() {
+        Notification read = saveLiked(10L);
+        read.markAsRead();
+        entityManager.persistAndFlush(read);
+
+        var found = notificationRepository.findFirstByReceiverIdAndTypeAndOpinionIdAndReadFalseOrderByCreatedAtDesc(
+                receiver.getId(), NotificationType.OPINION_LIKED, 10L);
+
+        assertThat(found).isEmpty();
     }
 
     @Test

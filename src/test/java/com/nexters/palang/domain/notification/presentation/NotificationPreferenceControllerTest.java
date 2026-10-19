@@ -38,15 +38,21 @@ class NotificationPreferenceControllerTest {
     private CurrentUserProvider currentUserProvider;
 
     @Test
-    @DisplayName("알림 설정을 조회하면 활동/모임 수신 여부를 반환한다")
+    @DisplayName("알림 설정을 조회하면 7개 토글 값을 반환한다")
     void getSettings() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(notificationPreferenceService.getSettings(1L)).willReturn(new NotificationPreferenceResponse(false, true));
+        given(notificationPreferenceService.getSettings(1L))
+                .willReturn(new NotificationPreferenceResponse(true, false, true, false, true, false, true));
 
         mockMvc.perform(get("/api/notifications/settings"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.activityEnabled").value(false))
-                .andExpect(jsonPath("$.data.groupEnabled").value(true));
+                .andExpect(jsonPath("$.data.pushEnabled").value(true))
+                .andExpect(jsonPath("$.data.activityCommentEnabled").value(false))
+                .andExpect(jsonPath("$.data.activityLikeEnabled").value(true))
+                .andExpect(jsonPath("$.data.groupInviteJoinEnabled").value(false))
+                .andExpect(jsonPath("$.data.groupCommentEnabled").value(true))
+                .andExpect(jsonPath("$.data.groupLikeEnabled").value(false))
+                .andExpect(jsonPath("$.data.groupScheduleEnabled").value(true));
     }
 
     @Test
@@ -63,13 +69,15 @@ class NotificationPreferenceControllerTest {
     @DisplayName("알림 설정을 변경하면 서비스에 위임한다")
     void updateSettings() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        UpdateNotificationPreferenceRequest request =
+                new UpdateNotificationPreferenceRequest(true, false, true, false, true, false, true);
 
         mockMvc.perform(put("/api/notifications/settings")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new UpdateNotificationPreferenceRequest(false, true))))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk());
 
-        verify(notificationPreferenceService).updateSettings(1L, false, true);
+        verify(notificationPreferenceService).updateSettings(1L, request);
     }
 
     @Test
@@ -79,7 +87,7 @@ class NotificationPreferenceControllerTest {
 
         mockMvc.perform(put("/api/notifications/settings")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"activityEnabled\": true}"))
+                        .content("{\"pushEnabled\": true}"))
                 .andExpect(status().isBadRequest());
     }
 }

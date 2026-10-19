@@ -9,8 +9,10 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import com.nexters.palang.domain.notification.domain.NotificationPreference;
+import com.nexters.palang.domain.notification.domain.NotificationType;
 import com.nexters.palang.domain.notification.infrastructure.NotificationPreferenceRepository;
 import com.nexters.palang.domain.notification.presentation.dto.NotificationPreferenceResponse;
+import com.nexters.palang.domain.notification.presentation.dto.UpdateNotificationPreferenceRequest;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
 import java.util.Optional;
@@ -56,28 +58,61 @@ class NotificationPreferenceServiceTest {
         return user;
     }
 
+    private NotificationPreference preference(
+            boolean pushEnabled, boolean activityCommentEnabled, boolean activityLikeEnabled,
+            boolean groupInviteJoinEnabled, boolean groupCommentEnabled, boolean groupLikeEnabled,
+            boolean groupScheduleEnabled) {
+        return NotificationPreference.builder()
+                .user(user(1L))
+                .pushEnabled(pushEnabled)
+                .activityCommentEnabled(activityCommentEnabled)
+                .activityLikeEnabled(activityLikeEnabled)
+                .groupInviteJoinEnabled(groupInviteJoinEnabled)
+                .groupCommentEnabled(groupCommentEnabled)
+                .groupLikeEnabled(groupLikeEnabled)
+                .groupScheduleEnabled(groupScheduleEnabled)
+                .build();
+    }
+
+    private UpdateNotificationPreferenceRequest request(
+            boolean pushEnabled, boolean activityCommentEnabled, boolean activityLikeEnabled,
+            boolean groupInviteJoinEnabled, boolean groupCommentEnabled, boolean groupLikeEnabled,
+            boolean groupScheduleEnabled) {
+        return new UpdateNotificationPreferenceRequest(
+                pushEnabled, activityCommentEnabled, activityLikeEnabled,
+                groupInviteJoinEnabled, groupCommentEnabled, groupLikeEnabled, groupScheduleEnabled);
+    }
+
     @Test
-    @DisplayName("설정을 변경한 적 없으면 조회 시 둘 다 true를 반환한다")
+    @DisplayName("설정을 변경한 적 없으면 조회 시 7개 전부 true를 반환한다")
     void getSettingsReturnsDefaultWhenNoRow() {
         given(notificationPreferenceRepository.findByUserId(1L)).willReturn(Optional.empty());
 
         NotificationPreferenceResponse response = notificationPreferenceService.getSettings(1L);
 
-        assertThat(response.activityEnabled()).isTrue();
-        assertThat(response.groupEnabled()).isTrue();
+        assertThat(response.pushEnabled()).isTrue();
+        assertThat(response.activityCommentEnabled()).isTrue();
+        assertThat(response.activityLikeEnabled()).isTrue();
+        assertThat(response.groupInviteJoinEnabled()).isTrue();
+        assertThat(response.groupCommentEnabled()).isTrue();
+        assertThat(response.groupLikeEnabled()).isTrue();
+        assertThat(response.groupScheduleEnabled()).isTrue();
     }
 
     @Test
     @DisplayName("저장된 설정이 있으면 그 값을 그대로 반환한다")
     void getSettingsReturnsStoredValue() {
-        NotificationPreference preference = NotificationPreference.builder()
-                .user(user(1L)).activityEnabled(false).groupEnabled(true).build();
-        given(notificationPreferenceRepository.findByUserId(1L)).willReturn(Optional.of(preference));
+        NotificationPreference stored = preference(true, false, true, false, true, false, true);
+        given(notificationPreferenceRepository.findByUserId(1L)).willReturn(Optional.of(stored));
 
         NotificationPreferenceResponse response = notificationPreferenceService.getSettings(1L);
 
-        assertThat(response.activityEnabled()).isFalse();
-        assertThat(response.groupEnabled()).isTrue();
+        assertThat(response.activityCommentEnabled()).isFalse();
+        assertThat(response.activityLikeEnabled()).isTrue();
+        assertThat(response.groupInviteJoinEnabled()).isFalse();
+        assertThat(response.groupCommentEnabled()).isTrue();
+        assertThat(response.groupLikeEnabled()).isFalse();
+        assertThat(response.groupScheduleEnabled()).isTrue();
     }
 
     @Test
@@ -86,33 +121,33 @@ class NotificationPreferenceServiceTest {
         given(notificationPreferenceRepository.findByUserId(1L)).willReturn(Optional.empty());
         given(userRepository.getReferenceById(1L)).willReturn(user(1L));
 
-        notificationPreferenceService.updateSettings(1L, false, true);
+        notificationPreferenceService.updateSettings(1L, request(true, false, true, false, true, false, true));
 
         ArgumentCaptor<NotificationPreference> captor = ArgumentCaptor.forClass(NotificationPreference.class);
         verify(notificationPreferenceRepository).save(captor.capture());
-        assertThat(captor.getValue().isActivityEnabled()).isFalse();
-        assertThat(captor.getValue().isGroupEnabled()).isTrue();
+        assertThat(captor.getValue().isActivityCommentEnabled()).isFalse();
+        assertThat(captor.getValue().isGroupInviteJoinEnabled()).isFalse();
+        assertThat(captor.getValue().isGroupScheduleEnabled()).isTrue();
     }
 
     @Test
     @DisplayName("이미 설정이 있으면 저장 대신 기존 row를 갱신한다")
     void updateSettingsUpdatesExistingRow() {
-        NotificationPreference preference = NotificationPreference.builder()
-                .user(user(1L)).activityEnabled(true).groupEnabled(true).build();
-        given(notificationPreferenceRepository.findByUserId(1L)).willReturn(Optional.of(preference));
+        NotificationPreference existing = preference(true, true, true, true, true, true, true);
+        given(notificationPreferenceRepository.findByUserId(1L)).willReturn(Optional.of(existing));
 
-        notificationPreferenceService.updateSettings(1L, false, false);
+        notificationPreferenceService.updateSettings(1L, request(false, false, false, false, false, false, false));
 
-        assertThat(preference.isActivityEnabled()).isFalse();
-        assertThat(preference.isGroupEnabled()).isFalse();
+        assertThat(existing.isPushEnabled()).isFalse();
+        assertThat(existing.isActivityCommentEnabled()).isFalse();
+        assertThat(existing.isGroupScheduleEnabled()).isFalse();
         verify(notificationPreferenceRepository, never()).save(any());
     }
 
     @Test
     @DisplayName("최초 PUT이 동시에 들어와 유니크 제약 위반이 나면, 상대방이 만든 row를 다시 조회해 갱신한다")
     void updateSettingsRetriesWhenConcurrentInsertConflicts() {
-        NotificationPreference createdByOtherRequest = NotificationPreference.builder()
-                .user(user(1L)).activityEnabled(true).groupEnabled(true).build();
+        NotificationPreference createdByOtherRequest = preference(true, true, true, true, true, true, true);
         given(notificationPreferenceRepository.findByUserId(1L))
                 .willReturn(Optional.empty())
                 .willReturn(Optional.of(createdByOtherRequest));
@@ -120,29 +155,77 @@ class NotificationPreferenceServiceTest {
         willThrow(new DataIntegrityViolationException("duplicate key"))
                 .given(notificationPreferenceRepository).save(any());
 
-        notificationPreferenceService.updateSettings(1L, false, true);
+        notificationPreferenceService.updateSettings(1L, request(true, false, true, false, true, false, true));
 
-        assertThat(createdByOtherRequest.isActivityEnabled()).isFalse();
-        assertThat(createdByOtherRequest.isGroupEnabled()).isTrue();
+        assertThat(createdByOtherRequest.isActivityCommentEnabled()).isFalse();
+        assertThat(createdByOtherRequest.isGroupInviteJoinEnabled()).isFalse();
     }
 
     @Test
-    @DisplayName("설정이 없는 사용자는 groupId 유무와 무관하게 항상 허용으로 취급한다")
+    @DisplayName("설정이 없는 사용자는 항상 허용으로 취급한다")
     void isEnabledDefaultsToTrueWhenNoRow() {
         given(notificationPreferenceRepository.findByUserId(1L)).willReturn(Optional.empty());
 
-        assertThat(notificationPreferenceService.isEnabled(1L, null)).isTrue();
-        assertThat(notificationPreferenceService.isEnabled(1L, 9L)).isTrue();
+        assertThat(notificationPreferenceService.isEnabled(1L, NotificationType.OPINION_LIKED, null)).isTrue();
+        assertThat(notificationPreferenceService.isEnabled(1L, NotificationType.GROUP_SCHEDULE_CHANGED, 9L)).isTrue();
     }
 
     @Test
-    @DisplayName("groupId가 없으면 activityEnabled를, 있으면 groupEnabled를 기준으로 판단한다")
-    void isEnabledUsesGroupIdToPickCategory() {
-        NotificationPreference preference = NotificationPreference.builder()
-                .user(user(1L)).activityEnabled(false).groupEnabled(true).build();
-        given(notificationPreferenceRepository.findByUserId(1L)).willReturn(Optional.of(preference));
+    @DisplayName("푸시 마스터가 꺼져 있으면 카테고리 설정과 무관하게 차단한다")
+    void isEnabledBlocksEverythingWhenPushDisabled() {
+        NotificationPreference stored = preference(false, true, true, true, true, true, true);
+        given(notificationPreferenceRepository.findByUserId(1L)).willReturn(Optional.of(stored));
 
-        assertThat(notificationPreferenceService.isEnabled(1L, null)).isFalse();
-        assertThat(notificationPreferenceService.isEnabled(1L, 9L)).isTrue();
+        assertThat(notificationPreferenceService.isEnabled(1L, NotificationType.OPINION_LIKED, null)).isFalse();
+        assertThat(notificationPreferenceService.isEnabled(1L, NotificationType.GROUP_JOINED, 9L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("OPINION_COMMENTED는 groupId 유무로 활동/모임 댓글 설정을 구분한다")
+    void isEnabledPicksCommentCategoryByGroupId() {
+        NotificationPreference stored = preference(true, false, true, true, true, true, true);
+        given(notificationPreferenceRepository.findByUserId(1L)).willReturn(Optional.of(stored));
+
+        assertThat(notificationPreferenceService.isEnabled(1L, NotificationType.OPINION_COMMENTED, null)).isFalse();
+        assertThat(notificationPreferenceService.isEnabled(1L, NotificationType.OPINION_COMMENTED, 9L)).isTrue();
+    }
+
+    @Test
+    @DisplayName("OPINION_LIKED는 groupId 유무로 활동/모임 좋아요 설정을 구분한다")
+    void isEnabledPicksLikeCategoryByGroupId() {
+        NotificationPreference stored = preference(true, true, false, true, true, true, true);
+        given(notificationPreferenceRepository.findByUserId(1L)).willReturn(Optional.of(stored));
+
+        assertThat(notificationPreferenceService.isEnabled(1L, NotificationType.OPINION_LIKED, null)).isFalse();
+        assertThat(notificationPreferenceService.isEnabled(1L, NotificationType.OPINION_LIKED, 9L)).isTrue();
+    }
+
+    @Test
+    @DisplayName("GROUP_JOINED/GROUP_MEMBER_JOINED는 모임 초대 및 가입 설정을 따른다")
+    void isEnabledUsesGroupInviteJoinCategory() {
+        NotificationPreference stored = preference(true, true, true, false, true, true, true);
+        given(notificationPreferenceRepository.findByUserId(1L)).willReturn(Optional.of(stored));
+
+        assertThat(notificationPreferenceService.isEnabled(1L, NotificationType.GROUP_JOINED, 9L)).isFalse();
+        assertThat(notificationPreferenceService.isEnabled(1L, NotificationType.GROUP_MEMBER_JOINED, 9L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("GROUP_SCHEDULE_CHANGED/GROUP_ENDING_SOON은 모임 일정 변경 설정을 따른다")
+    void isEnabledUsesGroupScheduleCategory() {
+        NotificationPreference stored = preference(true, true, true, true, true, true, false);
+        given(notificationPreferenceRepository.findByUserId(1L)).willReturn(Optional.of(stored));
+
+        assertThat(notificationPreferenceService.isEnabled(1L, NotificationType.GROUP_SCHEDULE_CHANGED, 9L)).isFalse();
+        assertThat(notificationPreferenceService.isEnabled(1L, NotificationType.GROUP_ENDING_SOON, 9L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("BOOK_NEW_OPINIONS는 대응하는 토글이 없어 항상 허용한다")
+    void isEnabledAlwaysAllowsBookNewOpinions() {
+        NotificationPreference stored = preference(true, false, false, false, false, false, false);
+        given(notificationPreferenceRepository.findByUserId(1L)).willReturn(Optional.of(stored));
+
+        assertThat(notificationPreferenceService.isEnabled(1L, NotificationType.BOOK_NEW_OPINIONS, null)).isTrue();
     }
 }

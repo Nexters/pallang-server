@@ -38,7 +38,7 @@ public class NotificationCreationService {
         if (actorId != null && actorId.equals(receiverId)) {
             return;
         }
-        if (!notificationPreferenceService.isEnabled(receiverId, groupId)) {
+        if (!notificationPreferenceService.isEnabled(receiverId, type, groupId)) {
             return;
         }
 
@@ -62,6 +62,49 @@ public class NotificationCreationService {
             pushDispatcher.dispatch(receiverId, type, title, body, notification.getId());
         } catch (Exception e) {
             // 푸시 발송 실패가 방금 저장한 알림까지 롤백시키면 안 된다 (인앱 알림은 이미 유효한 결과).
+            log.error("FCM 푸시 발송 실패 (notificationId={})", notification.getId(), e);
+        }
+    }
+
+    // OPINION_LIKED 전용 집계 경로(Figma 기준 "N명이 좋아해요"): 같은 흔적에 대해 아직 안 읽은 좋아요 알림이
+    // 있으면 새로 만들지 않고 그 알림의 제목(인원수)/행위자만 갱신한다. 없거나 이미 읽었으면 새로 만든다.
+    @Transactional
+    public void createOrUpdateOpinionLiked(
+            Long receiverId, Long actorId, String title, String body,
+            Long opinionId, Long groupId, String groupName
+    ) {
+        if (actorId != null && actorId.equals(receiverId)) {
+            return;
+        }
+        if (!notificationPreferenceService.isEnabled(receiverId, NotificationType.OPINION_LIKED, groupId)) {
+            return;
+        }
+
+        Notification notification = notificationRepository
+                .findFirstByReceiverIdAndTypeAndOpinionIdAndReadFalseOrderByCreatedAtDesc(
+                        receiverId, NotificationType.OPINION_LIKED, opinionId)
+                .map(existing -> {
+                    existing.refreshLikeAggregation(actorId, title, body);
+                    return existing;
+                })
+                .orElseGet(() -> {
+                    User receiver = userRepository.getReferenceById(receiverId);
+                    Notification created = Notification.builder()
+                            .receiver(receiver)
+                            .type(NotificationType.OPINION_LIKED)
+                            .title(title)
+                            .body(body)
+                            .actorId(actorId)
+                            .opinionId(opinionId)
+                            .groupId(groupId)
+                            .groupName(groupName)
+                            .build();
+                    return notificationRepository.save(created);
+                });
+
+        try {
+            pushDispatcher.dispatch(receiverId, NotificationType.OPINION_LIKED, title, body, notification.getId());
+        } catch (Exception e) {
             log.error("FCM 푸시 발송 실패 (notificationId={})", notification.getId(), e);
         }
     }
