@@ -34,5 +34,13 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
                     + "(select max(r2.id) from Report r2 group by r2.targetType, r2.targetId)")
     Page<ReportTargetSummaryProjection> findTargetSummaries(Pageable pageable);
 
+    // 위와 같고 정렬만 반대(오래 방치된 신고부터 처리할 때). 집계 결과 기준 정렬이라 Pageable의 Sort로는 표현할 수 없다.
+    @Query(value = "select r.targetType as targetType, r.targetId as targetId, count(r) as reportCount, "
+            + "max(r.createdAt) as lastReportedAt from Report r "
+            + "group by r.targetType, r.targetId order by max(r.createdAt) asc",
+            countQuery = "select count(r) from Report r where r.id in "
+                    + "(select max(r2.id) from Report r2 group by r2.targetType, r2.targetId)")
+    Page<ReportTargetSummaryProjection> findTargetSummariesOldestFirst(Pageable pageable);
+
     List<Report> findByTargetTypeAndTargetIdIn(ReportTargetType targetType, Collection<Long> targetIds);
 }

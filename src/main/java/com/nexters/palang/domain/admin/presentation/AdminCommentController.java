@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.admin.presentation;
 
 import com.nexters.palang.domain.admin.application.AdminAccessGuard;
+import com.nexters.palang.domain.admin.application.AdminSortOrder;
 import com.nexters.palang.domain.admin.application.AdminCommentMapper;
 import com.nexters.palang.domain.admin.application.AdminCommentService;
 import com.nexters.palang.domain.admin.presentation.dto.AdminCommentListResponse;
@@ -37,10 +38,11 @@ public class AdminCommentController implements AdminCommentApi {
     @GetMapping("/api/admin/comments")
     public ResponseEntity<DataResponse<AdminCommentListResponse>> searchComments(
             @RequestParam String keyword,
+            @RequestParam(defaultValue = "LATEST") AdminSortOrder sort,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         adminAccessGuard.requireAdmin();
-        Page<Comment> results = adminCommentService.searchComments(keyword, pageable(page, size));
+        Page<Comment> results = adminCommentService.searchComments(keyword, pageable(page, size, sort));
         return ResponseEntity.ok(DataResponse.from(AdminCommentMapper.toListResponse(results)));
     }
 
@@ -63,5 +65,9 @@ public class AdminCommentController implements AdminCommentApi {
 
     private Pageable pageable(int page, int size) {
         return PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_SIZE));
+    }
+
+    private Pageable pageable(int page, int size, AdminSortOrder sort) {
+        return PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_SIZE), sort.toSort());
     }
 }

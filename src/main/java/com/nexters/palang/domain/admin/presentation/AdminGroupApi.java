@@ -1,5 +1,6 @@
 package com.nexters.palang.domain.admin.presentation;
 
+import com.nexters.palang.domain.admin.application.AdminSortOrder;
 import com.nexters.palang.domain.admin.presentation.dto.AdminGroupListResponse;
 import com.nexters.palang.domain.admin.presentation.dto.AdminGroupSummaryResponse;
 import com.nexters.palang.domain.admin.presentation.dto.AdminUpdateGroupRequest;
@@ -21,6 +22,7 @@ public interface AdminGroupApi {
     })
     ResponseEntity<DataResponse<AdminGroupListResponse>> searchGroups(
             @Parameter(description = "모임명 검색어") String keyword,
+            @Parameter(description = "정렬 — 작성일 기준 (LATEST: 최신순, 기본값 / OLDEST: 오래된순)") AdminSortOrder sort,
             @Parameter(hidden = true) int page,
             @Parameter(hidden = true) int size
     );

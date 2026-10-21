@@ -2,6 +2,7 @@ package com.nexters.palang.domain.opinion.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.nexters.palang.domain.admin.application.AdminSortOrder;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.opinion.domain.Opinion;
 import com.nexters.palang.domain.passage.domain.Passage;
@@ -43,6 +44,35 @@ class OpinionRepositoryTest {
         return entityManager.persistAndFlush(Passage.builder()
                 .book(book).creator(creator).pageNumber(1).quotedText("발췌 문장").isSpoiler(false)
                 .normalizedHash("hash").build());
+    }
+
+    // 같은 트랜잭션 안에서 연달아 저장하면 createdAt이 같아질 수 있어, 정렬 검증용으로 시각을 직접 박아 둔다.
+    private void setCreatedAt(Opinion opinion, LocalDateTime createdAt) {
+        entityManager.getEntityManager()
+                .createQuery("update Opinion o set o.createdAt = :createdAt where o.id = :id")
+                .setParameter("createdAt", createdAt)
+                .setParameter("id", opinion.getId())
+                .executeUpdate();
+        entityManager.clear();
+    }
+
+    @Test
+    @DisplayName("관리자 의견 검색: 정렬을 고르면 작성일 최신순/오래된순으로 나온다")
+    void findByContentContainingHonorsAdminSortOrder() {
+        User writer = user("작성자");
+        Passage passage = passage(writer);
+        Opinion old = entityManager.persistAndFlush(Opinion.builder().passage(passage).user(writer).content("옛 의견").build());
+        Opinion recent = entityManager.persistAndFlush(Opinion.builder().passage(passage).user(writer).content("새 의견").build());
+        setCreatedAt(old, LocalDateTime.of(2026, 1, 1, 9, 0));
+        setCreatedAt(recent, LocalDateTime.of(2026, 10, 1, 9, 0));
+
+        Page<Opinion> latest = opinionRepository.findByContentContaining(
+                "의견", PageRequest.of(0, 20, AdminSortOrder.LATEST.toSort()));
+        Page<Opinion> oldest = opinionRepository.findByContentContaining(
+                "의견", PageRequest.of(0, 20, AdminSortOrder.OLDEST.toSort()));
+
+        assertThat(latest.getContent()).extracting(Opinion::getId).containsExactly(recent.getId(), old.getId());
+        assertThat(oldest.getContent()).extracting(Opinion::getId).containsExactly(old.getId(), recent.getId());
     }
 
     @Test

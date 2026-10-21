@@ -1,5 +1,6 @@
 package com.nexters.palang.domain.admin.presentation;
 
+import com.nexters.palang.domain.admin.application.AdminSortOrder;
 import com.nexters.palang.domain.admin.presentation.dto.AdminUserListResponse;
 import com.nexters.palang.global.common.error.ErrorResponse;
 import com.nexters.palang.global.common.response.DataResponse;
@@ -28,6 +29,7 @@ public interface AdminUserApi {
     })
     ResponseEntity<DataResponse<AdminUserListResponse>> searchUsers(
             @Parameter(description = "닉네임/이메일 검색어") String keyword,
+            @Parameter(description = "정렬 — 작성일 기준 (LATEST: 최신순, 기본값 / OLDEST: 오래된순)") AdminSortOrder sort,
             @Parameter(hidden = true) int page,
             @Parameter(hidden = true) int size
     );

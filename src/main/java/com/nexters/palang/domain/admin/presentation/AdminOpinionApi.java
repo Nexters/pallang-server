@@ -1,5 +1,6 @@
 package com.nexters.palang.domain.admin.presentation;
 
+import com.nexters.palang.domain.admin.application.AdminSortOrder;
 import com.nexters.palang.domain.admin.presentation.dto.AdminOpinionListResponse;
 import com.nexters.palang.domain.admin.presentation.dto.AdminOpinionSummaryResponse;
 import com.nexters.palang.domain.admin.presentation.dto.AdminRemovalReasonResponse;
@@ -27,6 +28,7 @@ public interface AdminOpinionApi {
     ResponseEntity<DataResponse<AdminOpinionListResponse>> searchOpinions(
             @Parameter(description = "이 대목의 의견만 작성 순서대로 조회 (주어지면 keyword 무시)") Long passageId,
             @Parameter(description = "내용 검색어 (passageId가 없을 때만 사용)") String keyword,
+            @Parameter(description = "정렬 — 작성일 기준 (LATEST: 최신순, 기본값 / OLDEST: 오래된순)") AdminSortOrder sort,
             @Parameter(hidden = true) int page,
             @Parameter(hidden = true) int size
     );
