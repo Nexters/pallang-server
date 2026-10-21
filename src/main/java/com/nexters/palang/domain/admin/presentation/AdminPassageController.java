@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.admin.presentation;
 
 import com.nexters.palang.domain.admin.application.AdminAccessGuard;
+import com.nexters.palang.domain.admin.application.AdminSortOrder;
 import com.nexters.palang.domain.admin.application.AdminPassageMapper;
 import com.nexters.palang.domain.admin.application.AdminPassageService;
 import com.nexters.palang.domain.admin.presentation.dto.AdminPassageListResponse;
@@ -37,10 +38,11 @@ public class AdminPassageController implements AdminPassageApi {
     @GetMapping("/api/admin/passages")
     public ResponseEntity<DataResponse<AdminPassageListResponse>> searchPassages(
             @RequestParam String keyword,
+            @RequestParam(defaultValue = "LATEST") AdminSortOrder sort,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         adminAccessGuard.requireAdmin();
-        Page<Passage> results = adminPassageService.searchPassages(keyword, pageable(page, size));
+        Page<Passage> results = adminPassageService.searchPassages(keyword, pageable(page, size, sort));
         return ResponseEntity.ok(DataResponse.from(AdminPassageMapper.toListResponse(results)));
     }
 
@@ -64,5 +66,9 @@ public class AdminPassageController implements AdminPassageApi {
 
     private Pageable pageable(int page, int size) {
         return PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_SIZE));
+    }
+
+    private Pageable pageable(int page, int size, AdminSortOrder sort) {
+        return PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_SIZE), sort.toSort());
     }
 }

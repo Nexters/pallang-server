@@ -1,5 +1,6 @@
 package com.nexters.palang.domain.admin.presentation;
 
+import com.nexters.palang.domain.admin.application.AdminSortOrder;
 import com.nexters.palang.domain.admin.presentation.dto.AdminReportListResponse;
 import com.nexters.palang.global.common.response.DataResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,6 +20,7 @@ public interface AdminReportApi {
             @ApiResponse(responseCode = "403", description = "관리자 권한 없음 (ADMIN_403_1)")
     })
     ResponseEntity<DataResponse<AdminReportListResponse>> getReportedTargets(
+            @Parameter(description = "정렬 — 마지막 신고 시각 기준 (LATEST: 최신순, 기본값 / OLDEST: 오래된순)") AdminSortOrder sort,
             @Parameter(hidden = true) int page,
             @Parameter(hidden = true) int size
     );

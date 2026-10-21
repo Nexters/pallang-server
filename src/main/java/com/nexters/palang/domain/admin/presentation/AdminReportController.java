@@ -2,6 +2,7 @@ package com.nexters.palang.domain.admin.presentation;
 
 import com.nexters.palang.domain.admin.application.AdminAccessGuard;
 import com.nexters.palang.domain.admin.application.AdminReportService;
+import com.nexters.palang.domain.admin.application.AdminSortOrder;
 import com.nexters.palang.domain.admin.presentation.dto.AdminReportListResponse;
 import com.nexters.palang.global.common.response.DataResponse;
 import lombok.RequiredArgsConstructor;
@@ -25,10 +26,11 @@ public class AdminReportController implements AdminReportApi {
     @Override
     @GetMapping("/api/admin/reports")
     public ResponseEntity<DataResponse<AdminReportListResponse>> getReportedTargets(
+            @RequestParam(defaultValue = "LATEST") AdminSortOrder sort,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         adminAccessGuard.requireAdmin();
         return ResponseEntity.ok(DataResponse.from(adminReportService.getReportedTargets(
-                PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_SIZE)))));
+                sort, PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_SIZE)))));
     }
 }

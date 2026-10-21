@@ -130,8 +130,16 @@
   .search { margin-left: auto; display: flex; gap: 8px; align-items: center; min-width: 320px; flex: 0 1 440px; }
   .search .input { padding-left: 38px; background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238f8d8a' stroke-width='2' stroke-linecap='round' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat 13px center; }
   .content { padding: 24px 32px 60px; max-width: 1180px; }
-  .summary { color: var(--ink-3); font-size: 13px; margin: 0 0 14px; display: flex; align-items: center; gap: 8px; }
+  .toolbar { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; flex-wrap: wrap; }
+  .summary { color: var(--ink-3); font-size: 13px; display: flex; align-items: center; gap: 8px; }
   .summary b { color: var(--brand); font-weight: 700; }
+  .seg { margin-left: auto; display: inline-flex; background: var(--surface-2); border-radius: 10px; padding: 3px; gap: 2px; }
+  .seg button {
+    border: 0; background: transparent; color: var(--ink-3); font-size: 12.5px; font-weight: 600;
+    padding: 6px 12px; border-radius: 8px; cursor: pointer; transition: background .15s, color .15s;
+  }
+  .seg button:hover { color: var(--ink); }
+  .seg button.on { background: var(--ink); color: #fff; box-shadow: var(--shadow-sm); }
 
   /* ---------- 표 ---------- */
   .table-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
@@ -228,8 +236,23 @@
   .empty .big { font-size: 34px; margin-bottom: 8px; }
   .skeleton { height: 120px; border-radius: 18px; background: linear-gradient(90deg, #eeece9 0%, #f6f5f3 50%, #eeece9 100%); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
   @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
-  .pager { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 22px; color: var(--ink-3); font-size: 13px; }
-  .pager .pos { min-width: 120px; text-align: center; font-variant-numeric: tabular-nums; }
+  .pager { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 24px; color: var(--ink-3); font-size: 13px; flex-wrap: wrap; }
+  .pages { display: inline-flex; gap: 4px; align-items: center; }
+  .pages button {
+    min-width: 34px; height: 34px; padding: 0 8px; border-radius: 9px; border: 1px solid transparent;
+    background: transparent; color: var(--ink-2); font-size: 13px; font-weight: 600; cursor: pointer;
+    font-variant-numeric: tabular-nums; transition: background .15s;
+  }
+  .pages button:hover:not(:disabled) { background: var(--surface); border-color: var(--line); }
+  .pages button.on { background: var(--brand); color: #fff; box-shadow: 0 4px 12px rgba(239, 90, 6, 0.3); }
+  .pages button:disabled { color: var(--ink-4); opacity: .5; cursor: not-allowed; }
+  .pages .dots { color: var(--ink-4); padding: 0 2px; }
+  .jump { display: inline-flex; align-items: center; gap: 6px; margin-left: 12px; padding-left: 14px; border-left: 1px solid var(--line); }
+  .jump input {
+    width: 64px; padding: 7px 8px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface);
+    color: var(--ink); text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; outline: none;
+  }
+  .jump input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(239, 90, 6, 0.14); }
 
   /* ---------- 모달 / 토스트 ---------- */
   .backdrop {
@@ -356,12 +379,21 @@
       </form>
     </div>
     <div class="content">
-      <div class="summary" id="summary"></div>
+      <div class="toolbar">
+        <div class="summary" id="summary"></div>
+        <div class="seg" id="sortSeg" role="group" aria-label="정렬">
+          <button type="button" data-sort="LATEST">최신순</button>
+          <button type="button" data-sort="OLDEST">오래된순</button>
+        </div>
+      </div>
       <div id="list"></div>
       <div class="pager" id="pager" hidden>
-        <button class="btn ghost sm" id="prevBtn">← 이전</button>
-        <span class="pos" id="pageLabel"></span>
-        <button class="btn ghost sm" id="nextBtn">다음 →</button>
+        <div class="pages" id="pages"></div>
+        <form class="jump" id="jumpForm">
+          <input type="number" id="jumpInput" min="1" inputmode="numeric" aria-label="이동할 페이지" />
+          <span id="jumpTotal"></span>
+          <button class="btn ghost sm" type="submit">이동</button>
+        </form>
       </div>
     </div>
   </main>
@@ -597,7 +629,7 @@
   const TOKEN_KEY = "pallang_admin_session_token";
   const PAGE_SIZE = 20;
   let currentTab = "passages";
-  const tabState = Object.fromEntries(Object.keys(TABS).map(k => [k, { keyword: "", page: 0, pageInfo: null }]));
+  const tabState = Object.fromEntries(Object.keys(TABS).map(k => [k, { keyword: "", page: 0, pageInfo: null, sort: "LATEST" }]));
 
   const $ = (id) => document.getElementById(id);
   const listEl = $("list");
@@ -684,6 +716,7 @@
     $("searchForm").hidden = !!tab.noSearch;
     $("keyword").placeholder = tab.searchPlaceholder || "";
     $("keyword").value = tabState[key].keyword;
+    renderSort();
     load(tabState[key].page);
   }
 
@@ -692,18 +725,44 @@
     tabState[currentTab].keyword = $("keyword").value.trim();
     load(0);
   });
-  $("prevBtn").addEventListener("click", () => { const s = tabState[currentTab]; if (s.page > 0) load(s.page - 1); });
-  $("nextBtn").addEventListener("click", () => { const s = tabState[currentTab]; if (s.pageInfo && s.pageInfo.hasNext) load(s.page + 1); });
+  // 정렬은 메뉴별로 따로 기억한다. 정렬을 바꾸면 첫 페이지부터 다시 본다.
+  for (const btn of $("sortSeg").querySelectorAll("button")) {
+    btn.addEventListener("click", () => {
+      const state = tabState[currentTab];
+      if (state.sort === btn.dataset.sort) return;
+      state.sort = btn.dataset.sort;
+      renderSort();
+      load(0);
+    });
+  }
+
+  function renderSort() {
+    const sort = tabState[currentTab].sort;
+    for (const btn of $("sortSeg").querySelectorAll("button")) btn.classList.toggle("on", btn.dataset.sort === sort);
+  }
+
+  $("jumpForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const p = tabState[currentTab].pageInfo;
+    const n = parseInt($("jumpInput").value, 10);
+    if (!p || isNaN(n)) return;
+    const target = Math.min(Math.max(n, 1), Math.max(p.totalPages, 1)) - 1;
+    $("jumpInput").value = "";
+    if (target !== p.page) load(target);
+  });
 
   // ---------- 목록 불러오기 ----------
   async function load(page) {
     const key = currentTab;
     const tab = TABS[key];
     const state = tabState[key];
+    if (state.pageInfo && page !== state.page) window.scrollTo({ top: 0 });
     listEl.innerHTML = '<div class="cards"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>';
     $("summary").textContent = "";
     try {
-      const result = await callApi(`${tab.listUrl}?keyword=${encodeURIComponent(state.keyword)}&page=${page}&size=${PAGE_SIZE}`, { method: "GET" });
+      const result = await callApi(
+          `${tab.listUrl}?keyword=${encodeURIComponent(state.keyword)}&sort=${state.sort}&page=${page}&size=${PAGE_SIZE}`,
+          { method: "GET" });
       if (key !== currentTab) return; // 불러오는 사이 다른 메뉴로 이동한 경우
       state.page = page;
       state.pageInfo = result.data.pageInfo;
@@ -728,13 +787,51 @@
     $("summary").innerHTML = `총 <b>${total.toLocaleString()}</b>건` + (state.keyword ? ` · 「${escapeHtml(state.keyword)}」 검색 결과` : "");
   }
 
+  // 처음/끝 페이지와 현재 페이지 주변 번호를 보여주고, 사이가 떨어지면 "…"으로 줄인다.
+  // 예) 1 … 6 7 [8] 9 10 … 42
+  function pageWindow(current, total) {
+    const around = 2;
+    const pages = new Set([0, total - 1]);
+    for (let i = current - around; i <= current + around; i++) if (i >= 0 && i < total) pages.add(i);
+    const sorted = [...pages].sort((a, b) => a - b);
+    const result = [];
+    sorted.forEach((page, idx) => {
+      if (idx > 0 && page - sorted[idx - 1] > 1) result.push(null);
+      result.push(page);
+    });
+    return result;
+  }
+
   function renderPager(state) {
     const p = state.pageInfo;
     $("pager").hidden = !p || p.totalPages <= 1;
-    if (!p) return;
-    $("pageLabel").textContent = `${p.page + 1} / ${Math.max(p.totalPages, 1)}`;
-    $("prevBtn").disabled = p.page <= 0;
-    $("nextBtn").disabled = !p.hasNext;
+    if (!p || p.totalPages <= 1) return;
+    const box = $("pages");
+    box.innerHTML = "";
+    const add = (label, target, opts = {}) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = label;
+      if (opts.on) b.className = "on";
+      if (opts.title) b.title = opts.title;
+      b.disabled = !!opts.disabled;
+      if (!opts.disabled && !opts.on) b.addEventListener("click", () => load(target));
+      box.appendChild(b);
+    };
+    add("«", 0, { disabled: p.page === 0, title: "첫 페이지" });
+    add("‹", p.page - 1, { disabled: p.page === 0, title: "이전 페이지" });
+    for (const page of pageWindow(p.page, p.totalPages)) {
+      if (page === null) {
+        box.insertAdjacentHTML("beforeend", '<span class="dots">…</span>');
+      } else {
+        add(String(page + 1), page, { on: page === p.page });
+      }
+    }
+    add("›", p.page + 1, { disabled: !p.hasNext, title: "다음 페이지" });
+    add("»", p.totalPages - 1, { disabled: p.page >= p.totalPages - 1, title: "마지막 페이지" });
+    $("jumpInput").max = p.totalPages;
+    $("jumpInput").placeholder = String(p.page + 1);
+    $("jumpTotal").textContent = `/ ${p.totalPages}`;
   }
 
   function actionButtons(tabKey, row, onDone) {
