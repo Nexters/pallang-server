@@ -36,11 +36,14 @@ public class AdminOpinionController implements AdminOpinionApi {
     @Override
     @GetMapping("/api/admin/opinions")
     public ResponseEntity<DataResponse<AdminOpinionListResponse>> searchOpinions(
-            @RequestParam String keyword,
+            @RequestParam(required = false) Long passageId,
+            @RequestParam(defaultValue = "") String keyword,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         adminAccessGuard.requireAdmin();
-        Page<Opinion> results = adminOpinionService.searchOpinions(keyword, pageable(page, size));
+        Page<Opinion> results = passageId != null
+                ? adminOpinionService.searchOpinionsByPassage(passageId, pageable(page, size))
+                : adminOpinionService.searchOpinions(keyword, pageable(page, size));
         return ResponseEntity.ok(DataResponse.from(AdminOpinionMapper.toListResponse(results)));
     }
 

@@ -28,6 +28,11 @@ public class AdminOpinionService {
         return opinionRepository.findByContentContaining(keyword, pageable);
     }
 
+    // 관리자 페이지에서 대목 행을 펼쳐 그 대목에 달린 의견을 한 세트로 보여주기 위한 조회(이슈 #204).
+    public Page<Opinion> searchOpinionsByPassage(Long passageId, Pageable pageable) {
+        return opinionRepository.findByPassageIdOrderByCreatedAtAscIdAsc(passageId, pageable);
+    }
+
     @Transactional
     public Opinion updateOpinion(Long opinionId, String content) {
         Opinion opinion = getExistingOpinion(opinionId);

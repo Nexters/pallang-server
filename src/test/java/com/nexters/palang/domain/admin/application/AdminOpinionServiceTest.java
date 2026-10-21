@@ -1,5 +1,6 @@
 package com.nexters.palang.domain.admin.application;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
@@ -20,6 +21,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 class AdminOpinionServiceTest {
@@ -36,6 +41,19 @@ class AdminOpinionServiceTest {
     @BeforeEach
     void setUp() {
         adminOpinionService = new AdminOpinionService(opinionRepository, passageRepository, cascadeDeleter);
+    }
+
+    @Test
+    @DisplayName("대목 id로 조회하면 그 대목의 의견을 작성 순서대로 가져오도록 리포지토리에 위임한다")
+    void searchOpinionsByPassageDelegatesToRepository() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Opinion opinion = mock(Opinion.class);
+        Page<Opinion> expected = new PageImpl<>(List.of(opinion), pageable, 1);
+        given(opinionRepository.findByPassageIdOrderByCreatedAtAscIdAsc(100L, pageable)).willReturn(expected);
+
+        Page<Opinion> results = adminOpinionService.searchOpinionsByPassage(100L, pageable);
+
+        assertThat(results).isEqualTo(expected);
     }
 
     @Test
