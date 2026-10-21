@@ -70,7 +70,8 @@ class NotificationServiceTest {
     void getNotificationsReturnsActivityOnlyWhenScopeIsActivity() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<Notification> expected = new PageImpl<>(java.util.List.of(notification(1L, user(1L))), pageable, 1);
-        given(notificationRepository.findByReceiverIdAndGroupIdIsNullOrderByCreatedAtDesc(1L, pageable))
+        given(notificationRepository.findByReceiverIdAndGroupIdIsNullAndTypeNotOrderByCreatedAtDesc(
+                1L, NotificationType.CONTENT_REMOVED, pageable))
                 .willReturn(expected);
 
         Page<Notification> results = notificationService.getNotifications(1L, NotificationScope.ACTIVITY, pageable);
@@ -102,9 +103,34 @@ class NotificationServiceTest {
     }
 
     @Test
+    @DisplayName("scope가 OPERATION이면 운영 안내(CONTENT_REMOVED)만 조회한다")
+    void getNotificationsReturnsOperationOnlyWhenScopeIsOperation() {
+        Pageable pageable = PageRequest.of(0, 20);
+        Page<Notification> expected = new PageImpl<>(java.util.List.of(notification(1L, user(1L))), pageable, 1);
+        given(notificationRepository.findByReceiverIdAndTypeOrderByCreatedAtDesc(
+                1L, NotificationType.CONTENT_REMOVED, pageable)).willReturn(expected);
+
+        Page<Notification> results = notificationService.getNotifications(1L, NotificationScope.OPERATION, pageable);
+
+        assertThat(results).isEqualTo(expected);
+    }
+
+    @Test
+    @DisplayName("scope가 OPERATION이면 운영 안내의 안 읽은 개수만 집계한다")
+    void countUnreadCountsOperationWhenScopeIsOperation() {
+        given(notificationRepository.countByReceiverIdAndTypeAndReadFalse(1L, NotificationType.CONTENT_REMOVED))
+                .willReturn(1L);
+
+        long count = notificationService.countUnread(1L, NotificationScope.OPERATION);
+
+        assertThat(count).isEqualTo(1L);
+    }
+
+    @Test
     @DisplayName("scope가 ACTIVITY면 모임에 속하지 않은 안 읽은 개수만 집계한다")
     void countUnreadCountsActivityWhenScopeIsActivity() {
-        given(notificationRepository.countByReceiverIdAndGroupIdIsNullAndReadFalse(1L)).willReturn(3L);
+        given(notificationRepository.countByReceiverIdAndGroupIdIsNullAndTypeNotAndReadFalse(
+                1L, NotificationType.CONTENT_REMOVED)).willReturn(3L);
 
         long count = notificationService.countUnread(1L, NotificationScope.ACTIVITY);
 

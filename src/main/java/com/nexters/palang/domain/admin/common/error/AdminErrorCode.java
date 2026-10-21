@@ -15,6 +15,8 @@ public enum AdminErrorCode implements BaseErrorCode {
             "다른 멤버가 있는 모임의 호스트여서 삭제할 수 없습니다."),
     USER_DELETE_BLOCKED_BY_PASSAGE(HttpStatus.CONFLICT, "ADMIN_409_2",
             "다른 사용자의 의견이 달린 흔적을 작성해서 삭제할 수 없습니다."),
+    GROUP_CONTENT_REMOVAL_REQUIRES_REPORT(HttpStatus.CONFLICT, "ADMIN_409_3",
+            "모임 게시물은 신고가 접수된 경우에만 사유를 선택해 삭제할 수 있습니다."),
     ;
 
     private final HttpStatus httpStatus;

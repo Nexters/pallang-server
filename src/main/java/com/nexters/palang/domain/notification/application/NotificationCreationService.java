@@ -2,9 +2,11 @@ package com.nexters.palang.domain.notification.application;
 
 import com.nexters.palang.domain.notification.domain.Notification;
 import com.nexters.palang.domain.notification.domain.NotificationType;
+import com.nexters.palang.domain.notification.domain.RemovalReason;
 import com.nexters.palang.domain.notification.infrastructure.NotificationRepository;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
+import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -62,6 +64,25 @@ public class NotificationCreationService {
             pushDispatcher.dispatch(receiverId, type, title, body, notification.getId());
         } catch (Exception e) {
             // 푸시 발송 실패가 방금 저장한 알림까지 롤백시키면 안 된다 (인앱 알림은 이미 유효한 결과).
+            log.error("FCM 푸시 발송 실패 (notificationId={})", notification.getId(), e);
+        }
+    }
+
+    // 운영 안내(관리자 사유 선택 삭제). 작성자가 반드시 알아야 하는 내용이라 알림 설정과 무관하게 인앱에는
+    // 항상 저장하고, 푸시만 사용자의 푸시 마스터 설정을 따른다.
+    @Transactional
+    public void createContentRemovedNotice(
+            Long receiverId, RemovalReason reason, String bookTitle, LocalDateTime writtenAt, String content) {
+        User receiver = userRepository.getReferenceById(receiverId);
+        Notification notification = notificationRepository.save(
+                Notification.contentRemoved(receiver, reason, bookTitle, writtenAt, content));
+        if (!notificationPreferenceService.isPushEnabled(receiverId)) {
+            return;
+        }
+        try {
+            pushDispatcher.dispatch(receiverId, NotificationType.CONTENT_REMOVED,
+                    notification.getTitle(), notification.getBody(), notification.getId());
+        } catch (Exception e) {
             log.error("FCM 푸시 발송 실패 (notificationId={})", notification.getId(), e);
         }
     }
