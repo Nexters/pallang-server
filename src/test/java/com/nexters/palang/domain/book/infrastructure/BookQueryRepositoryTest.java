@@ -163,6 +163,30 @@ class BookQueryRepositoryTest {
     }
 
     @Test
+    @DisplayName("publicPassageCount는 전역 공개 대목만 세고, 모임 전용 대목은 passageCount에만 포함한다")
+    void searchByTitleCountsOnlyGlobalPassagesAsPublic() {
+        User host = user("wsr-pub");
+        Book groupOnlyBook = book("공개 집계 모임 전용 책");
+        Book mixedBook = book("공개 집계 섞인 책");
+        Group groupOnly = group(groupOnlyBook, host, "모임 전용");
+        Group mixedGroup = group(mixedBook, host, "섞인 모임");
+        groupPassage(groupOnlyBook, host, groupOnly, 1);
+        passage(mixedBook, host, 1);
+        passage(mixedBook, host, 2);
+        groupPassage(mixedBook, host, mixedGroup, 3);
+
+        Page<BookSearchProjection> results = bookQueryRepository.searchByTitle(
+                "공개 집계", BookSearchSort.NAME, PageRequest.of(0, 20));
+
+        assertThat(results.getContent())
+                .extracting(BookSearchProjection::bookId, BookSearchProjection::passageCount,
+                        BookSearchProjection::publicPassageCount)
+                .containsExactlyInAnyOrder(
+                        tuple(groupOnlyBook.getId(), 1L, 0L),
+                        tuple(mixedBook.getId(), 3L, 2L));
+    }
+
+    @Test
     @DisplayName("소프트 삭제된 대목은 passageCount 집계에서 제외된다")
     void searchByTitleExcludesDeletedPassageFromCount() {
         User writer = user("wsr-del");
@@ -310,6 +334,34 @@ class BookQueryRepositoryTest {
         assertThat(results.get(0).opinionCount()).isEqualTo(2);
         assertThat(bookWithoutPassages.getId()).isNotIn(
                 results.stream().map(BookActivityProjection::bookId).toList());
+    }
+
+    @Test
+    @DisplayName("인기 도서와 캐러셀도 publicPassageCount에 전역 공개 대목만 센다")
+    void findPopularAndCarouselBooksCountOnlyGlobalPassagesAsPublic() {
+        User host = user("writer-pub");
+        Book groupOnlyBook = book("모임에서만 읽는 책");
+        Book mixedBook = book("전역과 모임에서 읽는 책");
+        Group groupOnly = group(groupOnlyBook, host, "모임 전용");
+        Group mixedGroup = group(mixedBook, host, "섞인 모임");
+        opinion(groupPassage(groupOnlyBook, host, groupOnly, 1), host);
+        opinion(passage(mixedBook, host, 1), host);
+        groupPassage(mixedBook, host, mixedGroup, 2);
+
+        Page<BookActivityProjection> popular = bookQueryRepository.findPopularBooks(PageRequest.of(0, 10));
+        List<BookActivityProjection> carousel = bookQueryRepository.findCarouselBooks(0, 20);
+
+        assertThat(popular.getContent())
+                .extracting(BookActivityProjection::bookId, BookActivityProjection::passageCount,
+                        BookActivityProjection::publicPassageCount)
+                .containsExactlyInAnyOrder(
+                        tuple(groupOnlyBook.getId(), 1L, 0L),
+                        tuple(mixedBook.getId(), 2L, 1L));
+        assertThat(carousel)
+                .extracting(BookActivityProjection::bookId, BookActivityProjection::publicPassageCount)
+                .containsExactlyInAnyOrder(
+                        tuple(groupOnlyBook.getId(), 0L),
+                        tuple(mixedBook.getId(), 1L));
     }
 
     @Test
