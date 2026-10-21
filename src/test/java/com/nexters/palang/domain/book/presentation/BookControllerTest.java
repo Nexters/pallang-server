@@ -86,7 +86,7 @@ class BookControllerTest {
         given(bookService.searchBooks(eq("제목"), any(Pageable.class))).willReturn(new PageImpl<>(
                 List.of(
                         new BookSearchProjection(
-                                1L, "제목", "작가", "출판사", 300, "isbn-db", "cover-db", BookSource.MANUAL, 3, 5),
+                                1L, "제목", "작가", "출판사", 300, "isbn-db", "cover-db", BookSource.MANUAL, 3, 5, 3),
                         BookSearchProjection.from(
                                 new ExternalBookResult("제목", "작가", "다른 출판사", "isbn-aladin", "cover-aladin"))),
                 DEFAULT_PAGEABLE, 2));
@@ -121,7 +121,7 @@ class BookControllerTest {
     void searchInternalBooks() throws Exception {
         given(bookService.searchInternalBooks(eq("제목"), any(BookSearchSort.class), any(Pageable.class))).willReturn(
                 new PageImpl<>(List.of(new BookSearchProjection(
-                        1L, "제목", "작가", "출판사", 300, "isbn", "cover", BookSource.MANUAL, 12, 34)),
+                        1L, "제목", "작가", "출판사", 300, "isbn", "cover", BookSource.MANUAL, 12, 34, 8)),
                         DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/internal-search").param("keyword", "제목"))
@@ -129,7 +129,8 @@ class BookControllerTest {
                 .andExpect(jsonPath("$.data.books[0].bookId").value(1))
                 .andExpect(jsonPath("$.data.books[0].title").value("제목"))
                 .andExpect(jsonPath("$.data.books[0].passageCount").value(12))
-                .andExpect(jsonPath("$.data.books[0].opinionCount").value(34));
+                .andExpect(jsonPath("$.data.books[0].opinionCount").value(34))
+                .andExpect(jsonPath("$.data.books[0].publicPassageCount").value(8));
     }
 
     @Test
@@ -176,7 +177,7 @@ class BookControllerTest {
     @DisplayName("홈 캐러셀 도서 목록을 요청하면 대목/흔적 수와 함께 반환한다")
     void getHomeCarouselBooks() throws Exception {
         given(bookService.getHomeCarouselBooks(isNull(), anyInt())).willReturn(
-                new BookCarouselPage(List.of(new BookActivityProjection(1L, "제목", "작가", "출판사", "cover", 3, 7)), 0, 20, 1));
+                new BookCarouselPage(List.of(new BookActivityProjection(1L, "제목", "작가", "출판사", "cover", 3, 7, 3)), 0, 20, 1));
 
         mockMvc.perform(get("/api/home/books"))
                 .andExpect(status().isOk())
@@ -188,7 +189,7 @@ class BookControllerTest {
     @DisplayName("홈 캐러셀 도서 목록 조회 시 offset을 지정하면 그대로 전달하고, 응답에 이전/다음 여부를 함께 내려준다")
     void getHomeCarouselBooksWithOffset() throws Exception {
         given(bookService.getHomeCarouselBooks(eq(40L), anyInt())).willReturn(
-                new BookCarouselPage(List.of(new BookActivityProjection(1L, "제목", "작가", "출판사", "cover", 3, 7)), 40, 20, 100));
+                new BookCarouselPage(List.of(new BookActivityProjection(1L, "제목", "작가", "출판사", "cover", 3, 7, 3)), 40, 20, 100));
 
         mockMvc.perform(get("/api/home/books").param("offset", "40").param("size", "20"))
                 .andExpect(status().isOk())
@@ -282,12 +283,13 @@ class BookControllerTest {
     @DisplayName("인기 도서 목록을 요청하면 흔적 많은 순 목록을 반환한다")
     void getPopularBooks() throws Exception {
         given(bookService.getPopularBooks(any(Pageable.class))).willReturn(
-                new PageImpl<>(List.of(new BookActivityProjection(1L, "인기 도서", "작가", "출판사", "cover", 3, 10)),
+                new PageImpl<>(List.of(new BookActivityProjection(1L, "인기 도서", "작가", "출판사", "cover", 3, 10, 3)),
                         DEFAULT_PAGEABLE, 1));
 
         mockMvc.perform(get("/api/books/popular"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.books[0].opinionCount").value(10));
+                .andExpect(jsonPath("$.data.books[0].opinionCount").value(10))
+                .andExpect(jsonPath("$.data.books[0].publicPassageCount").value(3));
     }
 
     @Test

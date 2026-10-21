@@ -19,6 +19,8 @@ import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.Projections;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.CaseBuilder;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.LocalDateTime;
@@ -65,7 +67,7 @@ public class BookQueryRepository {
                 .select(Projections.constructor(BookSearchProjection.class,
                         book.id, book.title, book.author, book.publisher, book.pageCount,
                         book.isbn, book.coverImageUrl, book.source,
-                        passage.countDistinct(), opinion.countDistinct()))
+                        passage.countDistinct(), opinion.countDistinct(), publicPassageCount(passage)))
                 .from(book)
                 .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
@@ -133,6 +135,16 @@ public class BookQueryRepository {
         return result;
     }
 
+    // 전역 공개 대목(group_id IS NULL)만 센다. passageCount는 모임 전용 대목까지 함께 세서, 모임에서만 읽는 책도
+    // 대목이 있는 것처럼 보인다 — 클라이언트는 이 값으로 groupId 없이 열었을 때 보일 대목이 있는지 가른다.
+    // passage.group.id는 FK 컬럼을 그대로 써 group 테이블을 조인하지 않는다(내 서재 집계와 같은 방식).
+    private NumberExpression<Long> publicPassageCount(QPassage passage) {
+        return new CaseBuilder()
+                .when(passage.group.id.isNull()).then(passage.id)
+                .otherwise(Expressions.nullExpression(Long.class))
+                .countDistinct();
+    }
+
     // 홈 캐러셀은 전체 목록 중 임의의 가운데 offset에서 좌우로 조회해야 해서, page*size로 offset이
     // 고정되는 Pageable 대신 offset/limit을 직접 받는다.
     public List<BookActivityProjection> findCarouselBooks(long offset, int limit) {
@@ -143,7 +155,7 @@ public class BookQueryRepository {
         return queryFactory
                 .select(Projections.constructor(BookActivityProjection.class,
                         book.id, book.title, book.author, book.publisher, book.coverImageUrl,
-                        passage.countDistinct(), opinion.countDistinct()))
+                        passage.countDistinct(), opinion.countDistinct(), publicPassageCount(passage)))
                 .from(book)
                 .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
@@ -346,7 +358,7 @@ public class BookQueryRepository {
         List<BookActivityProjection> content = queryFactory
                 .select(Projections.constructor(BookActivityProjection.class,
                         book.id, book.title, book.author, book.publisher, book.coverImageUrl,
-                        passage.countDistinct(), opinion.countDistinct()))
+                        passage.countDistinct(), opinion.countDistinct(), publicPassageCount(passage)))
                 .from(book)
                 .innerJoin(passage).on(passage.book.eq(book).and(passage.deletedAt.isNull()))
                 .leftJoin(opinion).on(opinion.passage.eq(passage).and(opinion.deletedAt.isNull()))
