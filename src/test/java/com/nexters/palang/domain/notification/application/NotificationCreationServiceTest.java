@@ -12,9 +12,11 @@ import static org.mockito.Mockito.verify;
 
 import com.nexters.palang.domain.notification.domain.Notification;
 import com.nexters.palang.domain.notification.domain.NotificationType;
+import com.nexters.palang.domain.notification.domain.RemovalReason;
 import com.nexters.palang.domain.notification.infrastructure.NotificationRepository;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.domain.user.infrastructure.UserRepository;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -131,6 +133,60 @@ class NotificationCreationServiceTest {
                 .doesNotThrowAnyException();
 
         verify(notificationRepository).save(any(Notification.class));
+    }
+
+    @Test
+    @DisplayName("운영 안내: 알림 설정과 무관하게 인앱에 저장하고, 푸시 마스터가 켜져 있으면 푸시도 보낸다")
+    void createContentRemovedNoticeSavesAndPushes() {
+        given(userRepository.getReferenceById(7L)).willReturn(user(7L));
+        given(notificationRepository.save(any(Notification.class))).willAnswer(invocation -> {
+            Notification notification = invocation.getArgument(0);
+            ReflectionTestUtils.setField(notification, "id", 400L);
+            return notification;
+        });
+        given(notificationPreferenceService.isPushEnabled(7L)).willReturn(true);
+
+        notificationCreationService.createContentRemovedNotice(
+                7L, RemovalReason.SPAM, "책 제목", LocalDateTime.of(2026, 10, 19, 14, 30), "반복된 내용");
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(captor.capture());
+        Notification saved = captor.getValue();
+        assertThat(saved.getType()).isEqualTo(NotificationType.CONTENT_REMOVED);
+        assertThat(saved.getTitle()).isEqualTo("작성하신 게시물이 삭제되었습니다");
+        assertThat(saved.getBody()).isEqualTo(RemovalReason.SPAM.getMessage());
+        assertThat(saved.getRemovedContentExcerpt()).isEqualTo("반복된 내용");
+        assertThat(saved.getGroupId()).isNull();
+        verify(pushDispatcher).dispatch(7L, NotificationType.CONTENT_REMOVED,
+                "작성하신 게시물이 삭제되었습니다", RemovalReason.SPAM.getMessage(), 400L);
+    }
+
+    @Test
+    @DisplayName("운영 안내: 푸시 마스터가 꺼져 있어도 인앱에는 저장하고 푸시만 생략한다")
+    void createContentRemovedNoticeSkipsPushWhenPushDisabled() {
+        given(userRepository.getReferenceById(7L)).willReturn(user(7L));
+        given(notificationRepository.save(any(Notification.class))).willAnswer(invocation -> invocation.getArgument(0));
+        given(notificationPreferenceService.isPushEnabled(7L)).willReturn(false);
+
+        notificationCreationService.createContentRemovedNotice(
+                7L, RemovalReason.ADVERTISEMENT, "책 제목", LocalDateTime.of(2026, 10, 19, 14, 30), "광고");
+
+        verify(notificationRepository).save(any(Notification.class));
+        verify(pushDispatcher, never()).dispatch(anyLong(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("운영 안내: 욕설·비방 사유는 작성 내용 미리보기를 보관하지 않는다")
+    void createContentRemovedNoticeOmitsPreviewForAbuse() {
+        given(userRepository.getReferenceById(7L)).willReturn(user(7L));
+        given(notificationRepository.save(any(Notification.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+        notificationCreationService.createContentRemovedNotice(
+                7L, RemovalReason.ABUSE, "책 제목", LocalDateTime.of(2026, 10, 19, 14, 30), "심한 욕설");
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationRepository).save(captor.capture());
+        assertThat(captor.getValue().getRemovedContentExcerpt()).isNull();
     }
 
     @Test

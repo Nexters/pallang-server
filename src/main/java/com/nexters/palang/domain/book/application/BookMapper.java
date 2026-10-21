@@ -35,7 +35,7 @@ public final class BookMapper {
         return new BookSearchResponse(
                 projection.bookId(), projection.title(), projection.author(), projection.publisher(),
                 projection.pageCount(), projection.isbn(), projection.coverImageUrl(), projection.source(),
-                projection.passageCount(), projection.opinionCount());
+                projection.passageCount(), projection.opinionCount(), projection.publicPassageCount());
     }
 
     public static BookSearchListResponse toSearchListResponse(Page<BookSearchProjection> projections) {
@@ -46,7 +46,8 @@ public final class BookMapper {
     public static BookActivityResponse toActivityResponse(BookActivityProjection projection) {
         return new BookActivityResponse(
                 projection.bookId(), projection.title(), projection.author(), projection.publisher(),
-                projection.coverImageUrl(), projection.passageCount(), projection.opinionCount());
+                projection.coverImageUrl(), projection.passageCount(), projection.opinionCount(),
+                projection.publicPassageCount());
     }
 
     public static BookActivityListResponse toActivityListResponse(Page<BookActivityProjection> projections) {

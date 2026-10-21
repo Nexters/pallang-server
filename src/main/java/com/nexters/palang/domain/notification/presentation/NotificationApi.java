@@ -19,7 +19,8 @@ import org.springframework.http.ResponseEntity;
 public interface NotificationApi {
 
     @Operation(summary = "알림 목록 조회",
-            description = "내가 받은 알림을 최신순으로 페이지네이션 조회합니다. scope로 [전체 | 활동 | 모임] 탭을 분류합니다. "
+            description = "내가 받은 알림을 최신순으로 페이지네이션 조회합니다. scope로 [전체 | 활동 | 모임 | 운영] 탭을 분류합니다. "
+                    + "운영 안내(CONTENT_REMOVED)는 전체·운영 탭에만 나오며 removalNotice에 삭제 안내 정보가 담깁니다. "
                     + "응답의 unreadCount는 조회한 scope와 동일한 범위로 집계됩니다. "
                     + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
@@ -30,7 +31,7 @@ public interface NotificationApi {
                                     + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}")))
     })
     ResponseEntity<DataResponse<NotificationListResponse>> getNotifications(
-            @Parameter(description = "알림 분류 탭 (ALL: 전체, ACTIVITY: 활동, GROUP: 모임, 기본값 ALL)") NotificationScope scope,
+            @Parameter(description = "알림 분류 탭 (ALL: 전체, ACTIVITY: 활동, GROUP: 모임, OPERATION: 운영, 기본값 ALL)") NotificationScope scope,
             @Parameter(description = "페이지 번호 (0부터 시작, 기본값 0)") int page,
             @Parameter(description = "페이지 크기 (기본값 20, 최대 100)") int size
     );

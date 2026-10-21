@@ -15,18 +15,25 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     Page<Notification> findByReceiverIdOrderByCreatedAtDesc(Long receiverId, Pageable pageable);
 
-    // 알림함 "활동" 탭: 모임에 속하지 않은(group_id IS NULL) 알림만.
-    Page<Notification> findByReceiverIdAndGroupIdIsNullOrderByCreatedAtDesc(Long receiverId, Pageable pageable);
+    // 알림함 "활동" 탭: 모임에 속하지 않은(group_id IS NULL) 알림 중 운영 안내(excludedType)를 뺀 것.
+    Page<Notification> findByReceiverIdAndGroupIdIsNullAndTypeNotOrderByCreatedAtDesc(
+            Long receiverId, NotificationType excludedType, Pageable pageable);
 
-    // 알림함 "모임" 탭: 모임에 속한(group_id IS NOT NULL) 알림만.
+    // 알림함 "모임" 탭: 모임에 속한(group_id IS NOT NULL) 알림만. 운영 안내는 group_id를 두지 않아 자연히 빠진다.
     Page<Notification> findByReceiverIdAndGroupIdIsNotNullOrderByCreatedAtDesc(Long receiverId, Pageable pageable);
+
+    // 알림함 "운영" 탭: 운영 안내 타입만.
+    Page<Notification> findByReceiverIdAndTypeOrderByCreatedAtDesc(
+            Long receiverId, NotificationType type, Pageable pageable);
 
     // 알림함 탭별 안 읽은 개수 뱃지.
     long countByReceiverIdAndReadFalse(Long receiverId);
 
-    long countByReceiverIdAndGroupIdIsNullAndReadFalse(Long receiverId);
+    long countByReceiverIdAndGroupIdIsNullAndTypeNotAndReadFalse(Long receiverId, NotificationType excludedType);
 
     long countByReceiverIdAndGroupIdIsNotNullAndReadFalse(Long receiverId);
+
+    long countByReceiverIdAndTypeAndReadFalse(Long receiverId, NotificationType type);
 
     // 홈 화면 벨 아이콘: scope와 무관하게 안 읽은 알림이 하나라도 있는지만 확인.
     boolean existsByReceiverIdAndReadFalse(Long receiverId);

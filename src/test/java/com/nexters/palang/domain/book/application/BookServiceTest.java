@@ -84,7 +84,7 @@ class BookServiceTest {
         for (int id = fromId; id <= toId; id++) {
             books.add(new BookSearchProjection(
                     (long) id, "책" + id, "작가", "출판사", 300, "isbn-db-" + id, "cover-" + id,
-                    BookSource.MANUAL, 0, id));
+                    BookSource.MANUAL, 0, id, 0));
         }
         return books;
     }
@@ -126,7 +126,7 @@ class BookServiceTest {
     void searchBooksFillsDbSlotsFirstThenAladin() {
         Pageable pageable = PageRequest.of(0, 20);
         BookSearchProjection dbBook = new BookSearchProjection(
-                1L, "프랑켄슈타인", "메리 셸리", "민음사", 300, "isbn-db", "cover-db", BookSource.MANUAL, 3, 5);
+                1L, "프랑켄슈타인", "메리 셸리", "민음사", 300, "isbn-db", "cover-db", BookSource.MANUAL, 3, 5, 3);
         ExternalBookResult aladinBook = new ExternalBookResult(
                 "프랑켄슈타인", "메리 셸리", "문학동네", "isbn-aladin", "cover-aladin");
         given(bookQueryRepository.countByTitle("프랑켄슈타인")).willReturn(1L);
@@ -149,7 +149,7 @@ class BookServiceTest {
     void searchBooksDropsAladinDuplicateWhenIsbnMatchesRegisteredBook() {
         Pageable pageable = PageRequest.of(0, 20);
         BookSearchProjection dbBook = new BookSearchProjection(
-                1L, "프랑켄슈타인", "메리 셸리", "민음사", 300, "isbn-1234", "cover-db", BookSource.MANUAL, 3, 5);
+                1L, "프랑켄슈타인", "메리 셸리", "민음사", 300, "isbn-1234", "cover-db", BookSource.MANUAL, 3, 5, 3);
         ExternalBookResult duplicateAladinBook = new ExternalBookResult(
                 "프랑켄슈타인", "메리 셸리", "민음사", "isbn-1234", "cover-aladin");
         ExternalBookResult otherAladinBook = new ExternalBookResult(
@@ -246,7 +246,7 @@ class BookServiceTest {
         Pageable pageable = PageRequest.of(0, 20);
         Page<BookSearchProjection> expected = new PageImpl<>(
                 List.of(new BookSearchProjection(
-                        1L, "프랑켄슈타인", "작가", "출판사", 300, "isbn", "cover", BookSource.MANUAL, 5, 10)),
+                        1L, "프랑켄슈타인", "작가", "출판사", 300, "isbn", "cover", BookSource.MANUAL, 5, 10, 5)),
                 pageable, 1);
         given(bookQueryRepository.searchByTitle("프랑", BookSearchSort.RECENT, pageable)).willReturn(expected);
 
@@ -330,7 +330,7 @@ class BookServiceTest {
     void getPopularBooks() {
         Pageable pageable = PageRequest.of(0, 20);
         Page<BookActivityProjection> expected = new PageImpl<>(
-                List.of(new BookActivityProjection(1L, "책1", "작가", "출판사", "cover", 5, 10)), pageable, 1);
+                List.of(new BookActivityProjection(1L, "책1", "작가", "출판사", "cover", 5, 10, 5)), pageable, 1);
         given(bookQueryRepository.findPopularBooks(pageable)).willReturn(expected);
 
         Page<BookActivityProjection> results = bookService.getPopularBooks(pageable);
@@ -343,7 +343,7 @@ class BookServiceTest {
     void getHomeCarouselBooksResolvesCenterOffsetWhenOffsetIsNull() {
         given(bookQueryRepository.countCarouselBooks()).willReturn(100L);
         given(bookQueryRepository.findCarouselBooks(40L, 20))
-                .willReturn(List.of(new BookActivityProjection(1L, "책1", "작가", "출판사", "cover", 5, 10)));
+                .willReturn(List.of(new BookActivityProjection(1L, "책1", "작가", "출판사", "cover", 5, 10, 5)));
 
         BookCarouselPage result = bookService.getHomeCarouselBooks(null, 20);
 

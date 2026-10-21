@@ -7,6 +7,7 @@ public record BookActivityProjection(
         String publisher,
         String coverImageUrl,
         long passageCount,
-        long opinionCount
+        long opinionCount,
+        long publicPassageCount
 ) {
 }
