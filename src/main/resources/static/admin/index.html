@@ -259,7 +259,55 @@
   .toast.error .dot { background: var(--danger); }
   @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
+  /* ---------- 신고 카드 ---------- */
+  .rcard { background: var(--surface); border-radius: 16px; box-shadow: var(--shadow); padding: 18px 22px; border-left: 4px solid var(--danger); }
+  .rcard.done { border-left-color: var(--line); opacity: .7; }
+  .rcard-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .rcard-head .count { font-weight: 800; color: var(--danger); font-size: 15px; }
+  .rcard-head .spacer { flex: 1; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .details { margin: 0 0 12px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+  .details li { font-size: 12.5px; color: var(--ink-3); background: var(--surface-2); border-radius: 8px; padding: 6px 10px; }
+  .details li::before { content: "신고 내용 · "; color: var(--ink-4); font-weight: 600; }
+  .rcard-body { font-size: 15px; color: var(--ink); white-space: pre-wrap; line-height: 1.7; margin: 8px 0 10px; }
+  .rcard-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--ink-4); }
+  .rcard-foot .actions { margin-left: auto; display: flex; gap: 4px; }
+  .gone { color: var(--ink-4); font-size: 13px; padding: 6px 0 2px; }
+
+  /* ---------- 사유 선택 삭제 모달 ---------- */
+  .modal.wide { width: 720px; }
+  .removal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .reason-list { display: flex; flex-direction: column; gap: 8px; }
+  .reason {
+    display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px;
+    border: 1.5px solid var(--line); cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .reason:hover { border-color: #f3c9ad; }
+  .reason input { margin-top: 3px; accent-color: var(--brand); }
+  .reason.selected { border-color: var(--brand); background: var(--brand-soft); }
+  .reason.disabled { opacity: .45; cursor: not-allowed; }
+  .reason b { display: block; font-size: 14px; color: var(--ink); }
+  .reason small { display: block; font-size: 12px; color: var(--ink-3); margin-top: 2px; line-height: 1.5; }
+  .reason.silent { border-style: dashed; }
+  .rule-note { font-size: 12.5px; color: var(--danger); background: var(--danger-soft); border-radius: 10px; padding: 9px 12px; }
+  .preview-label { font-size: 12px; font-weight: 700; color: var(--ink-4); margin-bottom: 8px; }
+  .notice {
+    border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: grid;
+    grid-template-columns: 34px 1fr; gap: 12px; background: #fff; font-size: 13px;
+  }
+  .notice .ic { width: 34px; height: 34px; border-radius: 10px; background: var(--surface-2); display: grid; place-items: center; }
+  .notice .kind { font-size: 12px; font-weight: 600; color: var(--ink); display: flex; justify-content: space-between; }
+  .notice .kind span { color: var(--ink-4); font-weight: 500; }
+  .notice .ttl { font-size: 15px; font-weight: 700; margin: 4px 0 8px; display: flex; gap: 3px; }
+  .notice .ttl::after { content: ""; width: 4px; height: 4px; border-radius: 50%; background: var(--brand); margin-top: 4px; }
+  .notice p { margin: 0 0 2px; color: var(--ink-2); line-height: 1.55; }
+  .notice p b { font-weight: 600; }
+  .notice .gap { height: 10px; }
+  .notice .muted { color: var(--ink-4); }
+  .notice-empty { border: 1.5px dashed var(--line); border-radius: 16px; padding: 30px 16px; text-align: center; color: var(--ink-4); font-size: 13px; }
+
   @media (max-width: 860px) {
+    .removal-grid { grid-template-columns: 1fr; }
     .app { grid-template-columns: 1fr; }
     .sidebar { position: static; height: auto; padding: 14px; }
     .nav { flex-direction: row; flex-wrap: wrap; }
@@ -345,6 +393,29 @@
   </div>
 </div>
 
+<!-- 사유 선택 삭제 모달 -->
+<div class="backdrop" id="removalBackdrop">
+  <div class="modal wide">
+    <h3>게시물 삭제</h3>
+    <div class="sub" id="removalSub"></div>
+    <div class="removal-grid">
+      <div>
+        <div class="preview-label">삭제 사유</div>
+        <div id="removalRule"></div>
+        <div class="reason-list" id="reasonList"></div>
+      </div>
+      <div>
+        <div class="preview-label">작성자가 받게 될 안내</div>
+        <div id="noticePreview"></div>
+      </div>
+    </div>
+    <div class="foot">
+      <button class="btn ghost" id="removalCancel">취소</button>
+      <button class="btn danger" id="removalOk" disabled>삭제</button>
+    </div>
+  </div>
+</div>
+
 <div class="toasts" id="toasts"></div>
 
 <script>
@@ -404,7 +475,15 @@
 
   // ---------- 화면 정의 ----------
   // view: "passageCards" | "opinionCards" | "table"
+  // 유저가 신고할 때 고르는 사유(ReportReason) — 관리자가 내리는 삭제 사유(RemovalReason)와는 별개다.
+  const REPORT_REASON_LABELS = { SPAM: "스팸·홍보", HATE: "혐오 표현", ABUSE: "욕설·괴롭힘", COPYRIGHT: "저작권", ETC: "기타" };
+
   const TABS = {
+    reports: {
+      group: "content", icon: "🚨", label: "신고",
+      desc: "신고가 들어온 의견·댓글입니다. 사유를 골라 삭제하면 작성자에게 운영 안내가 갑니다.",
+      view: "reportCards", listUrl: "/api/admin/reports", listKey: "reports", idKey: "targetId", noSearch: true,
+    },
     passages: {
       group: "content", icon: "❝", label: "대목 · 의견",
       desc: "대목과 그 아래 달린 의견을 한 세트로 봅니다.",
@@ -602,7 +681,8 @@
     renderNav();
     $("pageTitle").textContent = tab.label;
     $("pageDesc").textContent = tab.desc;
-    $("keyword").placeholder = tab.searchPlaceholder;
+    $("searchForm").hidden = !!tab.noSearch;
+    $("keyword").placeholder = tab.searchPlaceholder || "";
     $("keyword").value = tabState[key].keyword;
     load(tabState[key].page);
   }
@@ -636,6 +716,7 @@
       }
       if (tab.view === "passageCards") renderPassageCards(rows);
       else if (tab.view === "opinionCards") renderOpinionCards(rows);
+      else if (tab.view === "reportCards") renderReportCards(rows);
       else renderTable(tab, rows);
     } catch (e) {
       listEl.innerHTML = `<div class="empty"><div class="big">⚠️</div>${escapeHtml(e.message)}</div>`;
@@ -671,9 +752,25 @@
     const del = document.createElement("button");
     del.className = "btn danger-ghost sm";
     del.textContent = "삭제";
-    del.addEventListener("click", () => confirmDelete(tabKey, row, onDone));
+    // 의견은 실제 유저 게시물이라 사유를 골라 삭제하고 작성자에게 운영 안내를 보낸다.
+    del.addEventListener("click", () => tabKey === "opinions"
+        ? openRemoval(opinionTarget(row), onDone)
+        : confirmDelete(tabKey, row, onDone));
     wrap.appendChild(del);
     return wrap;
+  }
+
+  // 의견 목록 행 → 사유 선택 삭제 모달이 쓰는 공통 형태
+  function opinionTarget(o) {
+    return {
+      opinionId: o.opinionId, author: o.userNickname, content: o.content, quotedText: o.passageQuotedText,
+      bookTitle: o.bookTitle, groupName: o.groupName, isGroup: o.groupId != null,
+      reportCount: o.reportCount || 0, writtenAt: o.createdAt,
+    };
+  }
+
+  function reportBadge(count) {
+    return count ? badge("🚨 신고 " + count, "danger") : "";
   }
 
   const reloadCurrent = () => load(tabState[currentTab].page);
@@ -750,6 +847,7 @@
           <div class="op-top">
             <span class="op-name">${escapeHtml(o.userNickname)}</span>
             ${relTime(o.createdAt)}
+            ${reportBadge(o.reportCount)}
             ${o.deleted ? badge("삭제됨", "danger") : ""}
           </div>
           <div class="op-body">${escapeHtml(o.content)}</div>
@@ -770,10 +868,12 @@
       card.className = "ocard" + (o.deleted ? " is-deleted" : "");
       card.innerHTML = `
         <div class="ocard-context" title="대목 #${o.passageId}">❝ ${escapeHtml(o.passageQuotedText)}</div>
-        <div class="op-top">${who(o.userNickname)} ${relTime(o.createdAt)} ${o.deleted ? badge("삭제됨", "danger") : ""}</div>
+        <div class="op-top">${who(o.userNickname)} ${relTime(o.createdAt)}
+          ${o.groupName ? badge("👥 " + o.groupName, "brand") : ""} ${reportBadge(o.reportCount)}
+          ${o.deleted ? badge("삭제됨", "danger") : ""}</div>
         <div class="ocard-body">${escapeHtml(o.content)}</div>
         <div class="ocard-foot">
-          <span class="like">♥ ${o.likeCount}</span><span>의견 #${o.opinionId}</span><span>대목 #${o.passageId}</span>
+          <span class="like">♥ ${o.likeCount}</span><span>「${escapeHtml(o.bookTitle)}」</span><span>의견 #${o.opinionId}</span><span>대목 #${o.passageId}</span>
           <span class="actions"></span>
         </div>`;
       card.querySelector(".actions").appendChild(actionButtons("opinions", o, reloadCurrent));
@@ -782,6 +882,163 @@
     listEl.innerHTML = "";
     listEl.appendChild(wrap);
   }
+
+  // ---------- 신고 카드 ----------
+  function renderReportCards(rows) {
+    const wrap = document.createElement("div");
+    wrap.className = "cards";
+    for (const r of rows) {
+      const isOpinion = r.targetType === "OPINION";
+      const card = document.createElement("article");
+      card.className = "rcard" + (r.targetAlive ? "" : " done");
+      card.innerHTML = `
+        <div class="rcard-head">
+          ${badge(isOpinion ? "의견" : "댓글", isOpinion ? "brand" : "")}
+          <span class="count">신고 ${r.reportCount}건</span>
+          ${r.groupName ? badge("👥 " + r.groupName, "brand") : ""}
+          ${r.targetAlive ? "" : badge("처리됨 · 삭제된 게시물", "")}
+          <span class="spacer"></span>
+          <span class="time">마지막 신고 ${relTime(r.lastReportedAt)}</span>
+        </div>
+        <div class="chips">${r.reasons.map(x => badge(`${REPORT_REASON_LABELS[x.reason] || x.reason} ${x.count}`, "danger")).join("")}</div>
+        ${r.details.length ? `<ul class="details">${r.details.map(d => `<li>${escapeHtml(d)}</li>`).join("")}</ul>` : ""}
+        ${r.targetAlive ? `
+          ${r.passageQuotedText ? `<div class="ocard-context">「${escapeHtml(r.bookTitle)}」 ❝ ${escapeHtml(r.passageQuotedText)}</div>` : ""}
+          <div class="op-top">${who(r.authorNickname)}</div>
+          <div class="rcard-body">${escapeHtml(r.content)}</div>
+          <div class="rcard-foot"><span>${isOpinion ? "의견" : "댓글"} #${r.targetId}</span><span class="actions"></span></div>`
+        : `<div class="gone">이미 삭제되어 내용을 볼 수 없어요. (${isOpinion ? "의견" : "댓글"} #${r.targetId})</div>`}`;
+      if (r.targetAlive) {
+        const actions = card.querySelector(".actions");
+        const btn = document.createElement("button");
+        btn.className = "btn danger sm";
+        if (isOpinion) {
+          btn.textContent = "사유 선택 삭제";
+          btn.addEventListener("click", () => openRemoval({
+            opinionId: r.targetId, author: r.authorNickname, content: r.content, quotedText: r.passageQuotedText,
+            bookTitle: r.bookTitle, groupName: r.groupName, isGroup: !!r.groupName,
+            reportCount: r.reportCount, writtenAt: null,
+          }, reloadCurrent));
+        } else {
+          btn.textContent = "댓글 삭제";
+          btn.addEventListener("click", () => confirmDelete("comments",
+              { commentId: r.targetId, userNickname: r.authorNickname }, reloadCurrent));
+        }
+        actions.appendChild(btn);
+      }
+      wrap.appendChild(card);
+    }
+    listEl.innerHTML = "";
+    listEl.appendChild(wrap);
+  }
+
+  // ---------- 사유 선택 삭제 모달 ----------
+  // 사유와 안내 문구는 서버(RemovalReason)가 단일 출처다. 처음 열 때 한 번만 불러온다.
+  let removalReasons = null;
+  let removing = null;
+  const SILENT = "SILENT";
+
+  async function openRemoval(target, onDone) {
+    if (!removalReasons) {
+      try {
+        removalReasons = (await callApi("/api/admin/removal-reasons", { method: "GET" })).data;
+      } catch (e) {
+        toast("삭제 사유를 불러오지 못했어요: " + e.message, "error");
+        return;
+      }
+    }
+    removing = { target, onDone, choice: null };
+    // 모임 게시물은 신고가 접수된 경우에만 사유 선택 삭제가 가능하다(서버도 같은 규칙으로 막는다).
+    const blocked = target.isGroup && target.reportCount === 0;
+    $("removalSub").innerHTML = `의견 #${target.opinionId} · ${escapeHtml(target.author)}`
+        + (target.groupName ? ` · 👥 ${escapeHtml(target.groupName)}` : " · 전체 공개")
+        + (target.reportCount ? ` · 신고 ${target.reportCount}건` : "");
+    $("removalRule").innerHTML = blocked
+        ? '<div class="rule-note" style="margin-bottom:10px">모임 게시물은 신고가 접수된 경우에만 사유를 선택해 삭제할 수 있어요.</div>'
+        : "";
+
+    const list = $("reasonList");
+    list.innerHTML = "";
+    const options = [
+      ...removalReasons.map(r => ({ value: r.reason, title: r.label, sub: r.message, disabled: blocked })),
+      { value: SILENT, title: "알림 없이 삭제", sub: "테스트·QA 데이터 정리용. 작성자에게 안내를 보내지 않습니다.", silent: true },
+    ];
+    for (const opt of options) {
+      const label = document.createElement("label");
+      label.className = "reason" + (opt.silent ? " silent" : "") + (opt.disabled ? " disabled" : "");
+      label.innerHTML = `<input type="radio" name="removalReason" value="${opt.value}" ${opt.disabled ? "disabled" : ""} />
+        <span><b>${escapeHtml(opt.title)}</b><small>${escapeHtml(opt.sub)}</small></span>`;
+      label.querySelector("input").addEventListener("change", () => selectRemoval(opt.value));
+      list.appendChild(label);
+    }
+    renderNoticePreview();
+    $("removalOk").disabled = true;
+    $("removalOk").textContent = "삭제";
+    $("removalBackdrop").classList.add("open");
+  }
+
+  function selectRemoval(value) {
+    removing.choice = value;
+    for (const el of $("reasonList").children) {
+      el.classList.toggle("selected", el.querySelector("input").value === value);
+    }
+    $("removalOk").disabled = false;
+    $("removalOk").textContent = value === SILENT ? "알림 없이 삭제" : "삭제하고 안내 보내기";
+    renderNoticePreview();
+  }
+
+  // 작성자 앱의 알림함 "운영" 탭에 실제로 보일 모습(Figma: 마이페이지_알림_운영)을 그대로 미리 보여준다.
+  function renderNoticePreview() {
+    const box = $("noticePreview");
+    const choice = removing && removing.choice;
+    if (!choice) { box.innerHTML = '<div class="notice-empty">사유를 고르면 작성자에게 보낼 안내를 미리 보여드려요.</div>'; return; }
+    if (choice === SILENT) { box.innerHTML = '<div class="notice-empty">작성자에게 아무 안내도 가지 않아요.</div>'; return; }
+    const reason = removalReasons.find(r => r.reason === choice);
+    const t = removing.target;
+    const content = (choice === "PASSAGE_FIELD_MISUSE" ? t.quotedText : t.content) || "";
+    box.innerHTML = `
+      <div class="notice">
+        <div class="ic">✏️</div>
+        <div>
+          <div class="kind">안내 <span>방금 전</span></div>
+          <div class="ttl">작성하신 게시물이 삭제되었습니다</div>
+          <p><b>책 제목 :</b> 『${escapeHtml(t.bookTitle || "-")}』</p>
+          <p><b>작성 일시 :</b> ${t.writtenAt ? escapeHtml(absTime(t.writtenAt)) : '<span class="muted">게시물 작성 시각</span>'}</p>
+          <p><b>작성 내용 :</b> ${reason.showsContentPreview
+              ? `“${escapeHtml(content.length > 100 ? content.slice(0, 99) + "…" : content)}”`
+              : '<span class="muted">(유해 내용이라 미리보기를 생략해요)</span>'}</p>
+          <div class="gap"></div>
+          <p><b>삭제 사유</b></p>
+          <p>${escapeHtml(reason.message)}</p>
+          <div class="gap"></div>
+          <p class="muted">삭제 사유에 대해 궁금한 점이 있거나 문의사항이 필요한 경우 pallang4you@gmail.com로 문의해주세요.</p>
+        </div>
+      </div>`;
+  }
+
+  function closeRemoval() { $("removalBackdrop").classList.remove("open"); removing = null; }
+  $("removalCancel").addEventListener("click", closeRemoval);
+  $("removalBackdrop").addEventListener("click", (e) => { if (e.target.id === "removalBackdrop") closeRemoval(); });
+  $("removalOk").addEventListener("click", async () => {
+    if (!removing || !removing.choice) return;
+    const { target, onDone, choice } = removing;
+    $("removalOk").disabled = true;
+    try {
+      if (choice === SILENT) {
+        await callApi(`/api/admin/opinions/${target.opinionId}`, { method: "DELETE" });
+        toast(`의견 #${target.opinionId}을 삭제했어요.`);
+      } else {
+        await callApi(`/api/admin/opinions/${target.opinionId}/removal`,
+            { method: "POST", body: JSON.stringify({ reason: choice }) });
+        toast(`의견 #${target.opinionId}을 삭제하고 ${target.author}님에게 안내를 보냈어요.`);
+      }
+      closeRemoval();
+      onDone();
+    } catch (e) {
+      toast("삭제 실패: " + e.message, "error");
+      $("removalOk").disabled = false;
+    }
+  });
 
   // ---------- 수정 모달 ----------
   let editing = null;
@@ -863,6 +1120,7 @@
     if (e.key !== "Escape") return;
     closeEdit();
     closeConfirm();
+    closeRemoval();
   });
 
   // ---------- 시작 ----------

@@ -100,6 +100,15 @@ public class NotificationPreferenceService {
             case GROUP_SCHEDULE_CHANGED, GROUP_ENDING_SOON -> preference.isGroupScheduleEnabled();
             // 더 이상 새로 발송하지 않는다(이슈 #193) — 대응하는 토글이 없으므로 차단하지 않는다.
             case BOOK_NEW_OPINIONS -> true;
+            // 운영 안내는 설정으로 끌 수 없다(인앱은 항상 저장). 이 경로를 타지 않지만 switch 완결성을 위해 둔다.
+            case CONTENT_REMOVED -> true;
         };
+    }
+
+    // 운영 안내처럼 인앱 저장은 항상 하되 푸시만 사용자의 푸시 마스터 설정을 따르는 경우에 쓴다.
+    public boolean isPushEnabled(Long userId) {
+        return notificationPreferenceRepository.findByUserId(userId)
+                .map(NotificationPreference::isPushEnabled)
+                .orElse(true);
     }
 }

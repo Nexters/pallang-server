@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nexters.palang.domain.notification.domain.Notification;
 import com.nexters.palang.domain.notification.domain.NotificationType;
+import com.nexters.palang.domain.notification.domain.RemovalReason;
 import com.nexters.palang.domain.user.domain.SnsProvider;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.global.config.JpaAuditingConfig;
@@ -81,15 +82,50 @@ class NotificationRepositoryTest {
     }
 
     @Test
-    @DisplayName("ACTIVITY 스코프로 조회하면 모임에 속하지 않은 알림만 최신순으로 반환한다")
-    void findByReceiverIdAndGroupIdIsNullOrderByCreatedAtDesc() {
+    @DisplayName("ACTIVITY 스코프로 조회하면 모임에 속하지 않은 알림만 반환하고 운영 안내는 제외한다")
+    void findByReceiverIdAndGroupIdIsNullAndTypeNotOrderByCreatedAtDesc() {
         Notification activity = save(NotificationType.OPINION_LIKED, null, null, null, null);
         save(NotificationType.OPINION_LIKED, null, null, 9L, "모임");
+        saveContentRemoved();
 
-        Page<Notification> results = notificationRepository
-                .findByReceiverIdAndGroupIdIsNullOrderByCreatedAtDesc(receiver.getId(), PageRequest.of(0, 20));
+        Page<Notification> results = notificationRepository.findByReceiverIdAndGroupIdIsNullAndTypeNotOrderByCreatedAtDesc(
+                receiver.getId(), NotificationType.CONTENT_REMOVED, PageRequest.of(0, 20));
 
         assertThat(results.getContent()).extracting(Notification::getId).containsExactly(activity.getId());
+    }
+
+    @Test
+    @DisplayName("OPERATION 스코프로 조회하면 운영 안내만 반환하고, 삭제 안내 스냅샷이 함께 저장된다")
+    void findByReceiverIdAndTypeOrderByCreatedAtDesc() {
+        save(NotificationType.OPINION_LIKED, null, null, null, null);
+        Notification notice = saveContentRemoved();
+
+        Page<Notification> results = notificationRepository.findByReceiverIdAndTypeOrderByCreatedAtDesc(
+                receiver.getId(), NotificationType.CONTENT_REMOVED, PageRequest.of(0, 20));
+
+        assertThat(results.getContent()).extracting(Notification::getId).containsExactly(notice.getId());
+        Notification found = results.getContent().get(0);
+        assertThat(found.getRemovalReason()).isEqualTo(RemovalReason.SPAM);
+        assertThat(found.getRemovedBookTitle()).isEqualTo("책 제목");
+        assertThat(found.getRemovedContentExcerpt()).isEqualTo("반복된 내용");
+        assertThat(found.getGroupId()).isNull();
+    }
+
+    @Test
+    @DisplayName("운영 탭 안 읽은 개수는 운영 안내만 센다")
+    void countByReceiverIdAndTypeAndReadFalse() {
+        save(NotificationType.OPINION_LIKED, null, null, null, null);
+        saveContentRemoved();
+
+        long count = notificationRepository.countByReceiverIdAndTypeAndReadFalse(
+                receiver.getId(), NotificationType.CONTENT_REMOVED);
+
+        assertThat(count).isEqualTo(1L);
+    }
+
+    private Notification saveContentRemoved() {
+        return entityManager.persistAndFlush(Notification.contentRemoved(
+                receiver, RemovalReason.SPAM, "책 제목", LocalDateTime.of(2026, 10, 19, 14, 30), "반복된 내용"));
     }
 
     @Test
@@ -164,12 +200,14 @@ class NotificationRepositoryTest {
     }
 
     @Test
-    @DisplayName("활동 탭의 안 읽은 개수만 집계한다")
-    void countByReceiverIdAndGroupIdIsNullAndReadFalse() {
+    @DisplayName("활동 탭의 안 읽은 개수만 집계하고 운영 안내는 제외한다")
+    void countByReceiverIdAndGroupIdIsNullAndTypeNotAndReadFalse() {
         save(NotificationType.OPINION_LIKED, null, null, null, null);
         save(NotificationType.OPINION_LIKED, null, null, 9L, "모임");
+        saveContentRemoved();
 
-        long count = notificationRepository.countByReceiverIdAndGroupIdIsNullAndReadFalse(receiver.getId());
+        long count = notificationRepository.countByReceiverIdAndGroupIdIsNullAndTypeNotAndReadFalse(
+                receiver.getId(), NotificationType.CONTENT_REMOVED);
 
         assertThat(count).isEqualTo(1L);
     }

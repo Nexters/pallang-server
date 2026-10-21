@@ -13,4 +13,6 @@ public enum NotificationType {
     GROUP_SCHEDULE_CHANGED,
     // 모임 종료 하루 전(멤버 전원에게).
     GROUP_ENDING_SOON,
+    // 운영 안내: 관리자가 사유를 골라 게시물을 삭제했을 때(작성자에게). 알림함 "운영" 탭에만 표시된다.
+    CONTENT_REMOVED,
 }

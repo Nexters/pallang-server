@@ -34,6 +34,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Notification extends BaseEntity {
 
+    public static final int REMOVED_CONTENT_EXCERPT_MAX_LENGTH = 100;
+    public static final String CONTENT_REMOVED_TITLE = "작성하신 게시물이 삭제되었습니다";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", updatable = false)
@@ -79,6 +82,23 @@ public class Notification extends BaseEntity {
     @Column(name = "opinion_count_snapshot")
     private Integer opinionCountSnapshot;
 
+    // CONTENT_REMOVED 전용: 삭제된 게시물을 작성자가 알아볼 수 있도록 남기는 식별 정보 스냅샷.
+    // 원본 의견/대목은 삭제되므로 여기 보관된 값이 유일한 기록이다. 다른 알림 타입에서는 전부 null.
+    // 사유는 enum 이름을 문자열로 저장한다. enum 타입으로 매핑하면 Hibernate가 MySQL ENUM이나 값 목록 CHECK 제약을
+    // 만들어 사유가 늘 때마다 운영 DB를 수동 ALTER해야 한다(ddl-auto: update는 이를 갱신하지 않는다).
+    // 바깥에서는 getRemovalReason()으로 enum으로만 다룬다.
+    @Column(name = "removal_reason", length = 40)
+    private String removalReason;
+
+    @Column(name = "removed_book_title")
+    private String removedBookTitle;
+
+    @Column(name = "removed_written_at")
+    private LocalDateTime removedWrittenAt;
+
+    @Column(name = "removed_content_excerpt", length = REMOVED_CONTENT_EXCERPT_MAX_LENGTH)
+    private String removedContentExcerpt;
+
     @Column(name = "is_read", nullable = false)
     private boolean read;
 
@@ -111,6 +131,37 @@ public class Notification extends BaseEntity {
         this.groupName = groupName;
         this.opinionCountSnapshot = opinionCountSnapshot;
         this.read = false;
+    }
+
+    // 운영 안내(게시물 삭제) 알림. 모임 게시물이어도 groupId를 두지 않는다 — 운영 안내는 "전체"와 "운영" 탭에만
+    // 보여야 해서(NotificationScope 참고). 사유가 내용 미리보기를 허용하지 않으면 내용 일부를 보관하지 않는다.
+    public static Notification contentRemoved(
+            User receiver, RemovalReason reason, String bookTitle, LocalDateTime writtenAt, String content) {
+        Notification notification = Notification.builder()
+                .receiver(receiver)
+                .type(NotificationType.CONTENT_REMOVED)
+                .title(CONTENT_REMOVED_TITLE)
+                .body(reason.getMessage())
+                .build();
+        notification.removalReason = reason.name();
+        notification.removedBookTitle = bookTitle;
+        notification.removedWrittenAt = writtenAt;
+        notification.removedContentExcerpt = reason.isShowsContentPreview() ? excerpt(content) : null;
+        return notification;
+    }
+
+    public RemovalReason getRemovalReason() {
+        return removalReason != null ? RemovalReason.valueOf(removalReason) : null;
+    }
+
+    private static String excerpt(String content) {
+        if (content == null) {
+            return null;
+        }
+        String trimmed = content.strip();
+        return trimmed.length() > REMOVED_CONTENT_EXCERPT_MAX_LENGTH
+                ? trimmed.substring(0, REMOVED_CONTENT_EXCERPT_MAX_LENGTH - 1) + "…"
+                : trimmed;
     }
 
     public void markAsRead() {
