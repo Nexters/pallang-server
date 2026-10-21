@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.admin.presentation;
 
 import com.nexters.palang.domain.admin.application.AdminAccessGuard;
+import com.nexters.palang.domain.admin.application.AdminSortOrder;
 import com.nexters.palang.domain.admin.application.AdminUserMapper;
 import com.nexters.palang.domain.admin.application.AdminUserSearchResult;
 import com.nexters.palang.domain.admin.application.AdminUserService;
@@ -32,10 +33,11 @@ public class AdminUserController implements AdminUserApi {
     @GetMapping("/api/admin/users")
     public ResponseEntity<DataResponse<AdminUserListResponse>> searchUsers(
             @RequestParam String keyword,
+            @RequestParam(defaultValue = "LATEST") AdminSortOrder sort,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         adminAccessGuard.requireAdmin();
-        Page<AdminUserSearchResult> results = adminUserService.searchUsers(keyword, pageable(page, size));
+        Page<AdminUserSearchResult> results = adminUserService.searchUsers(keyword, pageable(page, size, sort));
         return ResponseEntity.ok(DataResponse.from(AdminUserMapper.toListResponse(results)));
     }
 
@@ -49,5 +51,9 @@ public class AdminUserController implements AdminUserApi {
 
     private Pageable pageable(int page, int size) {
         return PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_SIZE));
+    }
+
+    private Pageable pageable(int page, int size, AdminSortOrder sort) {
+        return PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_SIZE), sort.toSort());
     }
 }

@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.admin.presentation;
 
 import com.nexters.palang.domain.admin.application.AdminAccessGuard;
+import com.nexters.palang.domain.admin.application.AdminSortOrder;
 import com.nexters.palang.domain.admin.application.AdminOpinionMapper;
 import com.nexters.palang.domain.admin.application.AdminOpinionService;
 import com.nexters.palang.domain.admin.presentation.dto.AdminOpinionListResponse;
@@ -45,12 +46,13 @@ public class AdminOpinionController implements AdminOpinionApi {
     public ResponseEntity<DataResponse<AdminOpinionListResponse>> searchOpinions(
             @RequestParam(required = false) Long passageId,
             @RequestParam(defaultValue = "") String keyword,
+            @RequestParam(defaultValue = "LATEST") AdminSortOrder sort,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         adminAccessGuard.requireAdmin();
         Page<Opinion> results = passageId != null
                 ? adminOpinionService.searchOpinionsByPassage(passageId, pageable(page, size))
-                : adminOpinionService.searchOpinions(keyword, pageable(page, size));
+                : adminOpinionService.searchOpinions(keyword, pageable(page, size, sort));
         Map<Long, Long> reportCounts = adminOpinionService.countReports(
                 results.getContent().stream().map(Opinion::getId).toList());
         return ResponseEntity.ok(DataResponse.from(AdminOpinionMapper.toListResponse(results, reportCounts)));
@@ -93,5 +95,9 @@ public class AdminOpinionController implements AdminOpinionApi {
 
     private Pageable pageable(int page, int size) {
         return PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_SIZE));
+    }
+
+    private Pageable pageable(int page, int size, AdminSortOrder sort) {
+        return PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_SIZE), sort.toSort());
     }
 }

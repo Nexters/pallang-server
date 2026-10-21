@@ -64,6 +64,34 @@ class ReportRepositoryTest {
     }
 
     @Test
+    @DisplayName("관리자 신고 목록: 마지막 신고 시각 기준 최신순/오래된순으로 정렬한다")
+    void findTargetSummariesSortedByLastReportedAt() {
+        User a = user("a");
+        report(a, ReportTargetType.OPINION, 10L, ReportReason.SPAM);
+        report(a, ReportTargetType.OPINION, 11L, ReportReason.SPAM);
+        // 연달아 저장하면 createdAt이 같아질 수 있어 시각을 직접 지정한다.
+        setCreatedAt(10L, LocalDateTime.of(2026, 1, 1, 9, 0));
+        setCreatedAt(11L, LocalDateTime.of(2026, 10, 1, 9, 0));
+
+        List<Long> latest = reportRepository.findTargetSummaries(PageRequest.of(0, 20)).getContent().stream()
+                .map(ReportTargetSummaryProjection::getTargetId).toList();
+        List<Long> oldest = reportRepository.findTargetSummariesOldestFirst(PageRequest.of(0, 20)).getContent().stream()
+                .map(ReportTargetSummaryProjection::getTargetId).toList();
+
+        assertThat(latest).containsExactly(11L, 10L);
+        assertThat(oldest).containsExactly(10L, 11L);
+    }
+
+    private void setCreatedAt(Long targetId, LocalDateTime createdAt) {
+        entityManager.getEntityManager()
+                .createQuery("update Report r set r.createdAt = :createdAt where r.targetId = :targetId")
+                .setParameter("createdAt", createdAt)
+                .setParameter("targetId", targetId)
+                .executeUpdate();
+        entityManager.clear();
+    }
+
+    @Test
     @DisplayName("대상 id 목록으로 대상별 신고 수를 집계한다")
     void countByTargets() {
         User a = user("a");

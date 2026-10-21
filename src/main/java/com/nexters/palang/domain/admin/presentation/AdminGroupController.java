@@ -1,6 +1,7 @@
 package com.nexters.palang.domain.admin.presentation;
 
 import com.nexters.palang.domain.admin.application.AdminAccessGuard;
+import com.nexters.palang.domain.admin.application.AdminSortOrder;
 import com.nexters.palang.domain.admin.application.AdminGroupMapper;
 import com.nexters.palang.domain.admin.application.AdminGroupSearchResult;
 import com.nexters.palang.domain.admin.application.AdminGroupService;
@@ -37,10 +38,11 @@ public class AdminGroupController implements AdminGroupApi {
     @GetMapping("/api/admin/groups")
     public ResponseEntity<DataResponse<AdminGroupListResponse>> searchGroups(
             @RequestParam String keyword,
+            @RequestParam(defaultValue = "LATEST") AdminSortOrder sort,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
         adminAccessGuard.requireAdmin();
-        Page<AdminGroupSearchResult> results = adminGroupService.searchGroups(keyword, pageable(page, size));
+        Page<AdminGroupSearchResult> results = adminGroupService.searchGroups(keyword, pageable(page, size, sort));
         return ResponseEntity.ok(DataResponse.from(AdminGroupMapper.toListResponse(results)));
     }
 
@@ -64,5 +66,9 @@ public class AdminGroupController implements AdminGroupApi {
 
     private Pageable pageable(int page, int size) {
         return PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_SIZE));
+    }
+
+    private Pageable pageable(int page, int size, AdminSortOrder sort) {
+        return PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_SIZE), sort.toSort());
     }
 }

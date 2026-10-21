@@ -40,8 +40,10 @@ public class AdminReportService {
     private final OpinionRepository opinionRepository;
     private final CommentRepository commentRepository;
 
-    public AdminReportListResponse getReportedTargets(Pageable pageable) {
-        Page<ReportTargetSummaryProjection> summaries = reportRepository.findTargetSummaries(pageable);
+    public AdminReportListResponse getReportedTargets(AdminSortOrder sort, Pageable pageable) {
+        Page<ReportTargetSummaryProjection> summaries = sort == AdminSortOrder.OLDEST
+                ? reportRepository.findTargetSummariesOldestFirst(pageable)
+                : reportRepository.findTargetSummaries(pageable);
 
         List<Long> opinionIds = targetIds(summaries, ReportTargetType.OPINION);
         List<Long> commentIds = targetIds(summaries, ReportTargetType.COMMENT);
