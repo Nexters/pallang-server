@@ -89,6 +89,10 @@ jobs:
             docker compose pull
             docker compose up -d --remove-orphans
             docker image prune -f
+            # 태그가 붙은 이전 배포 이미지는 prune -f로 지워지지 않아 매 배포마다 ~1GB씩 쌓인다(#214).
+            # 롤백용으로 최신 3개만 남기고 나머지 앱 이미지를 지운다. 실행 중인 이미지는 docker가 삭제를 거부한다.
+            docker images ghcr.io/nexters/pallang-server --format '{{.Repository}}:{{.Tag}}' \
+              | grep -v ":${IMAGE_TAG}$" | tail -n +4 | xargs -r docker rmi || true
 
   deploy-prod:
     needs: build-and-push
@@ -127,3 +131,7 @@ jobs:
             docker compose pull
             docker compose up -d --remove-orphans
             docker image prune -f
+            # 태그가 붙은 이전 배포 이미지는 prune -f로 지워지지 않아 매 배포마다 ~1GB씩 쌓인다(#214).
+            # 롤백용으로 최신 3개만 남기고 나머지 앱 이미지를 지운다. 실행 중인 이미지는 docker가 삭제를 거부한다.
+            docker images ghcr.io/nexters/pallang-server --format '{{.Repository}}:{{.Tag}}' \
+              | grep -v ":${IMAGE_TAG}$" | tail -n +4 | xargs -r docker rmi || true
