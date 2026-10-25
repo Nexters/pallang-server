@@ -49,10 +49,9 @@ spring:
       invoke-url: ${CLOVA_OCR_INVOKE_URL:}
       secret-key: ${CLOVA_OCR_SECRET_KEY:}
 
-naver:
-  base-url: https://openapi.naver.com
-  client-id: ${NAVER_CLIENT_ID:}
-  client-secret: ${NAVER_CLIENT_SECRET:}
+kakao-book:
+  base-url: https://dapi.kakao.com
+  rest-api-key: ${KAKAO_REST_API_KEY:}
 
 kakao:
   base-url: https://kapi.kakao.com

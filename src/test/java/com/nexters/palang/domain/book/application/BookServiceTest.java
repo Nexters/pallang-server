@@ -13,7 +13,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.book.domain.SampleLibraryBook;
-import com.nexters.palang.domain.book.infrastructure.NaverBookApiClient;
+import com.nexters.palang.domain.book.infrastructure.KakaoBookApiClient;
 import com.nexters.palang.domain.book.infrastructure.ExternalBookSearchResult;
 import com.nexters.palang.domain.book.domain.ReadingStatus;
 import com.nexters.palang.domain.book.domain.UserBookStatus;
@@ -53,7 +53,7 @@ class BookServiceTest {
     private UserBookStatusRepository userBookStatusRepository;
 
     @Mock
-    private NaverBookApiClient naverBookApiClient;
+    private KakaoBookApiClient kakaoBookApiClient;
 
     @Mock
     private FileStorageService fileStorageService;
@@ -63,7 +63,7 @@ class BookServiceTest {
     @BeforeEach
     void setUp() {
         bookService = new BookService(
-                bookRepository, bookQueryRepository, userBookStatusRepository, naverBookApiClient, fileStorageService);
+                bookRepository, bookQueryRepository, userBookStatusRepository, kakaoBookApiClient, fileStorageService);
     }
 
     private Book book(Long id, String title) {
@@ -103,11 +103,11 @@ class BookServiceTest {
     void searchBooksTrimsKeyword() {
         Pageable pageable = PageRequest.of(0, 20);
         given(bookQueryRepository.countByTitle("제목")).willReturn(0L);
-        given(naverBookApiClient.searchAll("제목")).willReturn(ExternalBookSearchResult.empty());
+        given(kakaoBookApiClient.searchAll("제목")).willReturn(ExternalBookSearchResult.empty());
 
         bookService.searchBooks("  제목  ", pageable);
 
-        verify(naverBookApiClient).searchAll("제목");
+        verify(kakaoBookApiClient).searchAll("제목");
     }
 
     @Test
@@ -118,7 +118,7 @@ class BookServiceTest {
         Page<BookSearchProjection> results = bookService.searchBooks("책", pageable);
 
         assertThat(results.getContent()).isEmpty();
-        verifyNoInteractions(naverBookApiClient, bookQueryRepository);
+        verifyNoInteractions(kakaoBookApiClient, bookQueryRepository);
     }
 
     @Test
@@ -132,7 +132,7 @@ class BookServiceTest {
         given(bookQueryRepository.countByTitle("프랑켄슈타인")).willReturn(1L);
         given(bookQueryRepository.searchByTitle("프랑켄슈타인", BookSearchSort.OPINION, 0L, 1))
                 .willReturn(List.of(dbBook));
-        given(naverBookApiClient.searchAll("프랑켄슈타인"))
+        given(kakaoBookApiClient.searchAll("프랑켄슈타인"))
                 .willReturn(new ExternalBookSearchResult(List.of(externalBook), 1));
 
         Page<BookSearchProjection> results = bookService.searchBooks("프랑켄슈타인", pageable);
@@ -158,7 +158,7 @@ class BookServiceTest {
         given(bookQueryRepository.searchByTitle("프랑켄슈타인", BookSearchSort.OPINION, 0L, 1))
                 .willReturn(List.of(dbBook));
         given(bookQueryRepository.findIsbnsByTitle("프랑켄슈타인")).willReturn(List.of("isbn-1234"));
-        given(naverBookApiClient.searchAll("프랑켄슈타인")).willReturn(
+        given(kakaoBookApiClient.searchAll("프랑켄슈타인")).willReturn(
                 new ExternalBookSearchResult(List.of(duplicateExternalBook, otherExternalBook), 2));
 
         Page<BookSearchProjection> results = bookService.searchBooks("프랑켄슈타인", pageable);
@@ -181,7 +181,7 @@ class BookServiceTest {
         ExternalBookResult real3 = new ExternalBookResult("책들", "작가", "출판사", "isbn-real-3", "cover");
         given(bookQueryRepository.countByTitle("책들")).willReturn(0L);
         given(bookQueryRepository.findIsbnsByTitle("책들")).willReturn(List.of("isbn-dup-1", "isbn-dup-2"));
-        given(naverBookApiClient.searchAll("책들")).willReturn(
+        given(kakaoBookApiClient.searchAll("책들")).willReturn(
                 new ExternalBookSearchResult(List.of(dup1, real1, dup2, real2, real3), 5));
 
         Page<BookSearchProjection> results = bookService.searchBooks("책들", pageable);
@@ -203,7 +203,7 @@ class BookServiceTest {
                 .willReturn(firstPageDbBooks);
         given(bookQueryRepository.searchByTitle("책모음", BookSearchSort.OPINION, 20L, 5))
                 .willReturn(secondPageDbBooks);
-        given(naverBookApiClient.searchAll("책모음")).willReturn(new ExternalBookSearchResult(List.of(externalBook), 7));
+        given(kakaoBookApiClient.searchAll("책모음")).willReturn(new ExternalBookSearchResult(List.of(externalBook), 7));
 
         Page<BookSearchProjection> firstPage = bookService.searchBooks("책모음", PageRequest.of(0, 20));
         Page<BookSearchProjection> secondPage = bookService.searchBooks("책모음", PageRequest.of(1, 20));
@@ -232,7 +232,7 @@ class BookServiceTest {
         externalItems.add(newExternalBook);
         given(bookQueryRepository.countByTitle("제목")).willReturn(5L);
         given(bookQueryRepository.findIsbnsByTitle("제목")).willReturn(List.of("isbn-dup"));
-        given(naverBookApiClient.searchAll("제목")).willReturn(new ExternalBookSearchResult(externalItems, 21));
+        given(kakaoBookApiClient.searchAll("제목")).willReturn(new ExternalBookSearchResult(externalItems, 21));
 
         Page<BookSearchProjection> results = bookService.searchBooks("제목", pageable);
 

@@ -30,24 +30,24 @@ import org.springframework.web.multipart.MultipartFile;
 public interface BookApi {
 
     @Operation(summary = "도서 검색",
-            description = "네이버 책 검색 API 결과와 서비스 DB에 등록된 도서(수동 등록 포함)를 함께 검색합니다. "
-                    + "이미 등록된 도서는 bookId/source가 채워져 내려가고, 네이버에만 있고 아직 등록되지 않은 도서는 "
+            description = "카카오 책 검색 API 결과와 서비스 DB에 등록된 도서(수동 등록 포함)를 함께 검색합니다. "
+                    + "이미 등록된 도서는 bookId/source가 채워져 내려가고, 카카오에만 있고 아직 등록되지 않은 도서는 "
                     + "bookId/source가 null이며 pageCount/passageCount/opinionCount는 0입니다. "
-                    + "같은 책이 네이버와 DB 양쪽에 모두 있으면(ISBN 동일) 이미 등록된 DB 쪽만 남기고 네이버 쪽은 "
-                    + "페이지와 무관하게 항상 제외합니다(ISBN이 없는 네이버 결과는 비교할 수 없어 그대로 둡니다). "
-                    + "DB 도서(흔적 많은 순 정렬)와 네이버 결과를 하나로 이어붙인 목록으로 취급해 페이지네이션하므로, "
+                    + "같은 책이 카카오와 DB 양쪽에 모두 있으면(ISBN 동일) 이미 등록된 DB 쪽만 남기고 카카오 쪽은 "
+                    + "페이지와 무관하게 항상 제외합니다(ISBN이 없는 카카오 결과는 비교할 수 없어 그대로 둡니다). "
+                    + "DB 도서(흔적 많은 순 정렬)와 카카오 결과를 하나로 이어붙인 목록으로 취급해 페이지네이션하므로, "
                     + "DB 매칭이 페이지 크기보다 많아도 페이지를 넘기면 빠짐없이 노출되며 같은 도서가 중복 노출되지 "
-                    + "않습니다(DB 매칭을 다 지나간 뒤부터 네이버 결과가 이어서 채워집니다). totalElements는 "
-                    + "DB 전체 매칭 수 + 네이버 전체 매칭 수입니다. 단, 네이버 결과는 키워드당 최대 200건까지만 "
-                    + "가져오므로, 네이버 쪽 매칭이 200건을 넘는 키워드는 200건을 넘어가는 페이지부터 "
-                    + "네이버 항목이 더 채워지지 않을 수 있습니다. "
+                    + "않습니다(DB 매칭을 다 지나간 뒤부터 카카오 결과가 이어서 채워집니다). totalElements는 "
+                    + "DB 전체 매칭 수 + 카카오 전체 매칭 수입니다. 단, 카카오 결과는 키워드당 최대 200건까지만 "
+                    + "가져오므로, 카카오 쪽 매칭이 200건을 넘는 키워드는 200건을 넘어가는 페이지부터 "
+                    + "카카오 항목이 더 채워지지 않을 수 있습니다. "
                     + "타이핑 중 자동완성 미리보기 용도로도 재사용되므로, keyword가 공백 제거 후 2글자 미만이면 "
-                    + "네이버를 호출하지 않고 빈 목록을 반환합니다. 네이버 쪽 결과는 동일 keyword로 최대 12시간 "
+                    + "카카오를 호출하지 않고 빈 목록을 반환합니다. 카카오 쪽 결과는 동일 keyword로 최대 12시간 "
                     + "캐싱되어 즉시 반영되지 않을 수 있습니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "검색 성공"),
             @ApiResponse(responseCode = "400", description = "keyword 누락, page/size 형식 오류(COMMON_400_1) "
-                    + "또는 네이버 검색 실패(BOOK_400_1)",
+                    + "또는 카카오 검색 실패(BOOK_400_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
     ResponseEntity<DataResponse<BookSearchListResponse>> searchBooks(

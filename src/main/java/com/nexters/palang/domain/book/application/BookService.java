@@ -6,7 +6,7 @@ import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.book.domain.SampleLibraryBook;
 import com.nexters.palang.domain.book.domain.UserBookStatus;
-import com.nexters.palang.domain.book.infrastructure.NaverBookApiClient;
+import com.nexters.palang.domain.book.infrastructure.KakaoBookApiClient;
 import com.nexters.palang.domain.book.infrastructure.ExternalBookSearchResult;
 import com.nexters.palang.domain.book.infrastructure.BookQueryRepository;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
@@ -41,7 +41,7 @@ public class BookService {
     private final BookRepository bookRepository;
     private final BookQueryRepository bookQueryRepository;
     private final UserBookStatusRepository userBookStatusRepository;
-    private final NaverBookApiClient naverBookApiClient;
+    private final KakaoBookApiClient kakaoBookApiClient;
     private final FileStorageService fileStorageService;
 
     // 외부 검색 API 호출(최대 수 초)이 포함돼 있어, DB 커넥션을 불필요하게 오래 붙잡지 않도록 트랜잭션에서 제외한다.
@@ -70,9 +70,9 @@ public class BookService {
                 : List.of();
 
         // DB 결과 뒤에 이어붙이는 구조라 외부 검색에 필요한 offset이 DB 매칭 수에 따라 달라지므로,
-        // NaverBookApiClient#searchAll이 키워드당 결과 전체(최대 200건)를 미리 모아 캐싱해서 돌려준다.
+        // KakaoBookApiClient#searchAll이 키워드당 결과 전체(최대 200건)를 미리 모아 캐싱해서 돌려준다.
         // 여기서 그 리스트를 대상으로 offset/limit 슬라이싱을 직접 수행한다.
-        ExternalBookSearchResult externalAll = naverBookApiClient.searchAll(trimmedKeyword);
+        ExternalBookSearchResult externalAll = kakaoBookApiClient.searchAll(trimmedKeyword);
 
         // 같은 책이 외부 검색/DB 양쪽에 모두 있으면(ISBN 동일) 이미 등록된 DB 쪽만 남기고 외부 검색 쪽은 제외한다.
         // ISBN이 없는 외부 검색 결과는 비교 기준이 없으므로 그대로 둔다. dedup을 먼저 하고 나서 offset/limit을

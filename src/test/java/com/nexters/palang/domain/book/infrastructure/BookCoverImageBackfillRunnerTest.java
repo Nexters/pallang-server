@@ -27,7 +27,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 class BookCoverImageBackfillRunnerTest {
 
     private static final String ALADIN_COVER = "https://image.aladin.co.kr/product/1/1/cover/1.jpg";
-    private static final String NAVER_COVER = "https://shopping-phinf.pstatic.net/main_1/1.jpg";
+    private static final String KAKAO_COVER = "https://search1.kakaocdn.net/thumb/R120x174.q85/?fname=1.jpg";
 
     @Autowired
     private TestEntityManager entityManager;
@@ -38,15 +38,15 @@ class BookCoverImageBackfillRunnerTest {
     @Autowired
     private PlatformTransactionManager transactionManager;
 
-    private NaverBookApiClient naverBookApiClient;
+    private KakaoBookApiClient kakaoBookApiClient;
 
     @BeforeEach
     void setUp() {
-        naverBookApiClient = mock(NaverBookApiClient.class);
+        kakaoBookApiClient = mock(KakaoBookApiClient.class);
     }
 
     private BookCoverImageBackfillRunner runner(int batchSize) {
-        return new BookCoverImageBackfillRunner(bookRepository, naverBookApiClient, transactionManager, batchSize);
+        return new BookCoverImageBackfillRunner(bookRepository, kakaoBookApiClient, transactionManager, batchSize);
     }
 
     private Book saveBook(String isbn, String coverImageUrl) {
@@ -60,46 +60,46 @@ class BookCoverImageBackfillRunnerTest {
                 .build());
     }
 
-    private static ExternalBookResult naverResult(String isbn, String cover) {
+    private static ExternalBookResult kakaoResult(String isbn, String cover) {
         return new ExternalBookResult("책", "작가", "출판사", isbn, cover);
     }
 
     @Test
-    @DisplayName("알라딘 표지를 가진 도서는 ISBN으로 네이버에서 찾은 표지로 교체한다")
-    void replacesAladinCoverWithNaverCover() {
+    @DisplayName("알라딘 표지를 가진 도서는 ISBN으로 카카오에서 찾은 표지로 교체한다")
+    void replacesAladinCoverWithKakaoCover() {
         Book book = saveBook("9788936433598", ALADIN_COVER);
         entityManager.clear();
-        given(naverBookApiClient.findByIsbn("9788936433598"))
-                .willReturn(Optional.of(naverResult("9788936433598", NAVER_COVER)));
+        given(kakaoBookApiClient.findByIsbn("9788936433598"))
+                .willReturn(Optional.of(kakaoResult("9788936433598", KAKAO_COVER)));
 
         runner(100).run();
 
-        assertThat(entityManager.find(Book.class, book.getId()).getCoverImageUrl()).isEqualTo(NAVER_COVER);
+        assertThat(entityManager.find(Book.class, book.getId()).getCoverImageUrl()).isEqualTo(KAKAO_COVER);
     }
 
     @Test
-    @DisplayName("네이버에서 찾지 못했거나 조회가 실패한 도서는 기존 표지를 유지하고 나머지는 계속 처리한다")
-    void keepsAladinCoverWhenNaverLookupFails() {
+    @DisplayName("카카오에서 찾지 못했거나 조회가 실패한 도서는 기존 표지를 유지하고 나머지는 계속 처리한다")
+    void keepsAladinCoverWhenKakaoLookupFails() {
         Book notFound = saveBook("isbn-not-found", ALADIN_COVER);
         Book failed = saveBook("isbn-failed", ALADIN_COVER);
         Book found = saveBook("isbn-found", ALADIN_COVER);
         entityManager.clear();
-        given(naverBookApiClient.findByIsbn("isbn-not-found")).willReturn(Optional.empty());
-        given(naverBookApiClient.findByIsbn("isbn-failed"))
+        given(kakaoBookApiClient.findByIsbn("isbn-not-found")).willReturn(Optional.empty());
+        given(kakaoBookApiClient.findByIsbn("isbn-failed"))
                 .willThrow(new BookException(BookErrorCode.EXTERNAL_SEARCH_FAILED));
-        given(naverBookApiClient.findByIsbn("isbn-found"))
-                .willReturn(Optional.of(naverResult("isbn-found", NAVER_COVER)));
+        given(kakaoBookApiClient.findByIsbn("isbn-found"))
+                .willReturn(Optional.of(kakaoResult("isbn-found", KAKAO_COVER)));
 
         // 배치 크기 1로 여러 배치를 돌면서, 교체되지 않고 남은 도서 때문에 무한 루프를 돌지 않는지도 검증한다.
         runner(1).run();
 
         assertThat(entityManager.find(Book.class, notFound.getId()).getCoverImageUrl()).isEqualTo(ALADIN_COVER);
         assertThat(entityManager.find(Book.class, failed.getId()).getCoverImageUrl()).isEqualTo(ALADIN_COVER);
-        assertThat(entityManager.find(Book.class, found.getId()).getCoverImageUrl()).isEqualTo(NAVER_COVER);
+        assertThat(entityManager.find(Book.class, found.getId()).getCoverImageUrl()).isEqualTo(KAKAO_COVER);
     }
 
     @Test
-    @DisplayName("알라딘 표지가 아닌 도서와 ISBN이 없는 도서는 네이버를 호출하지 않는다")
+    @DisplayName("알라딘 표지가 아닌 도서와 ISBN이 없는 도서는 카카오를 호출하지 않는다")
     void skipsNonAladinCoversAndBooksWithoutIsbn() {
         saveBook("9788936433598", "/images/book-covers/uploaded.jpg");
         Book noIsbn = saveBook(null, ALADIN_COVER);
@@ -108,17 +108,17 @@ class BookCoverImageBackfillRunnerTest {
         runner(100).run();
 
         assertThat(entityManager.find(Book.class, noIsbn.getId()).getCoverImageUrl()).isEqualTo(ALADIN_COVER);
-        verify(naverBookApiClient, never()).findByIsbn(anyString());
+        verify(kakaoBookApiClient, never()).findByIsbn(anyString());
     }
 
     @Test
-    @DisplayName("네이버 키가 설정되지 않은 환경에서는 백필을 실행하지 않는다")
-    void doesNothingWhenNaverIsNotConfigured() {
+    @DisplayName("카카오 REST API 키가 설정되지 않은 환경에서는 백필을 실행하지 않는다")
+    void doesNothingWhenKakaoIsNotConfigured() {
         saveBook("9788936433598", ALADIN_COVER);
-        given(naverBookApiClient.isConfigured()).willReturn(false);
+        given(kakaoBookApiClient.isConfigured()).willReturn(false);
 
         runner(100).onApplicationReady();
 
-        verify(naverBookApiClient, never()).findByIsbn(anyString());
+        verify(kakaoBookApiClient, never()).findByIsbn(anyString());
     }
 }

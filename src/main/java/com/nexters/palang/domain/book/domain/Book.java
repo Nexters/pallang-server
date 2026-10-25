@@ -91,7 +91,7 @@ public class Book extends BaseEntity {
         this.coverImageUrl = coverImageUrl;
     }
 
-    // 알라딘 서비스 종료로 image.aladin.co.kr 표지를 네이버 표지로 교체할 때만 쓴다(BookCoverImageBackfillRunner).
+    // 알라딘 서비스 종료로 image.aladin.co.kr 표지를 카카오 표지로 교체할 때만 쓴다(BookCoverImageBackfillRunner).
     public void replaceCoverImageUrl(String coverImageUrl) {
         this.coverImageUrl = coverImageUrl;
     }

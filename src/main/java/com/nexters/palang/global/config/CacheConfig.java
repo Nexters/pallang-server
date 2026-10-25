@@ -16,7 +16,7 @@ import tools.jackson.databind.jsontype.PolymorphicTypeValidator;
 @EnableCaching
 public class CacheConfig {
 
-    // 외부(네이버) 도서 검색(자동완성 포함) 캐시. 배치로 미리 채워두지 않고, 실제로 검색된 키워드만
+    // 외부(카카오) 도서 검색(자동완성 포함) 캐시. 배치로 미리 채워두지 않고, 실제로 검색된 키워드만
     // 반응형으로 캐싱한다. TTL을 길게 잡아 같은 키워드가 여러 사용자에게서 겹칠 때 외부 API 호출을
     // 흡수하되, 너무 길면 신간이 자동완성에 늦게 반영되므로 12시간으로 제한한다.
     private static final Duration EXTERNAL_BOOK_SEARCH_TTL = Duration.ofHours(12);

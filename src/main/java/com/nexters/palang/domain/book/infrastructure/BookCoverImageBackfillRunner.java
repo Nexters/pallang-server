@@ -16,12 +16,12 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 // 알라딘 TTB API 서비스 종료에 대비해, 알라딘 검색으로 등록돼 image.aladin.co.kr 표지를 가진 도서를
-// ISBN으로 네이버 책 검색에서 다시 찾아 네이버 표지 URL로 교체한다. BookTitleNormalizationBackfillRunner와
+// ISBN으로 카카오 책 검색에서 다시 찾아 카카오 표지 URL로 교체한다. BookTitleNormalizationBackfillRunner와
 // 같이 마이그레이션 도구 대신 앱 시작 시 자동으로 돌고, 교체된 도서는 조건에서 빠지므로 멱등적이다.
 //
 // 도서마다 외부 API를 호출해 오래 걸릴 수 있으므로 ApplicationRunner로 기동을 막지 않고, 기동이 끝난 뒤
-// 비동기로 실행한다. 네이버에서 못 찾았거나 호출이 실패한 도서는 기존 표지를 그대로 두고 건너뛰며,
-// 다음 기동 때 다시 시도한다. 네이버 키가 없는 환경(local, 테스트)에서는 아예 실행하지 않는다.
+// 비동기로 실행한다. 카카오에서 못 찾았거나 호출이 실패한 도서는 기존 표지를 그대로 두고 건너뛰며,
+// 다음 기동 때 다시 시도한다. 카카오 REST API 키가 없는 환경(local, 테스트)에서는 아예 실행하지 않는다.
 @Slf4j
 @Component
 public class BookCoverImageBackfillRunner {
@@ -30,25 +30,25 @@ public class BookCoverImageBackfillRunner {
     private static final int DEFAULT_BATCH_SIZE = 100;
 
     private final BookRepository bookRepository;
-    private final NaverBookApiClient naverBookApiClient;
+    private final KakaoBookApiClient kakaoBookApiClient;
     private final TransactionTemplate transactionTemplate;
     private final int batchSize;
 
     @Autowired
     public BookCoverImageBackfillRunner(
             BookRepository bookRepository,
-            NaverBookApiClient naverBookApiClient,
+            KakaoBookApiClient kakaoBookApiClient,
             PlatformTransactionManager transactionManager) {
-        this(bookRepository, naverBookApiClient, transactionManager, DEFAULT_BATCH_SIZE);
+        this(bookRepository, kakaoBookApiClient, transactionManager, DEFAULT_BATCH_SIZE);
     }
 
     BookCoverImageBackfillRunner(
             BookRepository bookRepository,
-            NaverBookApiClient naverBookApiClient,
+            KakaoBookApiClient kakaoBookApiClient,
             PlatformTransactionManager transactionManager,
             int batchSize) {
         this.bookRepository = bookRepository;
-        this.naverBookApiClient = naverBookApiClient;
+        this.kakaoBookApiClient = kakaoBookApiClient;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
         this.batchSize = batchSize;
     }
@@ -56,7 +56,7 @@ public class BookCoverImageBackfillRunner {
     @Async
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
-        if (!naverBookApiClient.isConfigured()) {
+        if (!kakaoBookApiClient.isConfigured()) {
             return;
         }
         run();
@@ -76,10 +76,10 @@ public class BookCoverImageBackfillRunner {
             }
 
             for (Book book : batch) {
-                Optional<String> naverCover = findNaverCover(book);
-                if (naverCover.isPresent()) {
+                Optional<String> kakaoCover = findKakaoCover(book);
+                if (kakaoCover.isPresent()) {
                     transactionTemplate.executeWithoutResult(status -> bookRepository.findById(book.getId())
-                            .ifPresent(target -> target.replaceCoverImageUrl(naverCover.get())));
+                            .ifPresent(target -> target.replaceCoverImageUrl(kakaoCover.get())));
                     replaced++;
                 } else {
                     skipped++;
@@ -93,15 +93,15 @@ public class BookCoverImageBackfillRunner {
         }
     }
 
-    private Optional<String> findNaverCover(Book book) {
+    private Optional<String> findKakaoCover(Book book) {
         if (book.getIsbn() == null || book.getIsbn().isBlank()) {
             return Optional.empty();
         }
         try {
-            return naverBookApiClient.findByIsbn(book.getIsbn().trim())
+            return kakaoBookApiClient.findByIsbn(book.getIsbn().trim())
                     .map(ExternalBookResult::coverImageUrl);
         } catch (RuntimeException e) {
-            log.warn("알라딘 표지 백필 중 네이버 조회 실패: bookId={}, isbn={}", book.getId(), book.getIsbn(), e);
+            log.warn("알라딘 표지 백필 중 카카오 조회 실패: bookId={}, isbn={}", book.getId(), book.getIsbn(), e);
             return Optional.empty();
         }
     }
