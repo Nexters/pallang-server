@@ -88,7 +88,7 @@ class BookControllerTest {
                         new BookSearchProjection(
                                 1L, "제목", "작가", "출판사", 300, "isbn-db", "cover-db", BookSource.MANUAL, 3, 5, 3),
                         BookSearchProjection.from(
-                                new ExternalBookResult("제목", "작가", "다른 출판사", "isbn-aladin", "cover-aladin"))),
+                                new ExternalBookResult("제목", "작가", "다른 출판사", "isbn-external", "cover-external"))),
                 DEFAULT_PAGEABLE, 2));
 
         mockMvc.perform(get("/api/books/search").param("keyword", "제목"))

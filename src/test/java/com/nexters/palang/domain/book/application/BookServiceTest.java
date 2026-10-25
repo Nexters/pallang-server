@@ -13,8 +13,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.book.domain.SampleLibraryBook;
-import com.nexters.palang.domain.book.infrastructure.AladinBookApiClient;
-import com.nexters.palang.domain.book.infrastructure.AladinSearchResult;
+import com.nexters.palang.domain.book.infrastructure.NaverBookApiClient;
+import com.nexters.palang.domain.book.infrastructure.ExternalBookSearchResult;
 import com.nexters.palang.domain.book.domain.ReadingStatus;
 import com.nexters.palang.domain.book.domain.UserBookStatus;
 import com.nexters.palang.domain.book.infrastructure.BookQueryRepository;
@@ -53,7 +53,7 @@ class BookServiceTest {
     private UserBookStatusRepository userBookStatusRepository;
 
     @Mock
-    private AladinBookApiClient aladinBookApiClient;
+    private NaverBookApiClient naverBookApiClient;
 
     @Mock
     private FileStorageService fileStorageService;
@@ -63,7 +63,7 @@ class BookServiceTest {
     @BeforeEach
     void setUp() {
         bookService = new BookService(
-                bookRepository, bookQueryRepository, userBookStatusRepository, aladinBookApiClient, fileStorageService);
+                bookRepository, bookQueryRepository, userBookStatusRepository, naverBookApiClient, fileStorageService);
     }
 
     private Book book(Long id, String title) {
@@ -89,51 +89,51 @@ class BookServiceTest {
         return books;
     }
 
-    // fromId..toId(포함) 범위의 더미 알라딘 검색 결과를 생성한다.
+    // fromId..toId(포함) 범위의 더미 외부 검색 검색 결과를 생성한다.
     private List<ExternalBookResult> externalBooks(int fromId, int toId) {
         List<ExternalBookResult> books = new ArrayList<>();
         for (int id = fromId; id <= toId; id++) {
-            books.add(new ExternalBookResult("책" + id, "작가", "출판사", "isbn-aladin-" + id, "cover-" + id));
+            books.add(new ExternalBookResult("책" + id, "작가", "출판사", "isbn-external-" + id, "cover-" + id));
         }
         return books;
     }
 
     @Test
-    @DisplayName("검색어 앞뒤 공백은 제거하고 알라딘을 호출한다")
+    @DisplayName("검색어 앞뒤 공백은 제거하고 외부 검색을 호출한다")
     void searchBooksTrimsKeyword() {
         Pageable pageable = PageRequest.of(0, 20);
         given(bookQueryRepository.countByTitle("제목")).willReturn(0L);
-        given(aladinBookApiClient.searchAll("제목")).willReturn(AladinSearchResult.empty());
+        given(naverBookApiClient.searchAll("제목")).willReturn(ExternalBookSearchResult.empty());
 
         bookService.searchBooks("  제목  ", pageable);
 
-        verify(aladinBookApiClient).searchAll("제목");
+        verify(naverBookApiClient).searchAll("제목");
     }
 
     @Test
-    @DisplayName("검색어가 2글자 미만이면 알라딘/DB 모두 조회하지 않고 빈 결과를 반환한다")
+    @DisplayName("검색어가 2글자 미만이면 외부 검색/DB 모두 조회하지 않고 빈 결과를 반환한다")
     void searchBooksReturnsEmptyWhenKeywordTooShort() {
         Pageable pageable = PageRequest.of(0, 20);
 
         Page<BookSearchProjection> results = bookService.searchBooks("책", pageable);
 
         assertThat(results.getContent()).isEmpty();
-        verifyNoInteractions(aladinBookApiClient, bookQueryRepository);
+        verifyNoInteractions(naverBookApiClient, bookQueryRepository);
     }
 
     @Test
-    @DisplayName("DB 매칭 도서를 앞쪽 slot에 채우고, 나머지 slot을 알라딘 결과로 채운다")
-    void searchBooksFillsDbSlotsFirstThenAladin() {
+    @DisplayName("DB 매칭 도서를 앞쪽 slot에 채우고, 나머지 slot을 외부 검색 결과로 채운다")
+    void searchBooksFillsDbSlotsFirstThenExternal() {
         Pageable pageable = PageRequest.of(0, 20);
         BookSearchProjection dbBook = new BookSearchProjection(
                 1L, "프랑켄슈타인", "메리 셸리", "민음사", 300, "isbn-db", "cover-db", BookSource.MANUAL, 3, 5, 3);
-        ExternalBookResult aladinBook = new ExternalBookResult(
-                "프랑켄슈타인", "메리 셸리", "문학동네", "isbn-aladin", "cover-aladin");
+        ExternalBookResult externalBook = new ExternalBookResult(
+                "프랑켄슈타인", "메리 셸리", "문학동네", "isbn-external", "cover-external");
         given(bookQueryRepository.countByTitle("프랑켄슈타인")).willReturn(1L);
         given(bookQueryRepository.searchByTitle("프랑켄슈타인", BookSearchSort.OPINION, 0L, 1))
                 .willReturn(List.of(dbBook));
-        given(aladinBookApiClient.searchAll("프랑켄슈타인"))
-                .willReturn(new AladinSearchResult(List.of(aladinBook), 1));
+        given(naverBookApiClient.searchAll("프랑켄슈타인"))
+                .willReturn(new ExternalBookSearchResult(List.of(externalBook), 1));
 
         Page<BookSearchProjection> results = bookService.searchBooks("프랑켄슈타인", pageable);
 
@@ -145,21 +145,21 @@ class BookServiceTest {
     }
 
     @Test
-    @DisplayName("ISBN이 같은 도서가 DB와 알라딘 양쪽에 있으면 DB에 등록된 도서만 남기고 알라딘 쪽은 제외한다")
-    void searchBooksDropsAladinDuplicateWhenIsbnMatchesRegisteredBook() {
+    @DisplayName("ISBN이 같은 도서가 DB와 외부 검색 양쪽에 있으면 DB에 등록된 도서만 남기고 외부 검색 쪽은 제외한다")
+    void searchBooksDropsExternalDuplicateWhenIsbnMatchesRegisteredBook() {
         Pageable pageable = PageRequest.of(0, 20);
         BookSearchProjection dbBook = new BookSearchProjection(
                 1L, "프랑켄슈타인", "메리 셸리", "민음사", 300, "isbn-1234", "cover-db", BookSource.MANUAL, 3, 5, 3);
-        ExternalBookResult duplicateAladinBook = new ExternalBookResult(
-                "프랑켄슈타인", "메리 셸리", "민음사", "isbn-1234", "cover-aladin");
-        ExternalBookResult otherAladinBook = new ExternalBookResult(
-                "프랑켄슈타인", "메리 셸리", "문학동네", "isbn-5678", "cover-aladin-2");
+        ExternalBookResult duplicateExternalBook = new ExternalBookResult(
+                "프랑켄슈타인", "메리 셸리", "민음사", "isbn-1234", "cover-external");
+        ExternalBookResult otherExternalBook = new ExternalBookResult(
+                "프랑켄슈타인", "메리 셸리", "문학동네", "isbn-5678", "cover-external-2");
         given(bookQueryRepository.countByTitle("프랑켄슈타인")).willReturn(1L);
         given(bookQueryRepository.searchByTitle("프랑켄슈타인", BookSearchSort.OPINION, 0L, 1))
                 .willReturn(List.of(dbBook));
         given(bookQueryRepository.findIsbnsByTitle("프랑켄슈타인")).willReturn(List.of("isbn-1234"));
-        given(aladinBookApiClient.searchAll("프랑켄슈타인")).willReturn(
-                new AladinSearchResult(List.of(duplicateAladinBook, otherAladinBook), 2));
+        given(naverBookApiClient.searchAll("프랑켄슈타인")).willReturn(
+                new ExternalBookSearchResult(List.of(duplicateExternalBook, otherExternalBook), 2));
 
         Page<BookSearchProjection> results = bookService.searchBooks("프랑켄슈타인", pageable);
 
@@ -170,10 +170,10 @@ class BookServiceTest {
     }
 
     @Test
-    @DisplayName("알라딘 배치 안에서 중복이 걸러져도, dedup을 먼저 적용한 뒤 skip/limit하므로 페이지가 짧아지지 않는다")
+    @DisplayName("외부 검색 배치 안에서 중복이 걸러져도, dedup을 먼저 적용한 뒤 skip/limit하므로 페이지가 짧아지지 않는다")
     void searchBooksDedupDoesNotShortenPageWhenEnoughRealItemsExist() {
         Pageable pageable = PageRequest.of(0, 3);
-        // 알라딘 5건 중 2건이 이미 등록된 도서와 중복이어도, 남는 3건으로 요청한 size(3)를 채울 수 있다.
+        // 외부 검색 5건 중 2건이 이미 등록된 도서와 중복이어도, 남는 3건으로 요청한 size(3)를 채울 수 있다.
         ExternalBookResult dup1 = new ExternalBookResult("책들", "작가", "출판사", "isbn-dup-1", "cover");
         ExternalBookResult real1 = new ExternalBookResult("책들", "작가", "출판사", "isbn-real-1", "cover");
         ExternalBookResult dup2 = new ExternalBookResult("책들", "작가", "출판사", "isbn-dup-2", "cover");
@@ -181,8 +181,8 @@ class BookServiceTest {
         ExternalBookResult real3 = new ExternalBookResult("책들", "작가", "출판사", "isbn-real-3", "cover");
         given(bookQueryRepository.countByTitle("책들")).willReturn(0L);
         given(bookQueryRepository.findIsbnsByTitle("책들")).willReturn(List.of("isbn-dup-1", "isbn-dup-2"));
-        given(aladinBookApiClient.searchAll("책들")).willReturn(
-                new AladinSearchResult(List.of(dup1, real1, dup2, real2, real3), 5));
+        given(naverBookApiClient.searchAll("책들")).willReturn(
+                new ExternalBookSearchResult(List.of(dup1, real1, dup2, real2, real3), 5));
 
         Page<BookSearchProjection> results = bookService.searchBooks("책들", pageable);
 
@@ -193,24 +193,24 @@ class BookServiceTest {
     @Test
     @DisplayName("DB 매칭이 페이지 크기보다 많으면 다음 페이지에서 이어지는 DB 도서를 보여주고, 같은 도서가 중복 노출되지 않는다")
     void searchBooksPaginatesAcrossDbOverflowIntoNextPage() {
-        // DB 매칭 25건, size 20 → 1페이지는 DB로 꽉 차서 알라딘 slot이 0개, 2페이지는 DB 나머지
-        // 5건(21~25번) + 알라딘 1건으로 채워진다.
+        // DB 매칭 25건, size 20 → 1페이지는 DB로 꽉 차서 외부 검색 slot이 0개, 2페이지는 DB 나머지
+        // 5건(21~25번) + 외부 검색 1건으로 채워진다.
         List<BookSearchProjection> firstPageDbBooks = dbBooks(1, 20);
         List<BookSearchProjection> secondPageDbBooks = dbBooks(21, 25);
-        ExternalBookResult aladinBook = new ExternalBookResult("책모음", "작가", "출판사", "isbn-a", "cover-a");
+        ExternalBookResult externalBook = new ExternalBookResult("책모음", "작가", "출판사", "isbn-a", "cover-a");
         given(bookQueryRepository.countByTitle("책모음")).willReturn(25L);
         given(bookQueryRepository.searchByTitle("책모음", BookSearchSort.OPINION, 0L, 20))
                 .willReturn(firstPageDbBooks);
         given(bookQueryRepository.searchByTitle("책모음", BookSearchSort.OPINION, 20L, 5))
                 .willReturn(secondPageDbBooks);
-        given(aladinBookApiClient.searchAll("책모음")).willReturn(new AladinSearchResult(List.of(aladinBook), 7));
+        given(naverBookApiClient.searchAll("책모음")).willReturn(new ExternalBookSearchResult(List.of(externalBook), 7));
 
         Page<BookSearchProjection> firstPage = bookService.searchBooks("책모음", PageRequest.of(0, 20));
         Page<BookSearchProjection> secondPage = bookService.searchBooks("책모음", PageRequest.of(1, 20));
 
         assertThat(firstPage.getContent()).isEqualTo(firstPageDbBooks);
 
-        assertThat(secondPage.getContent()).hasSize(6); // DB 5건 + 알라딘 1건
+        assertThat(secondPage.getContent()).hasSize(6); // DB 5건 + 외부 검색 1건
         assertThat(secondPage.getContent().subList(0, 5)).isEqualTo(secondPageDbBooks);
         assertThat(secondPage.getContent().get(5).bookId()).isNull();
 
@@ -221,18 +221,18 @@ class BookServiceTest {
     }
 
     @Test
-    @DisplayName("DB 매칭이 1페이지 안에서 끝나면 2페이지부터는 알라딘 결과만 채우고, DB total만큼 알라딘 쪽을 건너뛴다")
-    void searchBooksReturnsAladinOnlyWhenDbFitsInFirstPage() {
+    @DisplayName("DB 매칭이 1페이지 안에서 끝나면 2페이지부터는 외부 검색 결과만 채우고, DB total만큼 외부 검색 쪽을 건너뛴다")
+    void searchBooksReturnsExternalOnlyWhenDbFitsInFirstPage() {
         Pageable pageable = PageRequest.of(1, 20);
-        ExternalBookResult duplicateAladinBook = new ExternalBookResult("제목", "작가", "출판사", "isbn-dup", "cover");
-        ExternalBookResult newAladinBook = new ExternalBookResult("제목", "작가", "출판사2", "isbn-new", "cover2");
-        // 1페이지(offset 0~19)에서 이미 노출됐어야 할 알라딘 15건(20 - dbTotal 5) 뒤에 중복/신규 도서가 이어진다.
-        List<ExternalBookResult> aladinItems = new ArrayList<>(externalBooks(1, 15));
-        aladinItems.add(duplicateAladinBook);
-        aladinItems.add(newAladinBook);
+        ExternalBookResult duplicateExternalBook = new ExternalBookResult("제목", "작가", "출판사", "isbn-dup", "cover");
+        ExternalBookResult newExternalBook = new ExternalBookResult("제목", "작가", "출판사2", "isbn-new", "cover2");
+        // 1페이지(offset 0~19)에서 이미 노출됐어야 할 외부 검색 15건(20 - dbTotal 5) 뒤에 중복/신규 도서가 이어진다.
+        List<ExternalBookResult> externalItems = new ArrayList<>(externalBooks(1, 15));
+        externalItems.add(duplicateExternalBook);
+        externalItems.add(newExternalBook);
         given(bookQueryRepository.countByTitle("제목")).willReturn(5L);
         given(bookQueryRepository.findIsbnsByTitle("제목")).willReturn(List.of("isbn-dup"));
-        given(aladinBookApiClient.searchAll("제목")).willReturn(new AladinSearchResult(aladinItems, 21));
+        given(naverBookApiClient.searchAll("제목")).willReturn(new ExternalBookSearchResult(externalItems, 21));
 
         Page<BookSearchProjection> results = bookService.searchBooks("제목", pageable);
 

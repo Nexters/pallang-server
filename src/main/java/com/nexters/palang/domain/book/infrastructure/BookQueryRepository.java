@@ -53,7 +53,7 @@ public class BookQueryRepository {
         return new PageImpl<>(content, pageable, countByTitle(keyword));
     }
 
-    // GET /api/books/search가 DB 검색 결과를 알라딘 결과와 하나의 연속된 목록처럼 취급해 페이지네이션할 때
+    // GET /api/books/search가 DB 검색 결과를 네이버 결과와 하나의 연속된 목록처럼 취급해 페이지네이션할 때
     // 쓰는 오버로드다. Pageable은 offset이 page*size로 고정돼 임의의 offset을 표현할 수 없어
     // (findCarouselBooks와 동일한 이유) offset/limit을 직접 받는다.
     public List<BookSearchProjection> searchByTitle(String keyword, BookSearchSort sort, long offset, int limit) {
@@ -81,7 +81,7 @@ public class BookQueryRepository {
     }
 
     // 제목으로 매칭되는, 살아있는 대목이 하나라도 있는 DB 도서의 전체 개수.
-    // (GET /api/books/search가 알라딘 결과와 합쳐 total을 계산할 때 페이지마다 이 값을 다시 구한다.)
+    // (GET /api/books/search가 네이버 결과와 합쳐 total을 계산할 때 페이지마다 이 값을 다시 구한다.)
     public long countByTitle(String keyword) {
         QBook book = QBook.book;
         QPassage passage = QPassage.passage;
@@ -96,9 +96,9 @@ public class BookQueryRepository {
         return count != null ? count : 0L;
     }
 
-    // GET /api/books/search에서 알라딘 결과 중 이미 DB에 등록된 도서와 ISBN이 같은 항목을 걸러내기 위한
+    // GET /api/books/search에서 네이버 결과 중 이미 DB에 등록된 도서와 ISBN이 같은 항목을 걸러내기 위한
     // 용도다. searchByTitle과 똑같이 살아있는 대목이 있는 도서만 대상으로 해야 한다 — 그렇지 않으면 아직
-    // 아무도 흔적을 남기지 않아 검색 결과에서 숨겨진 도서의 ISBN 때문에, 그 책의 알라딘 결과까지 함께
+    // 아무도 흔적을 남기지 않아 검색 결과에서 숨겨진 도서의 ISBN 때문에, 그 책의 네이버 결과까지 함께
     // 숨겨져 사용자가 그 책을 전혀 찾을 수 없게 된다. 페이지와 무관하게 매칭되는 도서 전부의 ISBN을 반환한다.
     public List<String> findIsbnsByTitle(String keyword) {
         QBook book = QBook.book;

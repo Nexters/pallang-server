@@ -5,7 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 public record BookSearchResponse(
         @Schema(example = "1", description = "서비스 DB에 등록된 도서일 때만 채워진다. "
-                + "GET /api/books/search에서 알라딘에만 있고 아직 등록되지 않은 도서는 null이다.",
+                + "GET /api/books/search에서 네이버에만 있고 아직 등록되지 않은 도서는 null이다.",
                 nullable = true) Long bookId,
         @Schema(example = "채식주의자", requiredMode = Schema.RequiredMode.REQUIRED) String title,
         @Schema(example = "한강", requiredMode = Schema.RequiredMode.REQUIRED) String author,

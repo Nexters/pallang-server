@@ -6,8 +6,8 @@ import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.book.domain.SampleLibraryBook;
 import com.nexters.palang.domain.book.domain.UserBookStatus;
-import com.nexters.palang.domain.book.infrastructure.AladinBookApiClient;
-import com.nexters.palang.domain.book.infrastructure.AladinSearchResult;
+import com.nexters.palang.domain.book.infrastructure.NaverBookApiClient;
+import com.nexters.palang.domain.book.infrastructure.ExternalBookSearchResult;
 import com.nexters.palang.domain.book.infrastructure.BookQueryRepository;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.book.infrastructure.UserBookStatusRepository;
@@ -35,16 +35,16 @@ import org.springframework.web.multipart.MultipartFile;
 public class BookService {
 
     private static final String COVER_IMAGE_SUB_DIRECTORY = "book-covers";
-    // 1글자 검색은 자동완성 노이즈만 크고 알라딘 쿼터만 소모하므로, 호출 자체를 하지 않는다.
+    // 1글자 검색은 자동완성 노이즈만 크고 외부 검색 쿼터만 소모하므로, 호출 자체를 하지 않는다.
     private static final int EXTERNAL_SEARCH_MIN_KEYWORD_LENGTH = 2;
 
     private final BookRepository bookRepository;
     private final BookQueryRepository bookQueryRepository;
     private final UserBookStatusRepository userBookStatusRepository;
-    private final AladinBookApiClient aladinBookApiClient;
+    private final NaverBookApiClient naverBookApiClient;
     private final FileStorageService fileStorageService;
 
-    // 알라딘 API 호출(최대 수 초)이 포함돼 있어, DB 커넥션을 불필요하게 오래 붙잡지 않도록 트랜잭션에서 제외한다.
+    // 외부 검색 API 호출(최대 수 초)이 포함돼 있어, DB 커넥션을 불필요하게 오래 붙잡지 않도록 트랜잭션에서 제외한다.
     // 아래 DB 조회들은 이 메서드 안에서 트랜잭션 없이 실행되지만, 전부 단순 조회(SELECT)라 문제 없다.
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Page<BookSearchProjection> searchBooks(String keyword, Pageable pageable) {
@@ -56,40 +56,39 @@ public class BookService {
         int size = pageable.getPageSize();
         long globalStart = pageable.getOffset();
 
-        // DB 도서 전체(흔적 많은 순 정렬)와 알라딘 결과 전체를 이어붙인 하나의 목록이라고 보고, 요청받은
-        // 페이지 구간([globalStart, globalStart+size))이 그 목록의 어느 지점에 해당하는지 계산해서 DB/알라딘
+        // DB 도서 전체(흔적 많은 순 정렬)와 외부 검색 결과 전체를 이어붙인 하나의 목록이라고 보고, 요청받은
+        // 페이지 구간([globalStart, globalStart+size))이 그 목록의 어느 지점에 해당하는지 계산해서 DB/외부 검색
         // 양쪽에 정확한 offset/limit을 나눠준다. DB 매칭이 몇 건이든(페이지 크기를 넘어가도) 페이지를
         // 넘기다 보면 전부 노출되고, 같은 도서가 페이지마다 중복 노출되는 일도 없다.
         long dbTotal = bookQueryRepository.countByTitle(trimmedKeyword);
         int dbCountThisPage = (int) Math.min(Math.max(dbTotal - globalStart, 0), size);
-        int aladinLimitForContent = size - dbCountThisPage;
-        long aladinOffset = Math.max(globalStart - dbTotal, 0);
+        int externalLimitForContent = size - dbCountThisPage;
+        long externalOffset = Math.max(globalStart - dbTotal, 0);
 
         List<BookSearchProjection> dbBooks = dbCountThisPage > 0
                 ? bookQueryRepository.searchByTitle(trimmedKeyword, BookSearchSort.OPINION, globalStart, dbCountThisPage)
                 : List.of();
 
-        // 알라딘 ItemSearch는 임의의 레코드 offset을 직접 요청할 방법이 없어(start는 페이지 번호,
-        // MaxResults 단위로만 페이지가 나뉨), AladinBookApiClient#searchAll이 키워드당 결과 전체
-        // (최대 200건, 알라딘 한도)를 미리 모아 캐싱해서 돌려준다. 여기서 그 리스트를 대상으로
-        // offset/limit 슬라이싱을 직접 수행한다.
-        AladinSearchResult aladinAll = aladinBookApiClient.searchAll(trimmedKeyword);
+        // DB 결과 뒤에 이어붙이는 구조라 외부 검색에 필요한 offset이 DB 매칭 수에 따라 달라지므로,
+        // NaverBookApiClient#searchAll이 키워드당 결과 전체(최대 200건)를 미리 모아 캐싱해서 돌려준다.
+        // 여기서 그 리스트를 대상으로 offset/limit 슬라이싱을 직접 수행한다.
+        ExternalBookSearchResult externalAll = naverBookApiClient.searchAll(trimmedKeyword);
 
-        // 같은 책이 알라딘/DB 양쪽에 모두 있으면(ISBN 동일) 이미 등록된 DB 쪽만 남기고 알라딘 쪽은 제외한다.
-        // ISBN이 없는 알라딘 결과는 비교 기준이 없으므로 그대로 둔다. dedup을 먼저 하고 나서 offset/limit을
+        // 같은 책이 외부 검색/DB 양쪽에 모두 있으면(ISBN 동일) 이미 등록된 DB 쪽만 남기고 외부 검색 쪽은 제외한다.
+        // ISBN이 없는 외부 검색 결과는 비교 기준이 없으므로 그대로 둔다. dedup을 먼저 하고 나서 offset/limit을
         // 적용하므로, 중복 때문에 페이지가 size보다 적게 채워지는 일도 없다.
         Set<String> registeredIsbns = Set.copyOf(bookQueryRepository.findIsbnsByTitle(trimmedKeyword));
-        List<BookSearchProjection> aladinBooks = aladinAll.items().stream()
+        List<BookSearchProjection> externalBooks = externalAll.items().stream()
                 .filter(item -> item.isbn() == null || item.isbn().isBlank() || !registeredIsbns.contains(item.isbn()))
-                .skip(aladinOffset)
-                .limit(aladinLimitForContent)
+                .skip(externalOffset)
+                .limit(externalLimitForContent)
                 .map(BookSearchProjection::from)
                 .toList();
 
         List<BookSearchProjection> content = new ArrayList<>(dbBooks);
-        content.addAll(aladinBooks);
+        content.addAll(externalBooks);
 
-        long total = dbTotal + aladinAll.totalResults();
+        long total = dbTotal + externalAll.totalResults();
         return new PageImpl<>(content, pageable, total);
     }
 

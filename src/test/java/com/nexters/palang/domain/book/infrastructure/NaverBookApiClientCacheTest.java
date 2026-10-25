@@ -24,17 +24,17 @@ import org.springframework.web.reactive.function.client.ExchangeFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
-// AladinBookApiClient#searchAll()에 걸린 @Cacheable이 실제로 동작하는지 검증한다. @Cacheable은
+// NaverBookApiClient#searchAll()에 걸린 @Cacheable이 실제로 동작하는지 검증한다. @Cacheable은
 // Spring AOP 프록시를 거쳐야 동작해서(클래스 안에서 self-invocation하면 적용되지 않음) Mockito로
-// AladinBookApiClient를 직접 new하는 방식(AladinBookApiClientTest)으로는 검증할 수 없고, 스프링
+// NaverBookApiClient를 직접 new하는 방식(NaverBookApiClientTest)으로는 검증할 수 없고, 스프링
 // 컨텍스트 + 실제 Redis(로컬 docker-compose 또는 CI redis 서비스)가 필요하다.
 @SpringBootTest(properties = "spring.main.allow-bean-definition-overriding=true")
-class AladinBookApiClientCacheTest {
+class NaverBookApiClientCacheTest {
 
-    private static final String CACHE_NAME = "aladinBookSearch";
+    private static final String CACHE_NAME = "naverBookSearch";
 
     @Autowired
-    private AladinBookApiClient aladinBookApiClient;
+    private NaverBookApiClient naverBookApiClient;
 
     @Autowired
     private ExchangeFunction exchangeFunction;
@@ -67,7 +67,7 @@ class AladinBookApiClientCacheTest {
                 .build();
     }
 
-    // 실제 알라딘 서버 대신 mock ExchangeFunction으로 응답하는 aladinWebClient로 교체한다.
+    // 실제 네이버 서버 대신 mock ExchangeFunction으로 응답하는 naverWebClient로 교체한다.
     // 원래 빈과 이름이 같아야 교체되므로, 이 테스트 컨텍스트에 한해 bean overriding을 허용한다.
     @TestConfiguration
     static class StubWebClientConfig {
@@ -78,28 +78,28 @@ class AladinBookApiClientCacheTest {
         }
 
         @Bean
-        public WebClient aladinWebClient(ExchangeFunction exchangeFunction) {
+        public WebClient naverWebClient(ExchangeFunction exchangeFunction) {
             return WebClient.builder()
-                    .baseUrl("http://www.aladin.co.kr/ttb/api")
+                    .baseUrl("https://openapi.naver.com")
                     .exchangeFunction(exchangeFunction)
                     .build();
         }
     }
 
     @Test
-    @DisplayName("같은 키워드로 다시 검색하면 캐시에서 응답하고 알라딘을 다시 호출하지 않는다")
+    @DisplayName("같은 키워드로 다시 검색하면 캐시에서 응답하고 네이버를 다시 호출하지 않는다")
     void searchUsesCacheOnSecondCall() throws InterruptedException {
         given(exchangeFunction.exchange(any())).willReturn(Mono.just(jsonResponse("""
                 {
-                  "totalResults": 1,
-                  "item": [
+                  "total": 1,
+                  "items": [
                     { "title": "채식주의자", "author": "한강", "publisher": "창비",
-                      "isbn13": "9788936433598", "cover": "cover.jpg" }
+                      "isbn": "9788936433598", "image": "cover.jpg" }
                   ]
                 }
                 """)));
 
-        AladinSearchResult first = aladinBookApiClient.searchAll("채식주의자캐시테스트");
+        ExternalBookSearchResult first = naverBookApiClient.searchAll("채식주의자캐시테스트");
         assertThat(first.items()).as("첫 호출 결과가 비어있으면 unless 조건 때문에 애초에 캐싱되지 않는다").isNotEmpty();
 
         // @Cacheable의 캐시 put은 원래 메서드가 결과를 반환하기 "전에" 같은 스레드에서 동기적으로
@@ -109,34 +109,34 @@ class AladinBookApiClientCacheTest {
         String cacheKey = "채식주의자캐시테스트";
         awaitCacheEntry(cacheKey);
 
-        AladinSearchResult second = aladinBookApiClient.searchAll("채식주의자캐시테스트");
+        ExternalBookSearchResult second = naverBookApiClient.searchAll("채식주의자캐시테스트");
 
         assertThat(second).isEqualTo(first);
         verify(exchangeFunction, times(1)).exchange(any());
     }
 
     @Test
-    @DisplayName("검색 실패는 캐싱되지 않아 다음 호출에서 알라딘을 다시 호출한다")
+    @DisplayName("검색 실패는 캐싱되지 않아 다음 호출에서 네이버를 다시 호출한다")
     void searchDoesNotCacheFailure() {
         given(exchangeFunction.exchange(any()))
                 .willReturn(Mono.just(ClientResponse.create(HttpStatus.INTERNAL_SERVER_ERROR).body("error").build()))
                 .willReturn(Mono.just(jsonResponse("{}")));
 
-        assertThatThrownBy(() -> aladinBookApiClient.searchAll("실패캐시테스트"))
+        assertThatThrownBy(() -> naverBookApiClient.searchAll("실패캐시테스트"))
                 .isInstanceOf(BookException.class);
-        AladinSearchResult second = aladinBookApiClient.searchAll("실패캐시테스트");
+        ExternalBookSearchResult second = naverBookApiClient.searchAll("실패캐시테스트");
 
         assertThat(second.items()).isEmpty();
         verify(exchangeFunction, times(2)).exchange(any());
     }
 
     @Test
-    @DisplayName("빈 결과는 캐싱되지 않아 다음 호출에서 알라딘을 다시 호출한다")
+    @DisplayName("빈 결과는 캐싱되지 않아 다음 호출에서 네이버를 다시 호출한다")
     void searchDoesNotCacheEmptyResult() {
         given(exchangeFunction.exchange(any())).willReturn(Mono.just(jsonResponse("{}")));
 
-        aladinBookApiClient.searchAll("빈결과캐시테스트");
-        aladinBookApiClient.searchAll("빈결과캐시테스트");
+        naverBookApiClient.searchAll("빈결과캐시테스트");
+        naverBookApiClient.searchAll("빈결과캐시테스트");
 
         verify(exchangeFunction, times(2)).exchange(any());
     }

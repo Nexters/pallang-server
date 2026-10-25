@@ -50,9 +50,10 @@ spring:
       invoke-url: ${CLOVA_OCR_INVOKE_URL:}
       secret-key: ${CLOVA_OCR_SECRET_KEY:}
 
-aladin:
-  base-url: https://www.aladin.co.kr/ttb/api
-  ttb-key: ${ALADIN_TTB_KEY:}
+naver:
+  base-url: https://openapi.naver.com
+  client-id: ${NAVER_CLIENT_ID:}
+  client-secret: ${NAVER_CLIENT_SECRET:}
 
 storage:
   public-base-url: ${STORAGE_PUBLIC_BASE_URL:https://api-dev.pallang.co.kr/images}
