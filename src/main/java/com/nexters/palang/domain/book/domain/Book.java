@@ -81,13 +81,18 @@ public class Book extends BaseEntity {
     }
 
     // 관리자 전용 수정(AdminBookService). 일반 유저 플로우에는 등록된 도서 정보를 고치는 기능이 없다
-    // (알라딘 API로 잘못 들어온 정보나 중복 도서 정리 목적). titleNormalized는 @PreUpdate에서 자동 갱신된다.
+    // (외부 검색 API로 잘못 들어온 정보나 중복 도서 정리 목적). titleNormalized는 @PreUpdate에서 자동 갱신된다.
     public void update(String title, String author, String publisher, int pageCount, String isbn, String coverImageUrl) {
         this.title = title;
         this.author = author;
         this.publisher = publisher;
         this.pageCount = pageCount;
         this.isbn = isbn;
+        this.coverImageUrl = coverImageUrl;
+    }
+
+    // 알라딘 서비스 종료로 image.aladin.co.kr 표지를 카카오 표지로 교체할 때만 쓴다(BookCoverImageBackfillRunner).
+    public void replaceCoverImageUrl(String coverImageUrl) {
         this.coverImageUrl = coverImageUrl;
     }
 

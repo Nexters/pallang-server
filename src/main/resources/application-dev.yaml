@@ -50,9 +50,9 @@ spring:
       invoke-url: ${CLOVA_OCR_INVOKE_URL:}
       secret-key: ${CLOVA_OCR_SECRET_KEY:}
 
-aladin:
-  base-url: https://www.aladin.co.kr/ttb/api
-  ttb-key: ${ALADIN_TTB_KEY:}
+kakao-book:
+  base-url: https://dapi.kakao.com
+  rest-api-key: ${KAKAO_REST_API_KEY:}
 
 storage:
   public-base-url: ${STORAGE_PUBLIC_BASE_URL:https://api-dev.pallang.co.kr/images}
