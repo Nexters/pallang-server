@@ -16,13 +16,13 @@ public class WebClientConfig {
 
     private static final int CONNECT_TIMEOUT_MILLIS = 3_000;
     private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(10);
-    // 도서 검색은 타이핑 중 자동완성으로도 호출되므로, 알라딘이 느릴 때 오래 기다리지 않도록
+    // 도서 검색은 타이핑 중 자동완성으로도 호출되므로, 카카오 책 검색이 느릴 때 오래 기다리지 않도록
     // 응답 타임아웃을 짧게 둔다 (다른 외부 연동은 기존 10초 유지).
-    private static final Duration ALADIN_RESPONSE_TIMEOUT = Duration.ofSeconds(3);
+    private static final Duration BOOK_SEARCH_RESPONSE_TIMEOUT = Duration.ofSeconds(3);
 
     @Bean
-    public WebClient aladinWebClient(WebClient.Builder builder, @Value("${aladin.base-url}") String baseUrl) {
-        return webClient(builder, baseUrl, ALADIN_RESPONSE_TIMEOUT);
+    public WebClient kakaoBookWebClient(WebClient.Builder builder, @Value("${kakao-book.base-url}") String baseUrl) {
+        return webClient(builder, baseUrl, BOOK_SEARCH_RESPONSE_TIMEOUT);
     }
 
     @Bean

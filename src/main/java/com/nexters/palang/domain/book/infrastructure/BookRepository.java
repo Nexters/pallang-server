@@ -19,6 +19,11 @@ public interface BookRepository extends JpaRepository<Book, Long> {
     // id > :id 조건으로 이어서 조회해야 한다(pageable은 정렬/LIMIT 용도로만 사용, offset은 항상 0).
     List<Book> findByTitleNormalizedIsNullAndIdGreaterThanOrderByIdAsc(Long id, Pageable pageable);
 
+    // 알라딘 표지 백필 대상(BookCoverImageBackfillRunner) 조회용. 교체에 실패한 도서는 계속 조건에
+    // 걸리므로 offset이 아니라 id > :id 키셋 페이지네이션으로 이어서 조회한다.
+    List<Book> findByCoverImageUrlContainingAndIdGreaterThanOrderByIdAsc(
+            String coverImageUrlKeyword, Long id, Pageable pageable);
+
     // 관리자 도서 검색(AdminBookService): 제목 또는 저자에 키워드가 포함된 도서 전부.
     Page<Book> findByTitleContainingOrAuthorContaining(String titleKeyword, String authorKeyword, Pageable pageable);
 }

@@ -4,9 +4,9 @@ spring:
   profiles:
     active: local
 
-aladin:
-  base-url: https://www.aladin.co.kr/ttb/api
-  ttb-key: ${ALADIN_TTB_KEY:}
+kakao-book:
+  base-url: https://dapi.kakao.com
+  rest-api-key: ${KAKAO_REST_API_KEY:}
 
 kakao:
   base-url: https://kapi.kakao.com
