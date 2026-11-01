@@ -31,7 +31,7 @@ import reactor.core.publisher.Mono;
 @SpringBootTest(properties = "spring.main.allow-bean-definition-overriding=true")
 class KakaoBookApiClientCacheTest {
 
-    private static final String CACHE_NAME = "kakaoBookSearch";
+    private static final String CACHE_NAME = "kakaoBookSearchV2";
 
     @Autowired
     private KakaoBookApiClient kakaoBookApiClient;

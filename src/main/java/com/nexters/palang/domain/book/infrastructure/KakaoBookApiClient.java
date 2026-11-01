@@ -48,7 +48,8 @@ public class KakaoBookApiClient {
     // 캐싱에서 제외해 다음 호출에서 다시 시도하게 한다.
     // 이 메서드는 반드시 다른 빈(BookService)이 호출해야 한다 — 같은 클래스 안에서 self-invocation하면
     // Spring AOP 프록시를 거치지 않아 캐싱이 동작하지 않는다.
-    @Cacheable(value = "kakaoBookSearch", key = "#keyword", unless = "#result.items().isEmpty()")
+    // 캐시 이름의 V2는 표지를 썸네일에서 원본 URL로 바꾸면서 썸네일 URL이 담긴 기존 캐시를 버리려고 붙였다.
+    @Cacheable(value = "kakaoBookSearchV2", key = "#keyword", unless = "#result.items().isEmpty()")
     public ExternalBookSearchResult searchAll(String keyword) {
         List<ExternalBookResult> items = new ArrayList<>();
         long totalResults = 0;
@@ -132,7 +133,7 @@ public class KakaoBookApiClient {
                 authors,
                 document.publisher(),
                 isbn13(document.isbn()),
-                blankToNull(document.thumbnail()));
+                KakaoCoverImageUrl.toOriginal(blankToNull(document.thumbnail())));
     }
 
     // "ISBN10 ISBN13" 중 13자리를 우선 고르고, 13자리가 없으면 마지막 값을 쓴다.

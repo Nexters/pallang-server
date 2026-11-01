@@ -89,6 +89,30 @@ class KakaoBookApiClientTest {
     }
 
     @Test
+    @DisplayName("카카오 썸네일 URL은 fname의 원본 표지 URL(https)로 바꿔 돌려준다")
+    void searchUsesOriginalCoverInsteadOfThumbnail() {
+        stubSearch("""
+                {
+                  "meta": { "total_count": 1, "pageable_count": 1, "is_end": true },
+                  "documents": [
+                    {
+                      "title": "빵충 사육 준수 사항",
+                      "authors": ["작가"],
+                      "publisher": "출판사",
+                      "isbn": "9791194891178",
+                      "thumbnail": "https://search1.kakaocdn.net/thumb/R120x174.q85/?fname=http%3A%2F%2Ft1.daumcdn.net%2Flbook%2Fimage%2F7271144%3Ftimestamp%3D20261003131118"
+                    }
+                  ]
+                }
+                """);
+
+        ExternalBookSearchResult result = kakaoBookApiClient().searchAll("빵충");
+
+        assertThat(result.items()).extracting(ExternalBookResult::coverImageUrl)
+                .containsExactly("https://t1.daumcdn.net/lbook/image/7271144?timestamp=20261003131118");
+    }
+
+    @Test
     @DisplayName("썸네일이 빈 문자열이면 표지 URL을 null로 둔다")
     void searchTreatsBlankThumbnailAsNull() {
         stubSearch("""
