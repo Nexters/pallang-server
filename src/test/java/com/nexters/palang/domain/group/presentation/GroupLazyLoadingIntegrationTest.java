@@ -140,7 +140,7 @@ class GroupLazyLoadingIntegrationTest {
     @DisplayName("방 설정을 변경하면 host 닉네임과 책 제목이 포함된 응답이 정상적으로 내려온다")
     void updateGroupReturnsHostNicknameAndBookTitle() throws Exception {
         Group group = createGroupDirectly();
-        UpdateGroupRequest request = new UpdateGroupRequest("주말 독서 모임", 6, null, null);
+        UpdateGroupRequest request = new UpdateGroupRequest("주말 독서 모임", 6, null, null, null);
 
         mockMvc.perform(patch("/api/groups/{groupId}", group.getId())
                         .header("Authorization", bearerToken(hostId))

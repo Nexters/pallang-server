@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
+import com.nexters.palang.domain.group.application.GroupMemberPreview;
 import com.nexters.palang.domain.group.application.GroupSummaryProjection;
 import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.domain.group.domain.GroupBookEntry;
@@ -12,12 +13,15 @@ import com.nexters.palang.domain.group.domain.GroupMemberRole;
 import com.nexters.palang.domain.group.domain.GroupMemberStatus;
 import com.nexters.palang.domain.group.domain.GroupStatus;
 import com.nexters.palang.domain.group.domain.ReadingPeriod;
+import com.nexters.palang.domain.group.domain.ReadingScheduleStatus;
 import com.nexters.palang.domain.user.domain.SnsProvider;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.global.config.JpaAuditingConfig;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -170,6 +174,49 @@ class GroupQueryRepositoryTest {
         assertThat(result.getTotalElements()).isEqualTo(1);
         assertThat(result.getContent()).extracting(GroupSummaryProjection::groupId).containsExactly(active.getId());
         assertThat(result.getContent().getFirst().memberCount()).isEqualTo(1L);
+    }
+
+    @Test
+    @DisplayName("카드에는 읽는 책 수와 읽는 책 중 가장 늦은 종료일이 담긴다")
+    void findMyGroupsIncludesReadingSummary() {
+        User me = user("me");
+        Group group = group("고전 뽀개기", book("채식주의자"), me, ReadingPeriod.of(TODAY, TODAY.plusDays(7)));
+        entityManager.persistAndFlush(GroupBookEntry.create(group, book("소년이 온다"), ReadingPeriod.of(TODAY, TODAY.plusDays(30)), TODAY));
+        entityManager.persistAndFlush(GroupBookEntry.create(group, book("흰"), ReadingPeriod.NONE, TODAY));
+        join(group, me, GroupMemberRole.HOST);
+
+        GroupSummaryProjection card = groupQueryRepository.findMyGroups(me.getId(), TODAY.plusDays(10), PageRequest.of(0, 20))
+                .getContent().getFirst();
+
+        // TODAY+10 기준: 첫 책(TODAY+7 종료)은 완독, 나머지 2권은 읽는 중
+        assertThat(card.readingSummary().readingBookCount()).isEqualTo(2);
+        assertThat(card.readingSummary().latestReadingEndDate()).isEqualTo(TODAY.plusDays(30));
+        assertThat(card.readingSummary().scheduleStatus()).isEqualTo(ReadingScheduleStatus.HAS_END_DATE);
+    }
+
+    @Test
+    @DisplayName("카드 아바타는 현재 멤버를 모임장 → 참여일 순으로 최대 5명까지 담는다")
+    void findMyGroupsIncludesMemberPreviews() {
+        User host = user("host");
+        Group group = group("고전 뽀개기", book("채식주의자"), host);
+        join(group, host, GroupMemberRole.HOST, JOINED_AT.plusDays(10));
+        List<User> members = new ArrayList<>();
+        for (int i = 1; i <= 6; i++) {
+            User member = user("member" + i);
+            members.add(member);
+            join(group, member, GroupMemberRole.MEMBER, JOINED_AT.plusDays(i));
+        }
+        User removed = user("removed");
+        GroupMember removedMembership = join(group, removed, GroupMemberRole.MEMBER, JOINED_AT);
+        ReflectionTestUtils.setField(removedMembership, "status", GroupMemberStatus.REMOVED);
+        entityManager.persistAndFlush(removedMembership);
+
+        GroupSummaryProjection card = groupQueryRepository.findMyGroups(host.getId(), TODAY, PageRequest.of(0, 20))
+                .getContent().getFirst();
+
+        assertThat(card.memberCount()).isEqualTo(7);
+        assertThat(card.memberPreviews()).extracting(GroupMemberPreview::userId).containsExactly(
+                host.getId(), members.get(0).getId(), members.get(1).getId(), members.get(2).getId(), members.get(3).getId());
     }
 
     @Test
