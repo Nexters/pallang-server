@@ -1,12 +1,13 @@
 package com.nexters.palang.domain.group.domain;
 
-import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.group.common.error.GroupErrorCode;
 import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.global.common.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -14,27 +15,22 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
-import java.time.LocalDate;
-import java.util.UUID;
+import jakarta.persistence.Version;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.Check;
 
+// 모임 자체(이름/정원/모임장/상태)만 담는다. 함께 읽는 책과 기간은 책마다 다를 수 있어 GroupBookEntry로
+// 분리했다(#223) — 모임 1개 : 모임 책 N개.
 @Getter
 @Entity
 // 테이블명을 "groups"로 두면 MySQL 8(GROUPS가 예약어, GROUPS BETWEEN 윈도우 프레임 구문 도입 이후)에서
 // DDL/쿼리가 깨질 수 있어 "reading_groups"로 둔다.
-@Table(
-        name = "reading_groups",
-        uniqueConstraints = @UniqueConstraint(name = "uq_reading_groups_invite_code", columnNames = "invite_code")
-)
-@Check(constraints = "capacity BETWEEN 2 AND 10 AND end_date >= start_date")
+@Table(name = "reading_groups")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Group extends BaseEntity {
 
-    public static final int NAME_MAX_LENGTH = 15;
     public static final int MIN_CAPACITY = 2;
     public static final int MAX_CAPACITY = 10;
 
@@ -43,13 +39,8 @@ public class Group extends BaseEntity {
     @Column(name = "id", updatable = false)
     private Long id;
 
-    @Column(name = "name", length = NAME_MAX_LENGTH, nullable = false)
+    @Column(name = "name", length = GroupName.COLUMN_LENGTH, nullable = false)
     private String name;
-
-    // 모임을 만들 때 함께 고른 책. 흔적/의견이 이 책을 기준으로 쌓이므로 생성 후에는 바꿀 수 없다(setter 없음).
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "book_id", nullable = false, updatable = false)
-    private Book book;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "host_id", nullable = false, updatable = false)
@@ -58,74 +49,60 @@ public class Group extends BaseEntity {
     @Column(name = "capacity", nullable = false)
     private int capacity;
 
-    @Column(name = "start_date", nullable = false)
-    private LocalDate startDate;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    private GroupStatus status;
 
-    @Column(name = "end_date", nullable = false)
-    private LocalDate endDate;
+    // 합치기(#227)로 흡수된 source 모임이면 흡수한 keeper 모임 id, 작업 id, 완료 시각을 남긴다.
+    @Column(name = "merged_into_id")
+    private Long mergedIntoId;
 
-    // 카카오톡 등으로 공유하는 초대 링크의 식별자. 별도 만료 시각을 두지 않으며, endDate가 지나도
-    // 무효화되지 않는다 — 기간은 강제되지 않는 안내용 값이라는 결정(isEnded() 주석 참고)과 일관되게,
-    // 종료된 모임에도 초대 링크로 새 멤버가 계속 가입할 수 있다. 유출 등으로 재발급이 필요하면
-    // regenerateInviteCode()로 기존 코드를 무효화한다.
-    @Column(name = "invite_code", length = 32, nullable = false)
-    private String inviteCode;
+    @Column(name = "merge_job_id")
+    private Long mergeJobId;
 
-    private Group(String name, Book book, User host, int capacity, LocalDate startDate, LocalDate endDate, String inviteCode) {
+    @Column(name = "merged_at")
+    private LocalDateTime mergedAt;
+
+    // 모임 설정 동시 수정 충돌 검사용(S03). 클라이언트가 받은 version과 다르면 저장을 거절한다.
+    @Version
+    @Column(name = "version", nullable = false)
+    private Long version;
+
+    private Group(String name, User host, int capacity) {
         this.name = name;
-        this.book = book;
         this.host = host;
         this.capacity = capacity;
-        this.startDate = startDate;
-        this.endDate = endDate;
-        this.inviteCode = inviteCode;
+        this.status = GroupStatus.ACTIVE;
     }
 
-    public static Group create(String name, Book book, User host, int capacity, LocalDate startDate, LocalDate endDate) {
+    public static Group create(String name, User host, int capacity) {
         validateCapacity(capacity);
-        validatePeriod(startDate, endDate);
-        return new Group(name, book, host, capacity, startDate, endDate, generateInviteCode());
+        return new Group(GroupName.normalize(name), host, capacity);
     }
 
-    // 방 설정 변경(host 전용): 책은 대상이 아니다. 정원을 현재 참여 인원보다 적게 줄이는 것은 막는다.
-    public void updateSettings(String name, int capacity, LocalDate startDate, LocalDate endDate, long currentMemberCount) {
+    // 모임 설정 변경(host 전용): 이름과 정원만 바꾼다. 정원을 현재 참여 인원보다 적게 줄이는 것은 막는다.
+    // 검증이 하나라도 실패하면 아무 필드도 바꾸지 않는다(S01).
+    public void updateSettings(String name, int capacity, long currentMemberCount) {
+        String normalizedName = GroupName.normalize(name);
         validateCapacity(capacity);
-        validatePeriod(startDate, endDate);
         if (capacity < currentMemberCount) {
             throw new GroupException(GroupErrorCode.CAPACITY_BELOW_MEMBER_COUNT);
         }
-        this.name = name;
+        this.name = normalizedName;
         this.capacity = capacity;
-        this.startDate = startDate;
-        this.endDate = endDate;
     }
 
-    // 기간은 모임원끼리 정하는 안내용 값일 뿐 강제되지 않는다(PM 확인: 기간이 지나도 모임 목록 노출,
-    // 흔적/의견 작성 모두 계속 가능). isEnded()는 FE가 "종료됨" 배지를 보여주는 용도로만 쓰이며,
-    // 어떤 조회/쓰기 API도 이 값으로 접근을 막지 않는다.
-    public boolean isEnded() {
-        return LocalDate.now().isAfter(endDate);
+    public boolean isActive() {
+        return status == GroupStatus.ACTIVE;
     }
 
-    // 초대 링크 재발급(host 전용): 기존 코드는 즉시 무효화되고 이 코드로 들어온 이후 요청은 전부
-    // INVALID_INVITE_CODE로 거절된다.
-    public void regenerateInviteCode() {
-        this.inviteCode = generateInviteCode();
+    public boolean isHost(Long userId) {
+        return host.getId().equals(userId);
     }
 
     private static void validateCapacity(int capacity) {
         if (capacity < MIN_CAPACITY || capacity > MAX_CAPACITY) {
             throw new GroupException(GroupErrorCode.INVALID_GROUP_CAPACITY);
         }
-    }
-
-    private static void validatePeriod(LocalDate startDate, LocalDate endDate) {
-        if (startDate.isAfter(endDate)) {
-            throw new GroupException(GroupErrorCode.INVALID_GROUP_PERIOD);
-        }
-    }
-
-    private static String generateInviteCode() {
-        return UUID.randomUUID().toString().replace("-", "");
     }
 }

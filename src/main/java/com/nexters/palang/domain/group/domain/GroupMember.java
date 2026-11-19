@@ -15,10 +15,13 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+// (모임, 사용자)당 행 하나. 탈퇴/내보내기는 행을 지우지 않고 status로 남기며, 다시 가입하면 같은 행을
+// ACTIVE로 되살린다(rejoin) — 그래서 (group_id, user_id) 유니크 제약을 그대로 유지할 수 있다.
 @Getter
 @Entity
 @Table(
@@ -47,15 +50,37 @@ public class GroupMember extends BaseEntity {
     @Column(name = "role", nullable = false, updatable = false)
     private GroupMemberRole role;
 
-    private GroupMember(Group group, User user, GroupMemberRole role) {
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 20, nullable = false)
+    private GroupMemberStatus status;
+
+    // 현재 멤버십이 시작된 시각(참여일). 재가입하면 그 시각으로 갱신된다 — created_at은 최초 가입 시각으로 남는다.
+    @Column(name = "joined_at", nullable = false)
+    private LocalDateTime joinedAt;
+
+    // 내보내진 시각. "removedAt 이전에 발급된 초대로는 재가입 불가"(#226) 판단에 쓴다.
+    @Column(name = "removed_at")
+    private LocalDateTime removedAt;
+
+    private GroupMember(Group group, User user, GroupMemberRole role, LocalDateTime joinedAt) {
         this.group = group;
         this.user = user;
         this.role = role;
+        this.status = GroupMemberStatus.ACTIVE;
+        this.joinedAt = joinedAt;
     }
 
-    // 나가기/강퇴는 이번 스코프에 없어 정원 검증 등은 가입 플로우(후속 이슈)에서 다룬다. 여기서는
-    // 이미 확정된 (group, user, role) 조합으로 멤버 레코드를 만드는 역할만 한다.
-    public static GroupMember of(Group group, User user, GroupMemberRole role) {
-        return new GroupMember(group, user, role);
+    public static GroupMember join(Group group, User user, GroupMemberRole role, LocalDateTime joinedAt) {
+        return new GroupMember(group, user, role, joinedAt);
+    }
+
+    public boolean isActive() {
+        return status == GroupMemberStatus.ACTIVE;
+    }
+
+    // 탈퇴/내보내기 후 유효한 초대로 다시 들어온 경우. 재가입 가능 여부(정원, 초대 발급 시각)는 호출 측이 검증한다.
+    public void rejoin(LocalDateTime joinedAt) {
+        this.status = GroupMemberStatus.ACTIVE;
+        this.joinedAt = joinedAt;
     }
 }

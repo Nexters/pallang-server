@@ -2,6 +2,8 @@ package com.nexters.palang.domain.admin.application;
 
 import com.nexters.palang.domain.comment.infrastructure.CommentRepository;
 import com.nexters.palang.domain.decoration.infrastructure.DecorationRepository;
+import com.nexters.palang.domain.group.infrastructure.GroupBookEntryRepository;
+import com.nexters.palang.domain.group.infrastructure.GroupInvitationRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupRepository;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionLikeRepository;
@@ -29,6 +31,8 @@ public class AdminCascadeDeleter {
     private final OpinionLikeRepository opinionLikeRepository;
     private final GroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
+    private final GroupBookEntryRepository groupBookEntryRepository;
+    private final GroupInvitationRepository groupInvitationRepository;
 
     // 의견(들)과 거기 달린 댓글/데코/좋아요를 전부 지운다. 한 의견에 달린 댓글은 부모/답글(자기참조 FK)
     // 관계여도 opinion_id로 한 번에 지우면 같은 DELETE 문 안에서 함께 제거되어 순서 문제가 없다
@@ -54,7 +58,7 @@ public class AdminCascadeDeleter {
         passageRepository.deleteAllById(ids);
     }
 
-    // 모임(들)과 그 안의 대목/의견/댓글/데코/좋아요, 모임원까지 전부 지운다.
+    // 모임(들)과 그 안의 대목/의견/댓글/데코/좋아요, 모임 책/초대/모임원까지 전부 지운다.
     public void deleteGroups(Collection<Long> groupIds) {
         if (groupIds.isEmpty()) {
             return;
@@ -62,6 +66,8 @@ public class AdminCascadeDeleter {
         List<Long> ids = List.copyOf(groupIds);
         List<Long> passageIds = passageRepository.findAllByGroupIdIn(ids).stream().map(Passage::getId).toList();
         deletePassages(passageIds);
+        groupBookEntryRepository.deleteAllByGroupIdIn(ids);
+        groupInvitationRepository.deleteAllByGroupIdIn(ids);
         groupMemberRepository.deleteAllByGroupIdIn(ids);
         groupRepository.deleteAllById(ids);
     }

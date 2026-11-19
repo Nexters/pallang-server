@@ -11,6 +11,7 @@ import com.nexters.palang.global.common.error.ErrorResponse;
 import com.nexters.palang.global.common.response.DataResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -23,19 +24,31 @@ import org.springframework.http.ResponseEntity;
 @Tag(name = "Group", description = "모임 API")
 public interface GroupApi {
 
-    @Operation(summary = "모임 생성", description = "책 1권을 고정해 모임을 만듭니다. 생성한 사용자는 모임장(HOST)으로 자동 가입됩니다. "
-            + "책은 생성 이후 변경할 수 없습니다. Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @Operation(summary = "모임 생성", description = "책 1권과 함께 모임을 만듭니다. 생성한 사용자는 모임장(HOST)으로 자동 가입됩니다. "
+            + "독서 기간은 선택이며, 넣는다면 시작일·종료일을 함께 넣고 둘 다 오늘(한국 시간) 이후여야 합니다. "
+            + "Idempotency-Key 헤더를 보내면 같은 키로 다시 요청해도 모임을 새로 만들지 않고 처음 만든 모임을 돌려줍니다 "
+            + "(응답 유실·이중 탭 대비). Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "생성 성공"),
-            @ApiResponse(responseCode = "400", description = "필수값 누락, 인원이 2~10명 범위를 벗어남(COMMON_400_1) "
-                    + "또는 시작일이 종료일보다 늦음 (GROUP_400_1)",
+            @ApiResponse(responseCode = "200", description = "생성 성공(같은 Idempotency-Key 재요청이면 처음 만든 모임)"),
+            @ApiResponse(responseCode = "400", description = "필수값 누락, 인원이 2~10명 범위를 벗어남(COMMON_400_1), "
+                    + "Idempotency-Key가 비었거나 100자 초과(COMMON_400_2), 시작일이 종료일보다 늦음(GROUP_400_1), "
+                    + "기간 한쪽만 입력(GROUP_400_4), 새 날짜가 오늘 이전(GROUP_400_5), 모임명 길이 위반(GROUP_400_6)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = {
                             @ExampleObject(name = "COMMON_400_1: 필수값 누락/인원 범위 초과",
                                     value = "{\"type\":\"/api/groups\",\"title\":\"COMMON_400_1\","
                                             + "\"status\":400,\"detail\":\"인원은 최소 2명 이상이어야 합니다.\"}"),
                             @ExampleObject(name = "GROUP_400_1: 시작일이 종료일보다 늦음",
                                     value = "{\"type\":\"/api/groups\",\"title\":\"GROUP_400_1\","
-                                            + "\"status\":400,\"detail\":\"시작일은 종료일보다 늦을 수 없습니다.\"}")
+                                            + "\"status\":400,\"detail\":\"시작일은 종료일보다 늦을 수 없습니다.\"}"),
+                            @ExampleObject(name = "GROUP_400_4: 기간 한쪽만 입력",
+                                    value = "{\"type\":\"/api/groups\",\"title\":\"GROUP_400_4\","
+                                            + "\"status\":400,\"detail\":\"시작일과 종료일은 함께 입력하거나 함께 비워야 합니다.\"}"),
+                            @ExampleObject(name = "GROUP_400_5: 새 날짜가 과거",
+                                    value = "{\"type\":\"/api/groups\",\"title\":\"GROUP_400_5\","
+                                            + "\"status\":400,\"detail\":\"새로 입력하거나 변경한 날짜는 오늘 이후여야 합니다.\"}"),
+                            @ExampleObject(name = "GROUP_400_6: 모임명 길이",
+                                    value = "{\"type\":\"/api/groups\",\"title\":\"GROUP_400_6\","
+                                            + "\"status\":400,\"detail\":\"모임명은 공백을 제외하고 1자 이상 15자 이하여야 합니다.\"}")
                     })),
             @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
@@ -46,7 +59,11 @@ public interface GroupApi {
                             value = "{\"type\":\"/api/groups\",\"title\":\"BOOK_404_1\","
                                     + "\"status\":404,\"detail\":\"해당 도서를 찾을 수 없습니다.\"}")))
     })
-    ResponseEntity<DataResponse<GroupDetailResponse>> createGroup(@Valid CreateGroupRequest request);
+    ResponseEntity<DataResponse<GroupDetailResponse>> createGroup(
+            @Parameter(name = "Idempotency-Key", in = ParameterIn.HEADER,
+                    description = "요청 키(선택, 최대 100자). 같은 키의 재요청은 처음 만든 모임을 돌려준다.")
+            String idempotencyKey,
+            @Valid CreateGroupRequest request);
 
     @Operation(summary = "내 모임 목록", description = "현재 로그인한 사용자가 속한 모임을 최근 생성 순으로 조회합니다. "
             + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
@@ -83,19 +100,32 @@ public interface GroupApi {
             @Parameter(description = "모임 ID", required = true) Long groupId
     );
 
-    @Operation(summary = "방 설정 변경", description = "모임장만 이름/인원/기간을 수정할 수 있습니다. 책은 대상이 아닙니다. "
-            + "인원은 현재 참여 인원보다 적게 줄일 수 없습니다. Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @Operation(summary = "방 설정 변경", description = "모임장만 이름/인원을 수정할 수 있습니다. 책은 대상이 아닙니다. "
+            + "인원은 현재 참여 인원보다 적게 줄일 수 없습니다. 기간(startDate/endDate)은 기존 앱 호환용으로, 둘 다 보내면 "
+            + "대표 책(가장 먼저 등록된 책)의 기간을 바꾸고 둘 다 비우면 기간은 그대로 둡니다. 바꾸지 않은 기존 과거 날짜는 "
+            + "그대로 저장할 수 있지만 새로 바꾼 날짜는 오늘(한국 시간) 이후여야 합니다. 한 필드라도 잘못되면 아무것도 "
+            + "저장되지 않습니다. Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "수정 성공"),
-            @ApiResponse(responseCode = "400", description = "필수값 누락, 인원이 2~10명 범위를 벗어남(COMMON_400_1) "
-                    + "또는 시작일이 종료일보다 늦음 (GROUP_400_1)",
+            @ApiResponse(responseCode = "400", description = "필수값 누락, 인원이 2~10명 범위를 벗어남(COMMON_400_1), "
+                    + "시작일이 종료일보다 늦음(GROUP_400_1), 기간 한쪽만 입력(GROUP_400_4), 바꾼 날짜가 오늘 이전(GROUP_400_5), "
+                    + "모임명 길이 위반(GROUP_400_6)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = {
                             @ExampleObject(name = "COMMON_400_1: 필수값 누락/인원 범위 초과",
                                     value = "{\"type\":\"/api/groups/1\",\"title\":\"COMMON_400_1\","
                                             + "\"status\":400,\"detail\":\"인원은 최대 10명까지 가능합니다.\"}"),
                             @ExampleObject(name = "GROUP_400_1: 시작일이 종료일보다 늦음",
                                     value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_400_1\","
-                                            + "\"status\":400,\"detail\":\"시작일은 종료일보다 늦을 수 없습니다.\"}")
+                                            + "\"status\":400,\"detail\":\"시작일은 종료일보다 늦을 수 없습니다.\"}"),
+                            @ExampleObject(name = "GROUP_400_4: 기간 한쪽만 입력",
+                                    value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_400_4\","
+                                            + "\"status\":400,\"detail\":\"시작일과 종료일은 함께 입력하거나 함께 비워야 합니다.\"}"),
+                            @ExampleObject(name = "GROUP_400_5: 새 날짜가 과거",
+                                    value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_400_5\","
+                                            + "\"status\":400,\"detail\":\"새로 입력하거나 변경한 날짜는 오늘 이후여야 합니다.\"}"),
+                            @ExampleObject(name = "GROUP_400_6: 모임명 길이",
+                                    value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_400_6\","
+                                            + "\"status\":400,\"detail\":\"모임명은 공백을 제외하고 1자 이상 15자 이하여야 합니다.\"}")
                     })),
             @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
@@ -140,7 +170,7 @@ public interface GroupApi {
             @Parameter(description = "모임 ID", required = true) Long groupId
     );
 
-    @Operation(summary = "모임 멤버 목록", description = "모임원만 조회할 수 있습니다. 모임장이 먼저, 그다음 가입 순으로 정렬됩니다. "
+    @Operation(summary = "모임 멤버 목록", description = "모임원만 조회할 수 있습니다. 현재 멤버만 보이며, 모임장이 먼저, 그다음 참여일 순(같으면 userId 순)으로 정렬됩니다. "
             + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),

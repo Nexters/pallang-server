@@ -10,6 +10,7 @@ import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.QBook;
 import com.nexters.palang.domain.book.domain.QUserBookStatus;
 import com.nexters.palang.domain.group.domain.QGroup;
+import com.nexters.palang.domain.group.domain.GroupMemberStatus;
 import com.nexters.palang.domain.group.domain.QGroupMember;
 import com.nexters.palang.domain.opinion.domain.QOpinion;
 import com.nexters.palang.domain.passage.domain.QPassage;
@@ -249,7 +250,8 @@ public class BookQueryRepository {
         QGroupMember groupMember = QGroupMember.groupMember;
         return passage.group.isNull().or(JPAExpressions.selectOne()
                 .from(groupMember)
-                .where(groupMember.group.id.eq(passage.group.id), groupMember.user.id.eq(userId))
+                .where(groupMember.group.id.eq(passage.group.id), groupMember.user.id.eq(userId),
+                        groupMember.status.eq(GroupMemberStatus.ACTIVE))
                 .exists());
     }
 
