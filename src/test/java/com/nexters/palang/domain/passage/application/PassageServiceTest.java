@@ -13,6 +13,7 @@ import com.nexters.palang.domain.decoration.application.DecorationMergeCandidate
 import com.nexters.palang.domain.decoration.domain.EffectType;
 import com.nexters.palang.domain.decoration.infrastructure.DecorationQueryRepository;
 import com.nexters.palang.domain.group.application.GroupAccessValidator;
+import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.domain.group.common.error.GroupErrorCode;
 import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionRepository;
@@ -20,6 +21,7 @@ import com.nexters.palang.domain.passage.common.error.PassageException;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.infrastructure.PassageQueryRepository;
 import com.nexters.palang.domain.passage.infrastructure.PassageRepository;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -212,6 +214,65 @@ class PassageServiceTest {
         given(passageRepository.findById(1L)).willReturn(Optional.of(passage));
 
         assertThatThrownBy(() -> passageService.updateSpoiler(1L, 10L, true))
+                .isInstanceOf(PassageException.class);
+    }
+
+    private Group group(Long id) {
+        Group group = Group.create("모임", null, null, 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20));
+        ReflectionTestUtils.setField(group, "id", id);
+        return group;
+    }
+
+    private Passage imageCardPassage(Group group) {
+        Book book = Book.builder().title("이방인").author("알베르 카뮈 (지은이), 김화영 (옮긴이)").build();
+        Passage passage = Passage.builder()
+                .book(book).group(group).pageNumber(87).quotedText("우리는 모두 이야기를 찾아 헤맨다.").build();
+        ReflectionTestUtils.setField(passage, "id", 1L);
+        return passage;
+    }
+
+    @Test
+    @DisplayName("공개 대목은 등록자가 아니어도 이미지 저장용 정보(발췌 문장·페이지·책 제목·역할 표기를 뗀 작가)를 조회할 수 있다")
+    void getImageCardReturnsPassageAndBookInfoForPublicPassage() {
+        given(passageRepository.findByIdAndDeletedAtIsNull(1L)).willReturn(Optional.of(imageCardPassage(null)));
+
+        PassageImageCardResult result = passageService.getImageCard(1L, 999L);
+
+        assertThat(result.passageId()).isEqualTo(1L);
+        assertThat(result.quotedText()).isEqualTo("우리는 모두 이야기를 찾아 헤맨다.");
+        assertThat(result.pageNumber()).isEqualTo(87);
+        assertThat(result.bookTitle()).isEqualTo("이방인");
+        assertThat(result.bookAuthor()).isEqualTo("알베르 카뮈");
+    }
+
+    @Test
+    @DisplayName("모임 전용 대목은 모임원이면 이미지 저장용 정보를 조회할 수 있다")
+    void getImageCardAllowsGroupMember() {
+        Group group = group(5L);
+        given(passageRepository.findByIdAndDeletedAtIsNull(1L)).willReturn(Optional.of(imageCardPassage(group)));
+
+        PassageImageCardResult result = passageService.getImageCard(1L, 10L);
+
+        assertThat(result.bookTitle()).isEqualTo("이방인");
+    }
+
+    @Test
+    @DisplayName("모임 전용 대목은 모임원이 아니면 이미지 저장용 정보를 조회할 수 없다")
+    void getImageCardThrowsExceptionWhenNotGroupMember() {
+        Group group = group(5L);
+        given(passageRepository.findByIdAndDeletedAtIsNull(1L)).willReturn(Optional.of(imageCardPassage(group)));
+        doThrow(new GroupException(GroupErrorCode.NOT_MEMBER)).when(groupAccessValidator).validateMember(5L, 999L);
+
+        assertThatThrownBy(() -> passageService.getImageCard(1L, 999L))
+                .isInstanceOf(GroupException.class);
+    }
+
+    @Test
+    @DisplayName("존재하지 않거나 삭제된 대목은 이미지 저장용 정보를 조회할 수 없다")
+    void getImageCardThrowsExceptionWhenPassageNotFound() {
+        given(passageRepository.findByIdAndDeletedAtIsNull(1L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> passageService.getImageCard(1L, 10L))
                 .isInstanceOf(PassageException.class);
     }
 }
