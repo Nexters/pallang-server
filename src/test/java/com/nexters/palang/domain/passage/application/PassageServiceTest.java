@@ -224,7 +224,7 @@ class PassageServiceTest {
     }
 
     private Passage imageCardPassage(Group group) {
-        Book book = Book.builder().title("이방인").author("알베르 카뮈").build();
+        Book book = Book.builder().title("이방인").author("알베르 카뮈 (지은이), 김화영 (옮긴이)").build();
         Passage passage = Passage.builder()
                 .book(book).group(group).pageNumber(87).quotedText("우리는 모두 이야기를 찾아 헤맨다.").build();
         ReflectionTestUtils.setField(passage, "id", 1L);
@@ -232,7 +232,7 @@ class PassageServiceTest {
     }
 
     @Test
-    @DisplayName("공개 대목은 등록자가 아니어도 이미지 저장용 정보(발췌 문장·페이지·책 제목·작가)를 조회할 수 있다")
+    @DisplayName("공개 대목은 등록자가 아니어도 이미지 저장용 정보(발췌 문장·페이지·책 제목·역할 표기를 뗀 작가)를 조회할 수 있다")
     void getImageCardReturnsPassageAndBookInfoForPublicPassage() {
         given(passageRepository.findByIdAndDeletedAtIsNull(1L)).willReturn(Optional.of(imageCardPassage(null)));
 
