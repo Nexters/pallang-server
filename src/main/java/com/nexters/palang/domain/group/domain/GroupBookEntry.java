@@ -84,6 +84,34 @@ public class GroupBookEntry extends BaseEntity {
         return ReadingPeriod.of(startDate, endDate);
     }
 
+    // 같은 판본인지: 같은 도서 행이거나, 둘 다 유효한 ISBN이 있고 그 값이 같으면 같은 판본이다. books.isbn은 유니크가
+    // 아니라 같은 판본이 여러 행으로 등록돼 있을 수 있어 id만으로는 부족하다. 제목 문자열은 판별에 쓰지 않는다(B04) —
+    // 제목이 같아도 다른 판본이면 따로 추가할 수 있다. ISBN이 없는 책끼리는 id가 같을 때만 같은 판본으로 본다.
+    public boolean isSameEditionAs(Book other) {
+        if (book.getId() != null && book.getId().equals(other.getId())) {
+            return true;
+        }
+        String isbn = normalizeIsbn(book.getIsbn());
+        return isbn != null && isbn.equals(normalizeIsbn(other.getIsbn()));
+    }
+
+    private static String normalizeIsbn(String isbn) {
+        if (isbn == null) {
+            return null;
+        }
+        String digits = isbn.replaceAll("[^0-9Xx]", "").toUpperCase();
+        return digits.isEmpty() ? null : digits;
+    }
+
+    // 기간과 상태 모드를 함께 반영한 다음 상태로 바꾼다. status가 null이면 상태는 건드리지 않는다(클라이언트가 상태를
+    // 직접 조작한 경우에만 보낸다). 기간 검증이 실패하면 아무것도 바뀌지 않는다.
+    public void changeSettings(ReadingPeriod newPeriod, ReadingStatus manualStatusOrNull, LocalDate today) {
+        changePeriod(newPeriod, today);
+        if (manualStatusOrNull != null) {
+            changeStatusManually(manualStatusOrNull);
+        }
+    }
+
     // 기간만 바꾼다. 바꾸지 않은 기존 과거 날짜는 그대로 허용하고, 상태 모드(AUTO/MANUAL)는 유지한다.
     public void changePeriod(ReadingPeriod newPeriod, LocalDate today) {
         newPeriod.validateChangedDatesNotPast(getPeriod(), today);

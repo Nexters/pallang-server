@@ -110,6 +110,11 @@ public class GroupService {
                 .filter(Group::isActive)
                 .orElseThrow(() -> new GroupException(GroupErrorCode.GROUP_NOT_FOUND));
         validateHost(group, userId);
+        // 설정 화면을 연 뒤 다른 곳(다른 기기 등)에서 설정이 바뀌었으면 덮어쓰지 않고 거절한다(S03). 모임 행을 잠근 뒤
+        // 비교하므로, 잠금을 기다리던 사이 먼저 커밋된 변경도 여기서 걸린다.
+        if (request.version() != null && !request.version().equals(group.getVersion())) {
+            throw new GroupException(GroupErrorCode.GROUP_SETTINGS_CONFLICT);
+        }
         long memberCount = groupMemberRepository.countActiveMembers(groupId);
         GroupBookEntry primaryEntry = groupBookEntries.getPrimaryEntry(groupId);
 
