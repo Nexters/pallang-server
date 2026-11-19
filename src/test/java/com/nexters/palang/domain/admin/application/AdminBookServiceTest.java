@@ -9,8 +9,7 @@ import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.book.infrastructure.UserBookStatusRepository;
-import com.nexters.palang.domain.group.domain.Group;
-import com.nexters.palang.domain.group.infrastructure.GroupRepository;
+import com.nexters.palang.domain.group.infrastructure.GroupBookEntryRepository;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.infrastructure.PassageRepository;
 import java.util.List;
@@ -30,7 +29,7 @@ class AdminBookServiceTest {
     @Mock
     private PassageRepository passageRepository;
     @Mock
-    private GroupRepository groupRepository;
+    private GroupBookEntryRepository groupBookEntryRepository;
     @Mock
     private UserBookStatusRepository userBookStatusRepository;
     @Mock
@@ -41,7 +40,7 @@ class AdminBookServiceTest {
     @BeforeEach
     void setUp() {
         adminBookService = new AdminBookService(
-                bookRepository, passageRepository, groupRepository, userBookStatusRepository, cascadeDeleter);
+                bookRepository, passageRepository, groupBookEntryRepository, userBookStatusRepository, cascadeDeleter);
     }
 
     @Test
@@ -53,13 +52,11 @@ class AdminBookServiceTest {
     }
 
     @Test
-    @DisplayName("책을 삭제하면 이 책의 모임/대목을 먼저 지운 뒤 읽기 상태와 책 자체를 지운다")
+    @DisplayName("책을 삭제하면 이 책을 함께 읽는 모임과 대목을 먼저 지운 뒤 읽기 상태와 책 자체를 지운다")
     void deleteBookCascadesGroupsAndPassagesThenBook() {
         given(bookRepository.findById(1L)).willReturn(Optional.of(mock(Book.class)));
 
-        Group hostedGroup = mock(Group.class);
-        given(hostedGroup.getId()).willReturn(100L);
-        given(groupRepository.findAllByBookId(1L)).willReturn(List.of(hostedGroup));
+        given(groupBookEntryRepository.findGroupIdsByBookId(1L)).willReturn(List.of(100L));
 
         Passage globalPassage = mock(Passage.class);
         given(globalPassage.getId()).willReturn(200L);

@@ -94,7 +94,7 @@ class OpinionQueryRepositoryTest {
 
     private Group group(String name) {
         return entityManager.persistAndFlush(
-                Group.create(name, book, me, 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20)));
+                Group.create(name, me, 4));
     }
 
     private Opinion opinion(User user, Passage passage, String content) {

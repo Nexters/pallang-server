@@ -16,6 +16,8 @@ import com.nexters.palang.domain.book.infrastructure.UserBookStatusRepository;
 import com.nexters.palang.domain.comment.infrastructure.CommentRepository;
 import com.nexters.palang.domain.decoration.infrastructure.DecorationRepository;
 import com.nexters.palang.domain.group.domain.Group;
+import com.nexters.palang.domain.group.infrastructure.GroupBookEntryRepository;
+import com.nexters.palang.domain.group.infrastructure.GroupInvitationRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupRepository;
 import com.nexters.palang.domain.notification.infrastructure.DeviceTokenRepository;
@@ -48,6 +50,10 @@ class AdminUserServiceTest {
     @Mock
     private GroupMemberRepository groupMemberRepository;
     @Mock
+    private GroupBookEntryRepository groupBookEntryRepository;
+    @Mock
+    private GroupInvitationRepository groupInvitationRepository;
+    @Mock
     private PassageRepository passageRepository;
     @Mock
     private OpinionRepository opinionRepository;
@@ -76,7 +82,8 @@ class AdminUserServiceTest {
     @BeforeEach
     void setUp() {
         adminUserService = new AdminUserService(
-                userRepository, groupRepository, groupMemberRepository, passageRepository, opinionRepository,
+                userRepository, groupRepository, groupMemberRepository, groupBookEntryRepository, groupInvitationRepository,
+                passageRepository, opinionRepository,
                 commentRepository, decorationRepository, opinionLikeRepository, deviceTokenRepository,
                 notificationRepository, reportRepository, userBlockRepository, userBookStatusRepository,
                 refreshTokenRepository);
@@ -105,7 +112,7 @@ class AdminUserServiceTest {
         given(hostedGroup.getId()).willReturn(100L);
         given(hostedGroup.getName()).willReturn("독서모임A");
         given(groupRepository.findAllByHostId(target.getId())).willReturn(List.of(hostedGroup));
-        given(groupMemberRepository.countByGroupId(100L)).willReturn(2L);
+        given(groupMemberRepository.countActiveMembers(100L)).willReturn(2L);
 
         assertThatThrownBy(() -> adminUserService.deleteUser(target.getId()))
                 .isInstanceOf(AdminException.class)
@@ -151,6 +158,28 @@ class AdminUserServiceTest {
         verify(userBlockRepository).deleteAllByBlockerIdOrBlockedId(target.getId(), target.getId());
         verify(userBookStatusRepository).deleteAllByUserId(target.getId());
         verify(refreshTokenRepository).deleteAllByUserId(target.getId());
+        verify(userRepository).delete(target);
+    }
+
+    @Test
+    @DisplayName("혼자 남은 모임의 호스트면 그 모임의 책/초대/모든 멤버십 이력을 지운 뒤 모임까지 함께 삭제된다")
+    void deleteRemovesSoloHostedGroupWithItsEntriesInvitationsAndMembershipHistory() {
+        given(userRepository.findById(target.getId())).willReturn(Optional.of(target));
+        Group soloGroup = mock(Group.class);
+        given(soloGroup.getId()).willReturn(100L);
+        given(groupRepository.findAllByHostId(target.getId())).willReturn(List.of(soloGroup));
+        given(groupMemberRepository.countActiveMembers(100L)).willReturn(1L);
+        given(passageRepository.findAllByCreatorId(target.getId())).willReturn(List.of());
+        given(passageRepository.findAllByGroupIdIn(List.of(100L))).willReturn(List.of());
+        given(opinionRepository.findIdsByUserId(target.getId())).willReturn(List.of());
+        given(commentRepository.findIdsByUserId(target.getId())).willReturn(List.of());
+
+        adminUserService.deleteUser(target.getId());
+
+        verify(groupBookEntryRepository).deleteAllByGroupIdIn(List.of(100L));
+        verify(groupInvitationRepository).deleteAllByGroupIdIn(List.of(100L));
+        verify(groupMemberRepository).deleteAllByGroupIdIn(List.of(100L));
+        verify(groupRepository).deleteAllById(List.of(100L));
         verify(userRepository).delete(target);
     }
 }

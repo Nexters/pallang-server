@@ -6,8 +6,11 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.nexters.palang.domain.group.application.GroupBookEntries;
 import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.group.domain.Group;
+import com.nexters.palang.domain.group.domain.GroupBookEntry;
+import com.nexters.palang.domain.group.domain.ReadingPeriod;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupRepository;
 import java.time.LocalDate;
@@ -28,13 +31,15 @@ class AdminGroupServiceTest {
     @Mock
     private GroupMemberRepository groupMemberRepository;
     @Mock
+    private GroupBookEntries groupBookEntries;
+    @Mock
     private AdminCascadeDeleter cascadeDeleter;
 
     private AdminGroupService adminGroupService;
 
     @BeforeEach
     void setUp() {
-        adminGroupService = new AdminGroupService(groupRepository, groupMemberRepository, cascadeDeleter);
+        adminGroupService = new AdminGroupService(groupRepository, groupMemberRepository, groupBookEntries, cascadeDeleter);
     }
 
     @Test
@@ -47,17 +52,20 @@ class AdminGroupServiceTest {
     }
 
     @Test
-    @DisplayName("모임을 수정하면 현재 참여 인원을 기준으로 설정이 바뀐다")
+    @DisplayName("모임을 수정하면 현재 참여 인원을 기준으로 설정이 바뀌고, 과거 날짜여도 대표 책 기간이 정정된다")
     void updateGroupDelegatesToEntity() {
         Group group = mock(Group.class);
+        GroupBookEntry primaryEntry = mock(GroupBookEntry.class);
         given(groupRepository.findWithAssociationsById(1L)).willReturn(Optional.of(group));
-        given(groupMemberRepository.countByGroupId(1L)).willReturn(3L);
-        LocalDate start = LocalDate.of(2026, 1, 1);
-        LocalDate end = LocalDate.of(2026, 2, 1);
+        given(groupMemberRepository.countActiveMembers(1L)).willReturn(3L);
+        given(groupBookEntries.getPrimaryEntry(1L)).willReturn(primaryEntry);
+        LocalDate start = LocalDate.of(2020, 1, 1);
+        LocalDate end = LocalDate.of(2020, 2, 1);
 
         AdminGroupSearchResult result = adminGroupService.updateGroup(1L, "새 이름", 5, start, end);
 
-        verify(group).updateSettings("새 이름", 5, start, end, 3L);
+        verify(group).updateSettings("새 이름", 5, 3L);
+        verify(primaryEntry).correctPeriod(ReadingPeriod.of(start, end));
         assertThat(result.memberCount()).isEqualTo(3L);
     }
 
