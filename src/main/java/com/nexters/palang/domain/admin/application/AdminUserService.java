@@ -8,6 +8,8 @@ import com.nexters.palang.domain.book.infrastructure.UserBookStatusRepository;
 import com.nexters.palang.domain.comment.infrastructure.CommentRepository;
 import com.nexters.palang.domain.decoration.infrastructure.DecorationRepository;
 import com.nexters.palang.domain.group.domain.Group;
+import com.nexters.palang.domain.group.infrastructure.GroupBookEntryRepository;
+import com.nexters.palang.domain.group.infrastructure.GroupInvitationRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupRepository;
 import com.nexters.palang.domain.notification.infrastructure.DeviceTokenRepository;
@@ -43,6 +45,8 @@ public class AdminUserService {
     private final UserRepository userRepository;
     private final GroupRepository groupRepository;
     private final GroupMemberRepository groupMemberRepository;
+    private final GroupBookEntryRepository groupBookEntryRepository;
+    private final GroupInvitationRepository groupInvitationRepository;
     private final PassageRepository passageRepository;
     private final OpinionRepository opinionRepository;
     private final CommentRepository commentRepository;
@@ -80,6 +84,11 @@ public class AdminUserService {
 
         groupMemberRepository.deleteAllByUserId(userId);
         if (!soloHostedGroupIds.isEmpty()) {
+            // 혼자 남은 모임이라도 예전에 나간/내보내진 다른 사람의 멤버십 행(비활성)과 모임 책/초대가 남아 있으므로
+            // FK 위반이 나지 않게 먼저 지운다.
+            groupBookEntryRepository.deleteAllByGroupIdIn(soloHostedGroupIds);
+            groupInvitationRepository.deleteAllByGroupIdIn(soloHostedGroupIds);
+            groupMemberRepository.deleteAllByGroupIdIn(soloHostedGroupIds);
             groupRepository.deleteAllById(soloHostedGroupIds);
         }
 
@@ -100,7 +109,7 @@ public class AdminUserService {
         List<Long> soloHostedGroupIds = new ArrayList<>();
         List<String> blockingGroupNames = new ArrayList<>();
         for (Group group : hostedGroups) {
-            if (groupMemberRepository.countByGroupId(group.getId()) > 1) {
+            if (groupMemberRepository.countActiveMembers(group.getId()) > 1) {
                 blockingGroupNames.add(group.getName());
             } else {
                 soloHostedGroupIds.add(group.getId());

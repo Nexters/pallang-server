@@ -122,7 +122,7 @@ class NotificationEventListenerTest {
     @Test
     @DisplayName("일정 변경 이벤트를 받으면 변경한 호스트를 제외한 멤버 전원에게 알림 생성을 요청한다")
     void onGroupScheduleChangedNotifiesMembersExceptActor() {
-        given(groupMemberRepository.findUserIdsByGroupId(9L)).willReturn(List.of(1L, 2L, 3L));
+        given(groupMemberRepository.findActiveUserIdsByGroupId(9L)).willReturn(List.of(1L, 2L, 3L));
 
         listener.onGroupScheduleChanged(new GroupScheduleChangedEvent(9L, "모임 이름", 1L));
 

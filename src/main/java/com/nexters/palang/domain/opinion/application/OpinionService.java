@@ -10,6 +10,7 @@ import com.nexters.palang.domain.group.application.GroupAccessValidator;
 import com.nexters.palang.domain.group.common.error.GroupErrorCode;
 import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.group.domain.Group;
+import com.nexters.palang.domain.group.infrastructure.GroupBookEntryRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupRepository;
 import com.nexters.palang.domain.opinion.common.error.OpinionErrorCode;
 import com.nexters.palang.domain.opinion.common.error.OpinionException;
@@ -50,6 +51,7 @@ public class OpinionService {
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
     private final GroupRepository groupRepository;
+    private final GroupBookEntryRepository groupBookEntryRepository;
     private final GroupAccessValidator groupAccessValidator;
 
     // 흔적 목록(FR-OPINION-03): 최신순(기본)/좋아요순. currentUserId는 비로그인 시 null(liked는 항상 false).
@@ -201,12 +203,12 @@ public class OpinionService {
         return opinionRepository.countByUserIdAndDeletedAtIsNull(userId);
     }
 
-    // 모임은 생성 시 책이 고정되므로(Group 불변식), 이 모임 소속으로 새 대목을 만들 때 요청의 bookId가
-    // 그 모임의 책과 다르면 막는다.
+    // 이 모임 소속으로 새 대목을 만들 때 요청의 bookId가 그 모임이 함께 읽는 책(GroupBookEntry) 중 하나가
+    // 아니면 막는다.
     private Passage createNewPassage(CreateOpinionRequest request, User creator, Group group) {
         Book book = bookRepository.findById(request.bookId())
                 .orElseThrow(() -> new BookException(BookErrorCode.BOOK_NOT_FOUND));
-        if (group != null && !group.getBook().getId().equals(request.bookId())) {
+        if (group != null && !groupBookEntryRepository.existsByGroupIdAndBookId(group.getId(), request.bookId())) {
             throw new GroupException(GroupErrorCode.GROUP_BOOK_MISMATCH);
         }
         Passage passage = Passage.builder()
