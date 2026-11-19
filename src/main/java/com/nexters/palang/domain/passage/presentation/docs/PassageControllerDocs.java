@@ -78,6 +78,31 @@ public interface PassageControllerDocs {
             @Valid @RequestBody PassageRequest.UpdateSpoiler request
     );
 
+    @Operation(summary = "이미지 저장용 대목 정보 조회",
+            description = "이미지 저장(꾸미기) 화면의 프레임에 표기할 발췌 문장·책 제목·작가명·발췌 페이지를 반환합니다. "
+                    + "의견·댓글은 포함하지 않습니다. 공개 대목은 등록자와 무관하게 로그인한 누구나 조회할 수 있고, "
+                    + "모임 전용 대목은 그 모임원만 조회할 수 있습니다. "
+                    + "이미지 합성·저장·공유는 클라이언트에서 처리하며 서버에는 이미지를 저장하지 않습니다. "
+                    + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "조회 성공"),
+            @ApiResponse(responseCode = "401", description = "AUTH_401_1: 로그인이 필요합니다.",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/passages/1/image-card\",\"title\":\"AUTH_401_1\","
+                                    + "\"status\":401,\"detail\":\"로그인이 필요합니다.\"}"))),
+            @ApiResponse(responseCode = "403", description = "GROUP_403_2: 모임 전용 대목인데 모임원이 아님",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/passages/1/image-card\",\"title\":\"GROUP_403_2\","
+                                    + "\"status\":403,\"detail\":\"모임원만 조회할 수 있습니다.\"}"))),
+            @ApiResponse(responseCode = "404", description = "PASSAGE_404_1: 해당 대목을 찾을 수 없습니다(삭제된 대목 포함).",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
+                            value = "{\"type\":\"/api/passages/1/image-card\",\"title\":\"PASSAGE_404_1\","
+                                    + "\"status\":404,\"detail\":\"해당 대목을 찾을 수 없습니다.\"}")))
+    })
+    DataResponse<PassageResponse.ImageCard> getImageCard(
+            @Parameter(description = "대목 ID", required = true) Long passageId
+    );
+
     @Operation(summary = "유사 문장 후보 조회", description = "저장 전 같은 도서의 인접 페이지(±1)에서 정규화 해시가 같은 대목 후보를 조회합니다. "
             + "groupId를 지정하면 그 모임 전용 대목만(요청자는 모임원이어야 함), 생략하면 전역 공개 대목만 비교합니다. "
             + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
