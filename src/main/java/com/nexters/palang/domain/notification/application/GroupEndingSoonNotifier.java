@@ -10,9 +10,9 @@ import com.nexters.palang.domain.notification.infrastructure.NotificationReposit
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -43,16 +43,16 @@ public class GroupEndingSoonNotifier {
     public void notifyGroupsEndingTomorrow() {
         LocalDate today = LocalDate.now(ZONE);
         LocalDate tomorrow = today.plusDays(1);
-        Collection<Group> endingSoon = groupBookEntryRepository.findAllInActiveGroupsByEndDate(tomorrow).stream()
+        Map<Long, List<GroupBookEntry>> endingSoonByGroupId = groupBookEntryRepository
+                .findAllInActiveGroupsByEndDate(tomorrow).stream()
                 .filter(entry -> entry.getStatusMode() == ReadingStatusMode.AUTO)
-                .map(GroupBookEntry::getGroup)
-                .collect(Collectors.toMap(Group::getId, group -> group, (first, second) -> first, LinkedHashMap::new))
-                .values();
+                .collect(Collectors.groupingBy(entry -> entry.getGroup().getId(), LinkedHashMap::new, Collectors.toList()));
         LocalDateTime startOfToday = today.atStartOfDay();
 
-        for (Group group : endingSoon) {
-            String title = "모임 종료 하루 전";
-            String body = "'%s' 모임이 내일 끝나요.".formatted(group.getName());
+        for (List<GroupBookEntry> entries : endingSoonByGroupId.values()) {
+            Group group = entries.getFirst().getGroup();
+            String title = "함께 읽는 책 종료 하루 전";
+            String body = endingSoonBody(group.getName(), entries);
             List<Long> memberIds = groupMemberRepository.findActiveUserIdsByGroupId(group.getId());
             for (Long memberId : memberIds) {
                 boolean alreadyNotifiedToday = notificationRepository.existsByReceiverIdAndTypeAndGroupIdAndCreatedAtAfter(
@@ -64,5 +64,15 @@ public class GroupEndingSoonNotifier {
                         title, body, null, null, null, group.getId(), group.getName(), null);
             }
         }
+    }
+
+    // 모임은 여러 권을 읽으므로 "모임이 끝난다"가 아니라 "어떤 책 읽기가 끝난다"고 알린다. 같은 날 여러 권이 끝나면
+    // 첫 책 제목과 나머지 권수로 묶는다.
+    private static String endingSoonBody(String groupName, List<GroupBookEntry> entries) {
+        String firstTitle = entries.getFirst().getBook().getTitle();
+        if (entries.size() == 1) {
+            return "'%s' 모임의 '%s' 읽기가 내일 끝나요.".formatted(groupName, firstTitle);
+        }
+        return "'%s' 모임의 '%s' 외 %d권 읽기가 내일 끝나요.".formatted(groupName, firstTitle, entries.size() - 1);
     }
 }

@@ -65,8 +65,10 @@ public interface GroupApi {
             String idempotencyKey,
             @Valid CreateGroupRequest request);
 
-    @Operation(summary = "내 모임 목록", description = "현재 로그인한 사용자가 속한 모임을 최근 생성 순으로 조회합니다. "
-            + "Authorization: Bearer {accessToken} 헤더로 인증합니다.")
+    @Operation(summary = "내 모임 목록", description = "현재 가입 중인 모임을 최근 생성 순으로 조회합니다(합쳐진 모임, 나간 모임 제외). "
+            + "카드에는 readingBookCount(\"총 N권 읽는 중\"), latestReadingEndDate와 readingScheduleStatus(날짜 칸), "
+            + "memberPreviews/extraMemberCount(아바타, \"+N\")를 쓰세요. bookId/bookTitle/startDate/endDate/ended는 "
+            + "배포된 앱 호환용으로 대표 책(가장 먼저 등록된 책) 기준입니다. Authorization: Bearer {accessToken} 헤더로 인증합니다.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공"),
             @ApiResponse(responseCode = "401", description = "인증 토큰 누락 (AUTH_401_1)",
@@ -100,8 +102,10 @@ public interface GroupApi {
             @Parameter(description = "모임 ID", required = true) Long groupId
     );
 
-    @Operation(summary = "방 설정 변경", description = "모임장만 이름/인원을 수정할 수 있습니다. 책은 대상이 아닙니다. "
-            + "인원은 현재 참여 인원보다 적게 줄일 수 없습니다. 기간(startDate/endDate)은 기존 앱 호환용으로, 둘 다 보내면 "
+    @Operation(summary = "방 설정 변경", description = "모임장만 이름/인원을 수정할 수 있습니다. 책은 대상이 아닙니다(책 추가/책 설정 "
+            + "API 사용). 인원은 현재 참여 인원보다 적게 줄일 수 없습니다. 설정 화면을 열 때 받은 모임 상세의 version을 함께 "
+            + "보내면, 그사이 다른 곳에서 설정이 바뀐 경우 저장하지 않고 409(GROUP_409_5)를 돌려줍니다 — 최신 값을 다시 조회해 "
+            + "사용자 입력과 비교한 뒤 다시 저장하세요. 기간(startDate/endDate)은 기존 앱 호환용으로, 둘 다 보내면 "
             + "대표 책(가장 먼저 등록된 책)의 기간을 바꾸고 둘 다 비우면 기간은 그대로 둡니다. 바꾸지 않은 기존 과거 날짜는 "
             + "그대로 저장할 수 있지만 새로 바꾼 날짜는 오늘(한국 시간) 이후여야 합니다. 한 필드라도 잘못되면 아무것도 "
             + "저장되지 않습니다. Authorization: Bearer {accessToken} 헤더로 인증합니다.")
@@ -139,10 +143,17 @@ public interface GroupApi {
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
                             value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_404_1\","
                                     + "\"status\":404,\"detail\":\"해당 모임을 찾을 수 없습니다.\"}"))),
-            @ApiResponse(responseCode = "409", description = "인원을 현재 참여 인원보다 적게 설정 (GROUP_409_1)",
-                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = @ExampleObject(
-                            value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_409_1\","
-                                    + "\"status\":409,\"detail\":\"인원을 현재 참여 인원보다 적게 설정할 수 없습니다.\"}")))
+            @ApiResponse(responseCode = "409", description = "인원을 현재 참여 인원보다 적게 설정(GROUP_409_1) 또는 "
+                    + "그사이 다른 곳에서 설정이 변경됨(GROUP_409_5)",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class), examples = {
+                            @ExampleObject(name = "GROUP_409_1: 정원이 현재 인원보다 적음",
+                                    value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_409_1\","
+                                            + "\"status\":409,\"detail\":\"인원을 현재 참여 인원보다 적게 설정할 수 없습니다.\"}"),
+                            @ExampleObject(name = "GROUP_409_5: 설정 충돌",
+                                    value = "{\"type\":\"/api/groups/1\",\"title\":\"GROUP_409_5\","
+                                            + "\"status\":409,\"detail\":\"다른 곳에서 모임 설정이 먼저 변경되었습니다. "
+                                            + "최신 설정을 확인한 뒤 다시 저장해 주세요.\"}")
+                    }))
     })
     ResponseEntity<DataResponse<GroupDetailResponse>> updateGroup(
             @Parameter(description = "모임 ID", required = true) Long groupId,

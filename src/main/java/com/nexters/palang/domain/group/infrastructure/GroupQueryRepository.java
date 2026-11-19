@@ -1,10 +1,12 @@
 package com.nexters.palang.domain.group.infrastructure;
 
+import com.nexters.palang.domain.group.application.GroupMemberPreview;
 import com.nexters.palang.domain.group.application.GroupSummaryProjection;
 import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.domain.group.domain.GroupBookEntry;
 import com.nexters.palang.domain.group.domain.GroupMember;
 import com.nexters.palang.domain.group.domain.GroupMemberStatus;
+import com.nexters.palang.domain.group.domain.GroupReadingSummary;
 import com.nexters.palang.domain.group.domain.GroupStatus;
 import com.nexters.palang.domain.group.domain.QGroup;
 import com.nexters.palang.domain.group.domain.QGroupBookEntry;
@@ -13,6 +15,7 @@ import com.nexters.palang.domain.group.domain.ReadingStatus;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +29,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 @RequiredArgsConstructor
 public class GroupQueryRepository {
+
+    // 모임 카드에 보여줄 아바타 수. 나머지는 "+N"으로 표시한다(memberCount - 미리보기 수).
+    public static final int MEMBER_PREVIEW_LIMIT = 5;
 
     private final JPAQueryFactory queryFactory;
 
@@ -68,42 +74,68 @@ public class GroupQueryRepository {
                 .fetch().stream()
                 .collect(Collectors.toMap(Group::getId, g -> g));
 
-        Map<Long, GroupBookEntry> primaryEntriesByGroupId = findPrimaryEntries(groupIds);
+        Map<Long, List<GroupBookEntry>> entriesByGroupId = findEntries(groupIds);
+        Map<Long, List<GroupMemberPreview>> previewsByGroupId = findMemberPreviews(groupIds);
 
         List<GroupSummaryProjection> content = groupIds.stream()
-                .filter(groupId -> groupsById.containsKey(groupId) && primaryEntriesByGroupId.containsKey(groupId))
+                .filter(groupId -> groupsById.containsKey(groupId) && entriesByGroupId.containsKey(groupId))
                 // host는 fetch join 대상이 아니라 LAZY 프록시지만, id만 읽는 건 프록시 초기화 없이도
                 // 안전하다(식별자는 프록시 생성 시점에 이미 채워져 있음) — LazyInitializationException 걱정 없다.
                 .map(groupId -> toProjection(
-                        groupsById.get(groupId), primaryEntriesByGroupId.get(groupId),
-                        memberCountsByGroupId.getOrDefault(groupId, 0L), userId, today))
+                        groupsById.get(groupId), entriesByGroupId.get(groupId),
+                        memberCountsByGroupId.getOrDefault(groupId, 0L),
+                        previewsByGroupId.getOrDefault(groupId, List.of()), userId, today))
                 .toList();
 
         long total = countMyGroups(userId);
         return new PageImpl<>(content, pageable, total);
     }
 
-    // 기존 단일 책 응답 호환: 모임별로 가장 먼저 등록된 entry(id 최소)를 대표 책으로 쓴다(GroupBookEntries 참고).
-    private Map<Long, GroupBookEntry> findPrimaryEntries(List<Long> groupIds) {
+    // 모임별 entry 전체(등록 순, id 오름차순). 첫 항목이 기존 단일 책 응답 호환용 대표 책이다(GroupBookEntries 참고).
+    private Map<Long, List<GroupBookEntry>> findEntries(List<Long> groupIds) {
         QGroupBookEntry entry = QGroupBookEntry.groupBookEntry;
-        Map<Long, GroupBookEntry> primaryByGroupId = new LinkedHashMap<>();
+        Map<Long, List<GroupBookEntry>> entriesByGroupId = new LinkedHashMap<>();
         queryFactory
                 .selectFrom(entry)
                 .join(entry.book).fetchJoin()
                 .where(entry.group.id.in(groupIds))
                 .orderBy(entry.id.asc())
                 .fetch()
-                .forEach(e -> primaryByGroupId.putIfAbsent(e.getGroup().getId(), e));
-        return primaryByGroupId;
+                .forEach(e -> entriesByGroupId.computeIfAbsent(e.getGroup().getId(), id -> new ArrayList<>()).add(e));
+        return entriesByGroupId;
     }
 
-    private GroupSummaryProjection toProjection(
-            Group group, GroupBookEntry primaryEntry, long memberCount, Long userId, LocalDate today) {
+    // 모임별 카드 아바타: 현재 멤버를 모임장 → 참여일 → userId 순으로 최대 MEMBER_PREVIEW_LIMIT명. 멤버십은
+    // (모임, 사용자)당 한 행이라 같은 사람이 두 번 나오지 않는다. 정원이 최대 10명이라 모임별로 전부 읽은 뒤 자른다.
+    private Map<Long, List<GroupMemberPreview>> findMemberPreviews(List<Long> groupIds) {
+        QGroupMember groupMember = QGroupMember.groupMember;
+        Map<Long, List<GroupMemberPreview>> previewsByGroupId = new LinkedHashMap<>();
+        queryFactory
+                .selectFrom(groupMember)
+                .join(groupMember.user).fetchJoin()
+                .where(groupMember.group.id.in(groupIds), groupMember.status.eq(GroupMemberStatus.ACTIVE))
+                .orderBy(groupMember.role.asc(), groupMember.joinedAt.asc(), groupMember.user.id.asc())
+                .fetch()
+                .forEach(member -> {
+                    List<GroupMemberPreview> previews =
+                            previewsByGroupId.computeIfAbsent(member.getGroup().getId(), id -> new ArrayList<>());
+                    if (previews.size() < MEMBER_PREVIEW_LIMIT) {
+                        previews.add(new GroupMemberPreview(member.getUser().getId(), member.getUser().getNickname(),
+                                member.getUser().getProfileImageUrl()));
+                    }
+                });
+        return previewsByGroupId;
+    }
+
+    private GroupSummaryProjection toProjection(Group group, List<GroupBookEntry> entries, long memberCount,
+            List<GroupMemberPreview> memberPreviews, Long userId, LocalDate today) {
+        GroupBookEntry primaryEntry = entries.getFirst();
         return new GroupSummaryProjection(
                 group.getId(), group.getName(), primaryEntry.getBook().getId(), primaryEntry.getBook().getTitle(),
                 primaryEntry.getBook().getCoverImageUrl(), memberCount, group.getCapacity(),
                 primaryEntry.getStartDate(), primaryEntry.getEndDate(),
-                primaryEntry.currentStatus(today) == ReadingStatus.FINISHED, group.getHost().getId().equals(userId));
+                primaryEntry.currentStatus(today) == ReadingStatus.FINISHED, group.getHost().getId().equals(userId),
+                GroupReadingSummary.of(entries, today), memberPreviews);
     }
 
     private long countMyGroups(Long userId) {

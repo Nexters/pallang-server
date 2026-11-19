@@ -64,9 +64,35 @@ class GroupEndingSoonNotifierTest {
 
     // 내일 끝나는 모임 책
     private GroupBookEntry entryEndingTomorrow(Group group) {
-        Book book = Book.builder().title("제목").author("작가").publisher("출판사").pageCount(300).build();
+        return entryEndingTomorrow(group, "제목");
+    }
+
+    private GroupBookEntry entryEndingTomorrow(Group group, String title) {
+        Book book = Book.builder().title(title).author("작가").publisher("출판사").pageCount(300).build();
         LocalDate today = LocalDate.now(ZONE);
         return GroupBookEntry.create(group, book, ReadingPeriod.of(today, today.plusDays(1)), today);
+    }
+
+    @Test
+    @DisplayName("알림 문구에는 끝나는 책 제목이 들어가고, 여러 권이면 첫 책 제목과 나머지 권수로 묶는다")
+    void bodyNamesEndingBooks() {
+        Group single = group(9L);
+        Group multiple = group(10L);
+        given(groupBookEntryRepository.findAllInActiveGroupsByEndDate(LocalDate.now(ZONE).plusDays(1)))
+                .willReturn(List.of(entryEndingTomorrow(single, "채식주의자"),
+                        entryEndingTomorrow(multiple, "모순"), entryEndingTomorrow(multiple, "흰")));
+        given(groupMemberRepository.findActiveUserIdsByGroupId(9L)).willReturn(List.of(1L));
+        given(groupMemberRepository.findActiveUserIdsByGroupId(10L)).willReturn(List.of(2L));
+        given(notificationRepository.existsByReceiverIdAndTypeAndGroupIdAndCreatedAtAfter(
+                any(), eq(NotificationType.GROUP_ENDING_SOON), any(), any(LocalDateTime.class)))
+                .willReturn(false);
+
+        notifier.notifyGroupsEndingTomorrow();
+
+        verify(notificationCreationService).create(eq(1L), eq(null), eq(NotificationType.GROUP_ENDING_SOON), any(),
+                eq("'모임' 모임의 '채식주의자' 읽기가 내일 끝나요."), eq(null), eq(null), eq(null), eq(9L), eq("모임"), eq(null));
+        verify(notificationCreationService).create(eq(2L), eq(null), eq(NotificationType.GROUP_ENDING_SOON), any(),
+                eq("'모임' 모임의 '모순' 외 1권 읽기가 내일 끝나요."), eq(null), eq(null), eq(null), eq(10L), eq("모임"), eq(null));
     }
 
     @Test
