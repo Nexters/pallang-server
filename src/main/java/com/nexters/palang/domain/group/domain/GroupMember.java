@@ -79,8 +79,29 @@ public class GroupMember extends BaseEntity {
     }
 
     // 탈퇴/내보내기 후 유효한 초대로 다시 들어온 경우. 재가입 가능 여부(정원, 초대 발급 시각)는 호출 측이 검증한다.
+    // removedAt은 마지막으로 내보내진 시각 기록으로 남겨둔다(상태가 ACTIVE면 재가입 제한 판단에 쓰이지 않는다).
     public void rejoin(LocalDateTime joinedAt) {
         this.status = GroupMemberStatus.ACTIVE;
         this.joinedAt = joinedAt;
+    }
+
+    // 모임장이 내보낸 경우(#226). 이 모임의 참여만 끝나며 계정 정지·차단으로 확대하지 않는다. 이미 ACTIVE가 아니면
+    // (나갔거나 이미 내보내짐) 상태와 시각을 바꾸지 않는다.
+    public void remove(LocalDateTime removedAt) {
+        if (!isActive()) {
+            return;
+        }
+        this.status = GroupMemberStatus.REMOVED;
+        this.removedAt = removedAt;
+    }
+
+    public boolean isRemoved() {
+        return status == GroupMemberStatus.REMOVED;
+    }
+
+    // 내보내진 계정은 내보낸 시각 이전에 발급된 초대로 다시 들어올 수 없다. 모임장이 그 뒤에 새로 발급한 초대만
+    // 허용한다(정원 등 일반 가입 검증은 따로 한다). 탈퇴(LEFT)에는 이 제한이 없다.
+    public boolean canRejoinWith(GroupInvitation invitation) {
+        return !isRemoved() || invitation.getCreatedAt().isAfter(removedAt);
     }
 }

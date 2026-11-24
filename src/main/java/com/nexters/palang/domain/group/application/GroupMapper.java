@@ -55,18 +55,28 @@ public final class GroupMapper {
         return new GroupListResponse(page.map(GroupMapper::toSummaryResponse).getContent(), PageInfo.from(page));
     }
 
-    public static GroupMemberResponse toMemberResponse(GroupMember member) {
+    // 모임장/본인 여부는 계정 ID로 판별한다. 본인이 모임장이면 같은 행에 두 표시가 모두 켜진다.
+    public static GroupMemberResponse toMemberResponse(GroupMember member, Long hostUserId, Long viewerId) {
         User user = member.getUser();
         return new GroupMemberResponse(
-                user.getId(), user.getNickname(), user.getProfileImageUrl(), member.getRole(), member.getJoinedAt());
+                user.getId(), user.getNickname(), user.getProfileImageUrl(), member.getRole(), member.getJoinedAt(),
+                user.getId().equals(hostUserId), user.getId().equals(viewerId));
     }
 
-    public static GroupMemberListResponse toMemberListResponse(Page<GroupMember> page) {
-        return new GroupMemberListResponse(page.map(GroupMapper::toMemberResponse).getContent(), PageInfo.from(page));
+    // host는 LAZY 프록시지만 id만 읽으므로 초기화 없이 안전하다.
+    public static GroupMemberListResponse toMemberListResponse(GroupMemberPage page) {
+        Group group = page.group();
+        Long hostUserId = group.getHost().getId();
+        Page<GroupMember> members = page.members();
+        return new GroupMemberListResponse(
+                members.map(member -> toMemberResponse(member, hostUserId, page.viewerId())).getContent(),
+                PageInfo.from(members), members.getTotalElements(), group.getCapacity());
     }
 
-    public static GroupInviteLinkResponse toInviteLinkResponse(Long groupId, String inviteCode) {
-        return new GroupInviteLinkResponse(groupId, inviteCode);
+    public static GroupInviteLinkResponse toInviteLinkResponse(GroupInviteLink inviteLink) {
+        Group group = inviteLink.group();
+        return new GroupInviteLinkResponse(group.getId(), inviteLink.inviteCode(), inviteLink.memberCount(),
+                group.getCapacity(), inviteLink.isFull());
     }
 
     public static GroupInvitationPreviewResponse toInvitationPreviewResponse(GroupInvitationPreview preview) {

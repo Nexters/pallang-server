@@ -18,6 +18,7 @@ import com.nexters.palang.domain.group.domain.event.GroupJoinedEvent;
 import com.nexters.palang.domain.group.domain.event.GroupScheduleChangedEvent;
 import com.nexters.palang.domain.group.infrastructure.GroupBookEntryRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupInvitationRepository;
+import com.nexters.palang.domain.group.infrastructure.GroupMemberRemovalRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupQueryRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupRepository;
@@ -54,6 +55,7 @@ public class GroupService {
     private final GroupMemberRepository groupMemberRepository;
     private final GroupBookEntryRepository groupBookEntryRepository;
     private final GroupInvitationRepository groupInvitationRepository;
+    private final GroupMemberRemovalRepository groupMemberRemovalRepository;
     private final GroupQueryRepository groupQueryRepository;
     private final GroupBookEntries groupBookEntries;
     private final BookRepository bookRepository;
@@ -145,38 +147,35 @@ public class GroupService {
         validateHost(group, userId);
         groupInvitationRepository.deleteAllByGroupIdIn(List.of(groupId));
         groupBookEntryRepository.deleteAllByGroupIdIn(List.of(groupId));
+        groupMemberRemovalRepository.deleteAllByGroupIdIn(List.of(groupId));
         groupMemberRepository.deleteAllByGroupId(groupId);
         groupRepository.delete(group);
     }
 
-    public Page<GroupMember> getGroupMembers(Long groupId, Long userId, Pageable pageable) {
-        getExistingGroup(groupId);
-        validateMember(groupId, userId);
-        return groupQueryRepository.findMembers(groupId, pageable);
-    }
-
     // 모임장이 공유할 현재 유효 초대 코드. 유효한 초대가 하나도 없으면(예: 합치기로 기존 초대가 종료된 경우)
-    // 새로 발급한다 — 그래서 읽기 전용 트랜잭션이 아니다.
+    // 새로 발급한다 — 그래서 읽기 전용 트랜잭션이 아니다. 명단 화면의 "초대 링크 보내기"와 목록 더보기의 초대가 같은
+    // 이 API를 쓴다. 정원이 가득 찼는지도 함께 돌려줘서 공유 전에 정원 안내를 보여줄 수 있게 한다(가입 시점에 다시 확인).
     @Transactional
-    public String getInviteLink(Long groupId, Long userId) {
+    public GroupInviteLink getInviteLink(Long groupId, Long userId) {
         Group group = getExistingActiveGroup(groupId);
         validateHost(group, userId);
-        return groupInvitationRepository
+        GroupInvitation invitation = groupInvitationRepository
                 .findFirstByGroupIdAndStatusOrderByIdDesc(groupId, GroupInvitationStatus.ACTIVE)
-                .orElseGet(() -> groupInvitationRepository.save(GroupInvitation.issue(group, userId)))
-                .getCode();
+                .orElseGet(() -> groupInvitationRepository.save(GroupInvitation.issue(group, userId)));
+        return new GroupInviteLink(group, invitation.getCode(), groupMemberRepository.countActiveMembers(groupId));
     }
 
     // 초대 링크 재발급(host 전용): 기존 유효 초대는 즉시 종료되고, 그 코드로 들어온 이후 요청은 전부
-    // INVALID_INVITE_CODE로 거절된다.
+    // INVALID_INVITE_CODE로 거절된다. 내보낸 멤버를 다시 들이려면 내보낸 뒤 재발급한 링크가 필요하다.
     @Transactional
-    public String regenerateInviteLink(Long groupId, Long userId) {
+    public GroupInviteLink regenerateInviteLink(Long groupId, Long userId) {
         Group group = getExistingActiveGroup(groupId);
         validateHost(group, userId);
         LocalDateTime now = now();
         groupInvitationRepository.findAllByGroupIdAndStatus(groupId, GroupInvitationStatus.ACTIVE)
                 .forEach(invitation -> invitation.revoke(now));
-        return groupInvitationRepository.save(GroupInvitation.issue(group, userId)).getCode();
+        String code = groupInvitationRepository.save(GroupInvitation.issue(group, userId)).getCode();
+        return new GroupInviteLink(group, code, groupMemberRepository.countActiveMembers(groupId));
     }
 
     // 초대 링크 미리보기: 비로그인 요청도 허용해야 하므로 userId는 nullable이다(Soft Authentication).
@@ -196,11 +195,16 @@ public class GroupService {
         Long groupId = getValidInvitation(inviteCode).getGroup().getId();
         Group group = groupRepository.findByIdForUpdate(groupId)
                 .orElseThrow(() -> new GroupException(GroupErrorCode.INVALID_INVITE_CODE));
-        getValidInvitation(inviteCode);
+        GroupInvitation invitation = getValidInvitation(inviteCode);
 
         Optional<GroupMember> existingMembership = groupMemberRepository.findByGroupIdAndUserId(groupId, userId);
         if (existingMembership.filter(GroupMember::isActive).isPresent()) {
             throw new GroupException(GroupErrorCode.ALREADY_JOINED);
+        }
+        // 내보내진 계정은 내보낸 시각 이전에 발급된 초대로 다시 들어올 수 없다(5.2). 정원 안내보다 먼저 알려줘야
+        // 모임장에게 새 링크를 요청해야 한다는 걸 알 수 있다.
+        if (existingMembership.filter(membership -> !membership.canRejoinWith(invitation)).isPresent()) {
+            throw new GroupException(GroupErrorCode.REJOIN_REQUIRES_NEW_INVITE);
         }
         long memberCount = groupMemberRepository.countActiveMembers(groupId);
         if (memberCount >= group.getCapacity()) {
@@ -208,7 +212,6 @@ public class GroupService {
         }
 
         // 탈퇴/내보내기 이력이 있으면 (group_id, user_id) 유니크 제약 때문에 같은 행을 되살린다.
-        // 내보내진 계정의 재가입 제한(removedAt 이전 초대 거절)은 #226에서 추가한다.
         existingMembership.ifPresentOrElse(
                 membership -> membership.rejoin(now()),
                 () -> groupMemberRepository.save(

@@ -10,6 +10,7 @@ import com.nexters.palang.domain.decoration.infrastructure.DecorationRepository;
 import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.domain.group.infrastructure.GroupBookEntryRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupInvitationRepository;
+import com.nexters.palang.domain.group.infrastructure.GroupMemberRemovalRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupRepository;
 import com.nexters.palang.domain.notification.infrastructure.DeviceTokenRepository;
@@ -47,6 +48,7 @@ public class AdminUserService {
     private final GroupMemberRepository groupMemberRepository;
     private final GroupBookEntryRepository groupBookEntryRepository;
     private final GroupInvitationRepository groupInvitationRepository;
+    private final GroupMemberRemovalRepository groupMemberRemovalRepository;
     private final PassageRepository passageRepository;
     private final OpinionRepository opinionRepository;
     private final CommentRepository commentRepository;
@@ -88,6 +90,7 @@ public class AdminUserService {
             // FK 위반이 나지 않게 먼저 지운다.
             groupBookEntryRepository.deleteAllByGroupIdIn(soloHostedGroupIds);
             groupInvitationRepository.deleteAllByGroupIdIn(soloHostedGroupIds);
+            groupMemberRemovalRepository.deleteAllByGroupIdIn(soloHostedGroupIds);
             groupMemberRepository.deleteAllByGroupIdIn(soloHostedGroupIds);
             groupRepository.deleteAllById(soloHostedGroupIds);
         }

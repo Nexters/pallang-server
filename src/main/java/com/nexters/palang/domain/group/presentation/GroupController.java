@@ -9,7 +9,6 @@ import com.nexters.palang.domain.group.presentation.dto.GroupDetailResponse;
 import com.nexters.palang.domain.group.presentation.dto.GroupInvitationPreviewResponse;
 import com.nexters.palang.domain.group.presentation.dto.GroupInviteLinkResponse;
 import com.nexters.palang.domain.group.presentation.dto.GroupListResponse;
-import com.nexters.palang.domain.group.presentation.dto.GroupMemberListResponse;
 import com.nexters.palang.domain.group.presentation.dto.UpdateGroupRequest;
 import com.nexters.palang.global.common.response.DataResponse;
 import com.nexters.palang.global.security.CurrentUserProvider;
@@ -86,30 +85,19 @@ public class GroupController implements GroupApi {
     }
 
     @Override
-    @GetMapping("/api/groups/{groupId}/members")
-    public ResponseEntity<DataResponse<GroupMemberListResponse>> getGroupMembers(
-            @PathVariable Long groupId,
-            @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
-            @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
-        Long currentUserId = currentUserProvider.getCurrentUserId();
-        return ResponseEntity.ok(DataResponse.from(GroupMapper.toMemberListResponse(
-                groupService.getGroupMembers(groupId, currentUserId, pageable(page, size)))));
-    }
-
-    @Override
     @GetMapping("/api/groups/{groupId}/invite-link")
     public ResponseEntity<DataResponse<GroupInviteLinkResponse>> getInviteLink(@PathVariable Long groupId) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        String inviteCode = groupService.getInviteLink(groupId, currentUserId);
-        return ResponseEntity.ok(DataResponse.from(GroupMapper.toInviteLinkResponse(groupId, inviteCode)));
+        return ResponseEntity.ok(DataResponse.from(
+                GroupMapper.toInviteLinkResponse(groupService.getInviteLink(groupId, currentUserId))));
     }
 
     @Override
     @PostMapping("/api/groups/{groupId}/invite-link/regenerate")
     public ResponseEntity<DataResponse<GroupInviteLinkResponse>> regenerateInviteLink(@PathVariable Long groupId) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        String inviteCode = groupService.regenerateInviteLink(groupId, currentUserId);
-        return ResponseEntity.ok(DataResponse.from(GroupMapper.toInviteLinkResponse(groupId, inviteCode)));
+        return ResponseEntity.ok(DataResponse.from(
+                GroupMapper.toInviteLinkResponse(groupService.regenerateInviteLink(groupId, currentUserId))));
     }
 
     @Override
