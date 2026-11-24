@@ -2,6 +2,7 @@ package com.nexters.palang.domain.passage.presentation;
 
 import com.nexters.palang.domain.decoration.application.DecorationMergeCandidate;
 import com.nexters.palang.domain.passage.application.PageNumbersResult;
+import com.nexters.palang.domain.passage.application.PassageImageCardResult;
 import com.nexters.palang.domain.passage.application.PassageOcrService;
 import com.nexters.palang.domain.passage.application.PassageService;
 import com.nexters.palang.domain.passage.application.SimilarPassageFinder;
@@ -81,6 +82,15 @@ public class PassageController implements PassageControllerDocs {
         Long currentUserId = currentUserProvider.getCurrentUserId();
         Passage passage = passageService.updateSpoiler(passageId, currentUserId, request.isSpoiler());
         return DataResponse.from(PassageResponse.SpoilerUpdate.from(passage));
+    }
+
+    @Override
+    @GetMapping("/api/passages/{passageId}/image-card")
+    public DataResponse<PassageResponse.ImageCard> getImageCard(@PathVariable Long passageId) {
+        // 비로그인은 이미지 생성 시 로그인 화면으로 보내야 하므로 여기서 401로 거절한다.
+        Long currentUserId = currentUserProvider.getCurrentUserId();
+        PassageImageCardResult result = passageService.getImageCard(passageId, currentUserId);
+        return DataResponse.from(PassageResponse.ImageCard.from(result));
     }
 
     @Override
