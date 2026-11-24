@@ -18,6 +18,7 @@ import com.nexters.palang.domain.decoration.infrastructure.DecorationRepository;
 import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.domain.group.infrastructure.GroupBookEntryRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupInvitationRepository;
+import com.nexters.palang.domain.group.infrastructure.GroupMemberRemovalRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupRepository;
 import com.nexters.palang.domain.notification.infrastructure.DeviceTokenRepository;
@@ -54,6 +55,8 @@ class AdminUserServiceTest {
     @Mock
     private GroupInvitationRepository groupInvitationRepository;
     @Mock
+    private GroupMemberRemovalRepository groupMemberRemovalRepository;
+    @Mock
     private PassageRepository passageRepository;
     @Mock
     private OpinionRepository opinionRepository;
@@ -83,7 +86,7 @@ class AdminUserServiceTest {
     void setUp() {
         adminUserService = new AdminUserService(
                 userRepository, groupRepository, groupMemberRepository, groupBookEntryRepository, groupInvitationRepository,
-                passageRepository, opinionRepository,
+                groupMemberRemovalRepository, passageRepository, opinionRepository,
                 commentRepository, decorationRepository, opinionLikeRepository, deviceTokenRepository,
                 notificationRepository, reportRepository, userBlockRepository, userBookStatusRepository,
                 refreshTokenRepository);
@@ -178,6 +181,7 @@ class AdminUserServiceTest {
 
         verify(groupBookEntryRepository).deleteAllByGroupIdIn(List.of(100L));
         verify(groupInvitationRepository).deleteAllByGroupIdIn(List.of(100L));
+        verify(groupMemberRemovalRepository).deleteAllByGroupIdIn(List.of(100L));
         verify(groupMemberRepository).deleteAllByGroupIdIn(List.of(100L));
         verify(groupRepository).deleteAllById(List.of(100L));
         verify(userRepository).delete(target);

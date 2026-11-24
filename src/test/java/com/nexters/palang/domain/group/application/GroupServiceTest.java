@@ -28,6 +28,7 @@ import com.nexters.palang.domain.group.domain.event.GroupJoinedEvent;
 import com.nexters.palang.domain.group.domain.event.GroupScheduleChangedEvent;
 import com.nexters.palang.domain.group.infrastructure.GroupBookEntryRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupInvitationRepository;
+import com.nexters.palang.domain.group.infrastructure.GroupMemberRemovalRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupQueryRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupRepository;
@@ -73,6 +74,8 @@ class GroupServiceTest {
     @Mock
     private GroupInvitationRepository groupInvitationRepository;
     @Mock
+    private GroupMemberRemovalRepository groupMemberRemovalRepository;
+    @Mock
     private GroupQueryRepository groupQueryRepository;
     @Mock
     private GroupBookEntries groupBookEntries;
@@ -95,7 +98,7 @@ class GroupServiceTest {
     void setUp() {
         groupService = new GroupService(
                 groupRepository, groupMemberRepository, groupBookEntryRepository, groupInvitationRepository,
-                groupQueryRepository, groupBookEntries, bookRepository, userRepository, idempotentExecutor,
+                groupMemberRemovalRepository, groupQueryRepository, groupBookEntries, bookRepository, userRepository, idempotentExecutor,
                 eventPublisher, CLOCK);
         book = book(1L);
         host = user(1L);
@@ -473,20 +476,10 @@ class GroupServiceTest {
         groupService.deleteGroup(1L, host.getId());
 
         verify(groupInvitationRepository).deleteAllByGroupIdIn(List.of(1L));
+        verify(groupMemberRemovalRepository).deleteAllByGroupIdIn(List.of(1L));
         verify(groupBookEntryRepository).deleteAllByGroupIdIn(List.of(1L));
         verify(groupMemberRepository).deleteAllByGroupId(1L);
         verify(groupRepository).delete(group);
-    }
-
-    // ===== 멤버 목록 =====
-
-    @Test
-    @DisplayName("현재 멤버가 아니면 모임 멤버 목록을 조회할 수 없다")
-    void getGroupMembersFailsWhenNotMember() {
-        given(groupRepository.findById(1L)).willReturn(Optional.of(group(1L, host)));
-        given(groupMemberRepository.existsActiveMember(1L, other.getId())).willReturn(false);
-
-        assertThatThrownBy(() -> groupService.getGroupMembers(1L, other.getId(), null)).isInstanceOf(GroupException.class);
     }
 
     // ===== 초대 링크 =====
@@ -508,7 +501,12 @@ class GroupServiceTest {
         given(groupInvitationRepository.findFirstByGroupIdAndStatusOrderByIdDesc(1L, GroupInvitationStatus.ACTIVE))
                 .willReturn(Optional.of(active));
 
-        assertThat(groupService.getInviteLink(1L, host.getId())).isEqualTo(active.getCode());
+        given(groupMemberRepository.countActiveMembers(1L)).willReturn(4L);
+
+        GroupInviteLink inviteLink = groupService.getInviteLink(1L, host.getId());
+
+        assertThat(inviteLink.inviteCode()).isEqualTo(active.getCode());
+        assertThat(inviteLink.isFull()).isTrue(); // 정원 4명, 현재 4명
         verify(groupInvitationRepository, never()).save(any());
     }
 
@@ -521,7 +519,7 @@ class GroupServiceTest {
                 .willReturn(Optional.empty());
         given(groupInvitationRepository.save(any(GroupInvitation.class))).willAnswer(invocation -> invocation.getArgument(0));
 
-        assertThat(groupService.getInviteLink(1L, host.getId())).hasSize(32);
+        assertThat(groupService.getInviteLink(1L, host.getId()).inviteCode()).hasSize(32);
         verify(groupInvitationRepository).save(any(GroupInvitation.class));
     }
 
@@ -542,7 +540,7 @@ class GroupServiceTest {
         given(groupInvitationRepository.findAllByGroupIdAndStatus(1L, GroupInvitationStatus.ACTIVE)).willReturn(List.of(old));
         given(groupInvitationRepository.save(any(GroupInvitation.class))).willAnswer(invocation -> invocation.getArgument(0));
 
-        String newCode = groupService.regenerateInviteLink(1L, host.getId());
+        String newCode = groupService.regenerateInviteLink(1L, host.getId()).inviteCode();
 
         assertThat(old.isActive()).isFalse();
         assertThat(newCode).isNotEqualTo(old.getCode());
@@ -689,5 +687,53 @@ class GroupServiceTest {
         assertThat(previous.isActive()).isTrue();
         assertThat(previous.getJoinedAt()).isEqualTo(LocalDateTime.now(CLOCK));
         verify(groupMemberRepository, never()).save(any(GroupMember.class));
+    }
+
+    private GroupMember removedMembership(Group group, LocalDateTime removedAt) {
+        GroupMember membership = GroupMember.join(group, other, GroupMemberRole.MEMBER, removedAt.minusDays(30));
+        membership.remove(removedAt);
+        return membership;
+    }
+
+    private GroupInvitation invitationIssuedAt(Group group, LocalDateTime issuedAt) {
+        GroupInvitation invitation = invitation(group);
+        ReflectionTestUtils.setField(invitation, "createdAt", issuedAt);
+        return invitation;
+    }
+
+    @Test
+    @DisplayName("내보내진 계정이 내보내기 전에 발급된 초대로 다시 가입하면 예외가 발생하고, 정원 안내보다 먼저 알려준다")
+    void joinGroupFailsWhenRemovedMemberUsesOldInvitation() {
+        Group group = group(1L, host);
+        LocalDateTime removedAt = LocalDateTime.of(2026, 11, 10, 12, 0);
+        GroupInvitation oldInvitation = invitationIssuedAt(group, removedAt.minusDays(5));
+        GroupMember removed = removedMembership(group, removedAt);
+        given(groupInvitationRepository.findWithGroupByCode(oldInvitation.getCode())).willReturn(Optional.of(oldInvitation));
+        given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group));
+        given(groupMemberRepository.findByGroupIdAndUserId(1L, other.getId())).willReturn(Optional.of(removed));
+
+        assertThatThrownBy(() -> groupService.joinGroup(oldInvitation.getCode(), other.getId()))
+                .isInstanceOf(GroupException.class)
+                .extracting("errorCode").isEqualTo(GroupErrorCode.REJOIN_REQUIRES_NEW_INVITE);
+        assertThat(removed.isActive()).isFalse();
+        verify(groupMemberRepository, never()).countActiveMembers(any());
+    }
+
+    @Test
+    @DisplayName("내보내진 계정도 내보낸 뒤 새로 발급된 초대로는 다시 가입할 수 있다")
+    void joinGroupAllowsRemovedMemberWithNewInvitation() {
+        Group group = group(1L, host);
+        LocalDateTime removedAt = LocalDateTime.of(2026, 11, 10, 12, 0);
+        GroupInvitation newInvitation = invitationIssuedAt(group, removedAt.plusMinutes(1));
+        GroupMember removed = removedMembership(group, removedAt);
+        given(groupInvitationRepository.findWithGroupByCode(newInvitation.getCode())).willReturn(Optional.of(newInvitation));
+        given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group));
+        given(groupMemberRepository.findByGroupIdAndUserId(1L, other.getId())).willReturn(Optional.of(removed));
+        given(groupMemberRepository.countActiveMembers(1L)).willReturn(1L);
+        given(groupBookEntries.getPrimaryEntry(1L)).willReturn(entry(group, ReadingPeriod.NONE));
+
+        groupService.joinGroup(newInvitation.getCode(), other.getId());
+
+        assertThat(removed.isActive()).isTrue();
     }
 }
