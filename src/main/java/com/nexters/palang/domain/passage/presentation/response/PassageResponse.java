@@ -3,6 +3,7 @@ package com.nexters.palang.domain.passage.presentation.response;
 import com.nexters.palang.domain.decoration.application.DecorationMergeCandidate;
 import com.nexters.palang.domain.opinion.presentation.dto.OpinionResponse.DecorationResponse;
 import com.nexters.palang.domain.passage.application.PageNumbersResult;
+import com.nexters.palang.domain.passage.application.PassageImageCardResult;
 import com.nexters.palang.domain.passage.application.SimilarPassageProjection;
 import com.nexters.palang.domain.passage.application.dto.OcrResultDto;
 import com.nexters.palang.domain.passage.domain.OcrBreakType;
@@ -22,6 +23,22 @@ public class PassageResponse {
     ) {
         public static SpoilerUpdate from(Passage passage) {
             return new SpoilerUpdate(passage.getId(), passage.isSpoiler());
+        }
+    }
+
+    // 이미지 저장(꾸미기) 화면: 프레임에 표기할 발췌 문장·책 제목·작가명·페이지만 내려준다(의견·댓글 제외).
+    public record ImageCard(
+            @Schema(example = "1", requiredMode = Schema.RequiredMode.REQUIRED) Long passageId,
+            @Schema(example = "우리는 모두 이야기를 찾아 헤맨다.", requiredMode = Schema.RequiredMode.REQUIRED) String quotedText,
+            @Schema(example = "87", requiredMode = Schema.RequiredMode.REQUIRED) int pageNumber,
+            @Schema(example = "이방인", requiredMode = Schema.RequiredMode.REQUIRED) String bookTitle,
+            @Schema(description = "프레임 표기용 작가명. 저장된 값의 역할 표기(예: \"(지은이)\")를 떼고 "
+                    + "옮긴이·감수·해설 등 저자가 아닌 이름은 뺀 값. 저자가 여럿이면 \", \"로 이어 붙인다.",
+                    example = "알베르 카뮈", requiredMode = Schema.RequiredMode.REQUIRED) String bookAuthor
+    ) {
+        public static ImageCard from(PassageImageCardResult result) {
+            return new ImageCard(
+                    result.passageId(), result.quotedText(), result.pageNumber(), result.bookTitle(), result.bookAuthor());
         }
     }
 
