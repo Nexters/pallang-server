@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -62,6 +63,19 @@ public class GlobalExceptionHandler {
         String detail = "'%s' 파라미터의 값이 올바르지 않습니다.".formatted(e.getName());
         return ResponseEntity.badRequest()
                 .body(ErrorResponse.of(request.getRequestURI(), GlobalErrorCode.INVALID_INPUT_VALUE, detail));
+    }
+
+    // 요청 본문을 읽을 수 없는 경우(JSON 형식 오류, enum에 없는 값, 날짜 형식 오류 등)를 잡는 핸들러. 잡지 않으면
+    // 아래 Exception 핸들러로 떨어져 클라이언트 입력 오류가 500으로 보인다.
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
+            HttpMessageNotReadableException e, HttpServletRequest request) {
+        log.warn("HttpMessageNotReadableException 발생: {}", e.getMessage());
+        log.warn("에러가 발생한 지점: {} {}", request.getMethod(), request.getRequestURI());
+
+        return ResponseEntity.badRequest()
+                .body(ErrorResponse.of(request.getRequestURI(), GlobalErrorCode.INVALID_INPUT_VALUE,
+                        "요청 본문의 형식이 올바르지 않습니다."));
     }
 
     // 지원하지 않는 HTTP 메서드 호출 시 예외를 잡는 핸들러
