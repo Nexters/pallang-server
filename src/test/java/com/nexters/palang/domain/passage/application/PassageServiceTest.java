@@ -21,7 +21,6 @@ import com.nexters.palang.domain.passage.common.error.PassageException;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.infrastructure.PassageQueryRepository;
 import com.nexters.palang.domain.passage.infrastructure.PassageRepository;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -218,7 +217,7 @@ class PassageServiceTest {
     }
 
     private Group group(Long id) {
-        Group group = Group.create("모임", null, null, 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20));
+        Group group = Group.create("모임", null, 4);
         ReflectionTestUtils.setField(group, "id", id);
         return group;
     }

@@ -80,7 +80,7 @@ public class NotificationEventListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onGroupScheduleChanged(GroupScheduleChangedEvent event) {
-        List<Long> memberIds = groupMemberRepository.findUserIdsByGroupId(event.groupId());
+        List<Long> memberIds = groupMemberRepository.findActiveUserIdsByGroupId(event.groupId());
         String title = "모임 일정 변경";
         String body = "'%s' 모임의 일정이 변경됐어요.".formatted(event.groupName());
         for (Long memberId : memberIds) {

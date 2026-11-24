@@ -88,7 +88,7 @@ class OpinionLikeServiceTest {
 
     private Group group(Long id) {
         Book book = Book.builder().title("제목").author("작가").publisher("출판사").pageCount(300).build();
-        Group built = Group.create("모임", book, writer, 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20));
+        Group built = Group.create("모임", writer, 4);
         ReflectionTestUtils.setField(built, "id", id);
         return built;
     }

@@ -14,10 +14,11 @@ public class GroupAccessValidator {
 
     private final GroupMemberRepository groupMemberRepository;
 
+    // 현재(ACTIVE) 멤버만 통과한다 — 탈퇴/내보내진 계정의 늦은 조회/쓰기 요청은 여기서 막힌다.
     // userId가 null이면(비로그인) 애초에 모임원일 수 없으므로 곧바로 거절한다(Soft Authentication 경로에서
     // groupId가 있는 리소스에 접근할 때 유용 — 로그인 여부와 무관하게 "모임원 아님" 하나로 처리).
     public void validateMember(Long groupId, Long userId) {
-        if (userId == null || !groupMemberRepository.existsByGroupIdAndUserId(groupId, userId)) {
+        if (userId == null || !groupMemberRepository.existsActiveMember(groupId, userId)) {
             throw new GroupException(GroupErrorCode.NOT_MEMBER);
         }
     }

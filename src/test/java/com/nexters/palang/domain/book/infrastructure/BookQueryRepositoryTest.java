@@ -88,11 +88,11 @@ class BookQueryRepositoryTest {
 
     private Group group(Book book, User host, String name) {
         return entityManager.persistAndFlush(
-                Group.create(name, book, host, 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20)));
+                Group.create(name, host, 4));
     }
 
     private void member(Group group, User user) {
-        entityManager.persistAndFlush(GroupMember.of(group, user, GroupMemberRole.MEMBER));
+        entityManager.persistAndFlush(GroupMember.join(group, user, GroupMemberRole.MEMBER, LocalDateTime.of(2026, 8, 1, 12, 0)));
     }
 
     private Passage groupPassage(Book book, User creator, Group group, int pageNumber) {

@@ -5,8 +5,7 @@ import com.nexters.palang.domain.book.common.error.BookException;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.book.infrastructure.UserBookStatusRepository;
-import com.nexters.palang.domain.group.domain.Group;
-import com.nexters.palang.domain.group.infrastructure.GroupRepository;
+import com.nexters.palang.domain.group.infrastructure.GroupBookEntryRepository;
 import com.nexters.palang.domain.passage.domain.Passage;
 import com.nexters.palang.domain.passage.infrastructure.PassageRepository;
 import java.util.List;
@@ -27,7 +26,7 @@ public class AdminBookService {
 
     private final BookRepository bookRepository;
     private final PassageRepository passageRepository;
-    private final GroupRepository groupRepository;
+    private final GroupBookEntryRepository groupBookEntryRepository;
     private final UserBookStatusRepository userBookStatusRepository;
     private final AdminCascadeDeleter cascadeDeleter;
 
@@ -43,13 +42,14 @@ public class AdminBookService {
         return book;
     }
 
-    // 이 책으로 만들어진 모임(과 그 안의 대목/의견/댓글/데코/좋아요, 모임원), 모임에 속하지 않은 대목까지
-    // 전부 하드 삭제한 뒤 책 자체를 지운다. 여러 유저의 데이터에 영향을 줄 수 있는 위험한 작업이다.
+    // 이 책을 함께 읽는 모임(과 그 안의 대목/의견/댓글/데코/좋아요, 모임 책/초대/모임원), 모임에 속하지 않은
+    // 대목까지 전부 하드 삭제한 뒤 책 자체를 지운다. 여러 유저의 데이터에 영향을 줄 수 있는 위험한 작업이다.
+    // 모임 책 삭제 기능이 없어 "이 책만 모임에서 빼는" 선택지는 없다 — 모임이 여러 권을 읽고 있어도 모임째 지운다.
     @Transactional
     public void deleteBook(Long bookId) {
         getExistingBook(bookId);
 
-        List<Long> groupIds = groupRepository.findAllByBookId(bookId).stream().map(Group::getId).toList();
+        List<Long> groupIds = groupBookEntryRepository.findGroupIdsByBookId(bookId);
         cascadeDeleter.deleteGroups(groupIds);
 
         // 모임에 속하지 않은(전역 공개) 대목을 포함해, 이 책에 남아있는 대목을 전부 정리한다.

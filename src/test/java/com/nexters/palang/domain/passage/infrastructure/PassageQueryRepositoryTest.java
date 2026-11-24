@@ -83,7 +83,7 @@ class PassageQueryRepositoryTest {
     }
 
     private Group group(Book book, User host) {
-        Group built = Group.create("모임", book, host, 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20));
+        Group built = Group.create("모임", host, 4);
         return entityManager.persistAndFlush(built);
     }
 

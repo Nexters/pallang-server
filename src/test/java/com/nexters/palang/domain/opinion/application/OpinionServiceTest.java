@@ -19,6 +19,7 @@ import com.nexters.palang.domain.group.application.GroupAccessValidator;
 import com.nexters.palang.domain.group.common.error.GroupErrorCode;
 import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.group.domain.Group;
+import com.nexters.palang.domain.group.infrastructure.GroupBookEntryRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupRepository;
 import com.nexters.palang.domain.opinion.common.error.OpinionException;
 import com.nexters.palang.domain.opinion.domain.Opinion;
@@ -73,6 +74,9 @@ class OpinionServiceTest {
     private GroupRepository groupRepository;
 
     @Mock
+    private GroupBookEntryRepository groupBookEntryRepository;
+
+    @Mock
     private GroupAccessValidator groupAccessValidator;
 
     private OpinionService opinionService;
@@ -81,7 +85,7 @@ class OpinionServiceTest {
     void setUp() {
         opinionService = new OpinionService(
                 opinionRepository, opinionQueryRepository, passageRepository, bookRepository, userRepository,
-                groupRepository, groupAccessValidator);
+                groupRepository, groupBookEntryRepository, groupAccessValidator);
     }
 
     private User user(Long id) {
@@ -109,7 +113,7 @@ class OpinionServiceTest {
     }
 
     private Group group(Long id, Book book) {
-        Group group = Group.create("모임", book, user(1L), 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20));
+        Group group = Group.create("모임", user(1L), 4);
         ReflectionTestUtils.setField(group, "id", id);
         return group;
     }
@@ -204,6 +208,7 @@ class OpinionServiceTest {
         given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
         given(bookRepository.findById(10L)).willReturn(Optional.of(book));
         given(groupRepository.findById(9L)).willReturn(Optional.of(group));
+        given(groupBookEntryRepository.existsByGroupIdAndBookId(9L, 10L)).willReturn(true);
         given(passageRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
         given(opinionRepository.save(any())).willAnswer(invocation -> invocation.getArgument(0));
 
@@ -239,16 +244,19 @@ class OpinionServiceTest {
     }
 
     @Test
-    @DisplayName("모임의 지정 도서와 다른 bookId로 모임 전용 흔적을 생성하려 하면 예외가 발생한다")
+    @DisplayName("모임이 함께 읽는 책이 아닌 bookId로 모임 전용 흔적을 생성하려 하면 예외가 발생한다")
     void createOpinionFailsWhenGroupBookMismatch() {
         Book otherBook = book(99L);
         Group group = group(9L, book(10L));
         given(userRepository.findById(1L)).willReturn(Optional.of(user(1L)));
         given(bookRepository.findById(99L)).willReturn(Optional.of(otherBook));
         given(groupRepository.findById(9L)).willReturn(Optional.of(group));
+        given(groupBookEntryRepository.existsByGroupIdAndBookId(9L, 99L)).willReturn(false);
 
         assertThatThrownBy(() -> opinionService.createOpinion(1L, request(99L, null, 9L)))
-                .isInstanceOf(GroupException.class);
+                .isInstanceOf(GroupException.class)
+                .satisfies(e -> assertThat(((GroupException) e).getErrorCode())
+                        .isEqualTo(GroupErrorCode.GROUP_BOOK_MISMATCH));
     }
 
     @Test
