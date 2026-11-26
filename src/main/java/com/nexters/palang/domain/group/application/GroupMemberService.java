@@ -76,7 +76,9 @@ public class GroupMemberService {
         // 사유 검증은 대상 상태와 무관하게 먼저 한다 — 잘못된 입력은 언제나 400이다.
         GroupMemberRemoval removal = GroupMemberRemoval.record(
                 groupId, actorUserId, targetUserId, request.reasonCode(), request.otherText(), requestKey);
-        GroupMember membership = groupMemberRepository.findByGroupIdAndUserId(groupId, targetUserId)
+        // 모임 행을 잠근 뒤 잠금 읽기로 최신 커밋 상태를 본다 — 일반 조회는 요청 키 확인 시점의 스냅샷을 읽어, 잠금을
+        // 기다리는 사이 다른 요청이 먼저 내보낸 것을 못 보고 이력/알림을 중복으로 만들 수 있다(MySQL REPEATABLE READ).
+        GroupMember membership = groupMemberRepository.findByGroupIdAndUserIdForUpdate(groupId, targetUserId)
                 .orElseThrow(() -> new GroupException(GroupErrorCode.GROUP_MEMBER_NOT_FOUND));
         if (!membership.isActive()) {
             return membership.getId();

@@ -192,12 +192,20 @@ public class GroupService {
     // 확인해, 그 사이 재발급·합치기로 초대가 종료됐으면 거절한다.
     @Transactional
     public GroupDetail joinGroup(String inviteCode, Long userId) {
-        Long groupId = getValidInvitation(inviteCode).getGroup().getId();
+        // 잠금 전에는 모임 id만 읽는다. 모임 엔티티를 미리 읽어두면 아래 잠금 조회가 영속성 컨텍스트의 옛 정원/상태를
+        // 그대로 돌려준다. 잠근 뒤의 초대/멤버십/인원 확인은 모두 잠금 읽기로 최신 커밋 상태를 읽는다 — MySQL
+        // REPEATABLE READ에서 일반 조회는 잠금 전 스냅샷을 읽어, 잠금을 기다리는 사이 커밋된 다른 가입을 못 보고 정원을
+        // 넘길 수 있기 때문이다.
+        Long groupId = groupInvitationRepository.findGroupIdByCode(inviteCode)
+                .orElseThrow(() -> new GroupException(GroupErrorCode.INVALID_INVITE_CODE));
         Group group = groupRepository.findByIdForUpdate(groupId)
                 .orElseThrow(() -> new GroupException(GroupErrorCode.INVALID_INVITE_CODE));
-        GroupInvitation invitation = getValidInvitation(inviteCode);
+        GroupInvitation invitation = groupInvitationRepository.findByCodeForUpdate(inviteCode)
+                .filter(found -> found.isActive() && group.isActive())
+                .orElseThrow(() -> new GroupException(GroupErrorCode.INVALID_INVITE_CODE));
 
-        Optional<GroupMember> existingMembership = groupMemberRepository.findByGroupIdAndUserId(groupId, userId);
+        Optional<GroupMember> existingMembership =
+                groupMemberRepository.findByGroupIdAndUserIdForUpdate(groupId, userId);
         if (existingMembership.filter(GroupMember::isActive).isPresent()) {
             throw new GroupException(GroupErrorCode.ALREADY_JOINED);
         }
@@ -206,7 +214,7 @@ public class GroupService {
         if (existingMembership.filter(membership -> !membership.canRejoinWith(invitation)).isPresent()) {
             throw new GroupException(GroupErrorCode.REJOIN_REQUIRES_NEW_INVITE);
         }
-        long memberCount = groupMemberRepository.countActiveMembers(groupId);
+        long memberCount = groupMemberRepository.findActiveMembersForUpdate(groupId).size();
         if (memberCount >= group.getCapacity()) {
             throw new GroupException(GroupErrorCode.GROUP_FULL);
         }

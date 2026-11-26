@@ -137,6 +137,15 @@ class GroupServiceTest {
         return GroupInvitation.issue(group, group.getHost().getId());
     }
 
+    // 잠금 읽기로 센 현재 멤버 n명(내용은 인원 수 판정에만 쓰인다)
+    private List<GroupMember> activeMembers(int count) {
+        List<GroupMember> members = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            members.add(GroupMember.join(group(1L, host), user(100L + i), GroupMemberRole.MEMBER, LocalDateTime.now(CLOCK)));
+        }
+        return members;
+    }
+
     // IdempotentExecutor는 트랜잭션/요청 키 처리만 담당하므로(별도 테스트), 여기서는 넘겨받은 작업을 그대로 실행한다.
     @SuppressWarnings("unchecked")
     private void runIdempotentActionDirectly() {
@@ -614,7 +623,7 @@ class GroupServiceTest {
     @Test
     @DisplayName("유효하지 않은 초대 코드로 가입하면 예외가 발생한다")
     void joinGroupFailsWhenInvalidCode() {
-        given(groupInvitationRepository.findWithGroupByCode("invalid")).willReturn(Optional.empty());
+        given(groupInvitationRepository.findGroupIdByCode("invalid")).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> groupService.joinGroup("invalid", other.getId())).isInstanceOf(GroupException.class);
     }
@@ -624,9 +633,10 @@ class GroupServiceTest {
     void joinGroupFailsWhenAlreadyJoined() {
         Group group = group(1L, host);
         GroupInvitation invitation = invitation(group);
-        given(groupInvitationRepository.findWithGroupByCode(invitation.getCode())).willReturn(Optional.of(invitation));
+        given(groupInvitationRepository.findGroupIdByCode(invitation.getCode())).willReturn(Optional.of(1L));
+        given(groupInvitationRepository.findByCodeForUpdate(invitation.getCode())).willReturn(Optional.of(invitation));
         given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group));
-        given(groupMemberRepository.findByGroupIdAndUserId(1L, host.getId()))
+        given(groupMemberRepository.findByGroupIdAndUserIdForUpdate(1L, host.getId()))
                 .willReturn(Optional.of(GroupMember.join(group, host, GroupMemberRole.HOST, LocalDateTime.now(CLOCK))));
 
         assertThatThrownBy(() -> groupService.joinGroup(invitation.getCode(), host.getId()))
@@ -639,10 +649,11 @@ class GroupServiceTest {
     void joinGroupFailsWhenFull() {
         Group group = group(1L, host);
         GroupInvitation invitation = invitation(group);
-        given(groupInvitationRepository.findWithGroupByCode(invitation.getCode())).willReturn(Optional.of(invitation));
+        given(groupInvitationRepository.findGroupIdByCode(invitation.getCode())).willReturn(Optional.of(1L));
+        given(groupInvitationRepository.findByCodeForUpdate(invitation.getCode())).willReturn(Optional.of(invitation));
         given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group));
-        given(groupMemberRepository.findByGroupIdAndUserId(1L, other.getId())).willReturn(Optional.empty());
-        given(groupMemberRepository.countActiveMembers(1L)).willReturn(4L);
+        given(groupMemberRepository.findByGroupIdAndUserIdForUpdate(1L, other.getId())).willReturn(Optional.empty());
+        given(groupMemberRepository.findActiveMembersForUpdate(1L)).willReturn(activeMembers(4));
 
         assertThatThrownBy(() -> groupService.joinGroup(invitation.getCode(), other.getId()))
                 .isInstanceOf(GroupException.class)
@@ -655,10 +666,11 @@ class GroupServiceTest {
     void joinGroupSucceeds() {
         Group group = group(1L, host);
         GroupInvitation invitation = invitation(group);
-        given(groupInvitationRepository.findWithGroupByCode(invitation.getCode())).willReturn(Optional.of(invitation));
+        given(groupInvitationRepository.findGroupIdByCode(invitation.getCode())).willReturn(Optional.of(1L));
+        given(groupInvitationRepository.findByCodeForUpdate(invitation.getCode())).willReturn(Optional.of(invitation));
         given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group));
-        given(groupMemberRepository.findByGroupIdAndUserId(1L, other.getId())).willReturn(Optional.empty());
-        given(groupMemberRepository.countActiveMembers(1L)).willReturn(1L);
+        given(groupMemberRepository.findByGroupIdAndUserIdForUpdate(1L, other.getId())).willReturn(Optional.empty());
+        given(groupMemberRepository.findActiveMembersForUpdate(1L)).willReturn(activeMembers(1));
         given(userRepository.getReferenceById(other.getId())).willReturn(other);
         given(groupBookEntries.getPrimaryEntry(1L)).willReturn(entry(group, ReadingPeriod.NONE));
 
@@ -676,10 +688,11 @@ class GroupServiceTest {
         GroupInvitation invitation = invitation(group);
         GroupMember previous = GroupMember.join(group, other, GroupMemberRole.MEMBER, LocalDateTime.of(2026, 1, 1, 0, 0));
         ReflectionTestUtils.setField(previous, "status", GroupMemberStatus.LEFT);
-        given(groupInvitationRepository.findWithGroupByCode(invitation.getCode())).willReturn(Optional.of(invitation));
+        given(groupInvitationRepository.findGroupIdByCode(invitation.getCode())).willReturn(Optional.of(1L));
+        given(groupInvitationRepository.findByCodeForUpdate(invitation.getCode())).willReturn(Optional.of(invitation));
         given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group));
-        given(groupMemberRepository.findByGroupIdAndUserId(1L, other.getId())).willReturn(Optional.of(previous));
-        given(groupMemberRepository.countActiveMembers(1L)).willReturn(1L);
+        given(groupMemberRepository.findByGroupIdAndUserIdForUpdate(1L, other.getId())).willReturn(Optional.of(previous));
+        given(groupMemberRepository.findActiveMembersForUpdate(1L)).willReturn(activeMembers(1));
         given(groupBookEntries.getPrimaryEntry(1L)).willReturn(entry(group, ReadingPeriod.NONE));
 
         groupService.joinGroup(invitation.getCode(), other.getId());
@@ -708,15 +721,16 @@ class GroupServiceTest {
         LocalDateTime removedAt = LocalDateTime.of(2026, 11, 10, 12, 0);
         GroupInvitation oldInvitation = invitationIssuedAt(group, removedAt.minusDays(5));
         GroupMember removed = removedMembership(group, removedAt);
-        given(groupInvitationRepository.findWithGroupByCode(oldInvitation.getCode())).willReturn(Optional.of(oldInvitation));
+        given(groupInvitationRepository.findGroupIdByCode(oldInvitation.getCode())).willReturn(Optional.of(1L));
+        given(groupInvitationRepository.findByCodeForUpdate(oldInvitation.getCode())).willReturn(Optional.of(oldInvitation));
         given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group));
-        given(groupMemberRepository.findByGroupIdAndUserId(1L, other.getId())).willReturn(Optional.of(removed));
+        given(groupMemberRepository.findByGroupIdAndUserIdForUpdate(1L, other.getId())).willReturn(Optional.of(removed));
 
         assertThatThrownBy(() -> groupService.joinGroup(oldInvitation.getCode(), other.getId()))
                 .isInstanceOf(GroupException.class)
                 .extracting("errorCode").isEqualTo(GroupErrorCode.REJOIN_REQUIRES_NEW_INVITE);
         assertThat(removed.isActive()).isFalse();
-        verify(groupMemberRepository, never()).countActiveMembers(any());
+        verify(groupMemberRepository, never()).findActiveMembersForUpdate(any());
     }
 
     @Test
@@ -726,10 +740,11 @@ class GroupServiceTest {
         LocalDateTime removedAt = LocalDateTime.of(2026, 11, 10, 12, 0);
         GroupInvitation newInvitation = invitationIssuedAt(group, removedAt.plusMinutes(1));
         GroupMember removed = removedMembership(group, removedAt);
-        given(groupInvitationRepository.findWithGroupByCode(newInvitation.getCode())).willReturn(Optional.of(newInvitation));
+        given(groupInvitationRepository.findGroupIdByCode(newInvitation.getCode())).willReturn(Optional.of(1L));
+        given(groupInvitationRepository.findByCodeForUpdate(newInvitation.getCode())).willReturn(Optional.of(newInvitation));
         given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group));
-        given(groupMemberRepository.findByGroupIdAndUserId(1L, other.getId())).willReturn(Optional.of(removed));
-        given(groupMemberRepository.countActiveMembers(1L)).willReturn(1L);
+        given(groupMemberRepository.findByGroupIdAndUserIdForUpdate(1L, other.getId())).willReturn(Optional.of(removed));
+        given(groupMemberRepository.findActiveMembersForUpdate(1L)).willReturn(activeMembers(1));
         given(groupBookEntries.getPrimaryEntry(1L)).willReturn(entry(group, ReadingPeriod.NONE));
 
         groupService.joinGroup(newInvitation.getCode(), other.getId());

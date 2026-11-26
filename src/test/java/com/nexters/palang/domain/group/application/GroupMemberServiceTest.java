@@ -153,7 +153,7 @@ class GroupMemberServiceTest {
         runIdempotentActionDirectly();
         GroupMember target = membership(member, GroupMemberRole.MEMBER);
         given(groupRepository.findByIdForUpdate(9L)).willReturn(Optional.of(group));
-        given(groupMemberRepository.findByGroupIdAndUserId(9L, 2L)).willReturn(Optional.of(target));
+        given(groupMemberRepository.findByGroupIdAndUserIdForUpdate(9L, 2L)).willReturn(Optional.of(target));
         rosterAvailableForHost();
 
         GroupMemberPage roster = service.removeMember(9L, 2L, 1L,
@@ -215,7 +215,7 @@ class GroupMemberServiceTest {
     void removeMemberFailsWhenNeverMember() {
         runIdempotentActionDirectly();
         given(groupRepository.findByIdForUpdate(9L)).willReturn(Optional.of(group));
-        given(groupMemberRepository.findByGroupIdAndUserId(9L, 7L)).willReturn(Optional.empty());
+        given(groupMemberRepository.findByGroupIdAndUserIdForUpdate(9L, 7L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.removeMember(9L, 7L, 1L, SPAM, null, PAGEABLE))
                 .isInstanceOf(GroupException.class)
@@ -229,7 +229,7 @@ class GroupMemberServiceTest {
         GroupMember left = membership(member, GroupMemberRole.MEMBER);
         ReflectionTestUtils.setField(left, "status", GroupMemberStatus.LEFT);
         given(groupRepository.findByIdForUpdate(9L)).willReturn(Optional.of(group));
-        given(groupMemberRepository.findByGroupIdAndUserId(9L, 2L)).willReturn(Optional.of(left));
+        given(groupMemberRepository.findByGroupIdAndUserIdForUpdate(9L, 2L)).willReturn(Optional.of(left));
         rosterAvailableForHost();
 
         GroupMemberPage roster = service.removeMember(9L, 2L, 1L, SPAM, null, PAGEABLE);
