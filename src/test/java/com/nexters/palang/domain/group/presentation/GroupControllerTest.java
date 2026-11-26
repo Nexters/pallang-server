@@ -2,6 +2,7 @@ package com.nexters.palang.domain.group.presentation;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -15,19 +16,26 @@ import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.group.application.GroupDetail;
 import com.nexters.palang.domain.group.application.GroupInvitationPreview;
+import com.nexters.palang.domain.group.application.GroupInviteLink;
+import com.nexters.palang.domain.group.application.GroupMemberPreview;
 import com.nexters.palang.domain.group.application.GroupService;
 import com.nexters.palang.domain.group.application.GroupSummaryProjection;
 import com.nexters.palang.domain.group.common.error.GroupErrorCode;
 import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.group.domain.Group;
+import com.nexters.palang.domain.group.domain.GroupBookEntry;
 import com.nexters.palang.domain.group.domain.GroupMember;
 import com.nexters.palang.domain.group.domain.GroupMemberRole;
+import com.nexters.palang.domain.group.domain.GroupReadingSummary;
+import com.nexters.palang.domain.group.domain.ReadingPeriod;
+import com.nexters.palang.domain.group.domain.ReadingScheduleStatus;
 import com.nexters.palang.domain.group.presentation.dto.CreateGroupRequest;
 import com.nexters.palang.domain.group.presentation.dto.UpdateGroupRequest;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.global.security.CurrentUserProvider;
 import com.nexters.palang.global.security.LoginRequiredException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,9 +81,17 @@ class GroupControllerTest {
     }
 
     private Group group(Long id, User host) {
-        Group built = Group.create("고전 뽀개기", book(), host, 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20));
+        Group built = Group.create("고전 뽀개기", host, 4);
         ReflectionTestUtils.setField(built, "id", id);
         return built;
+    }
+
+    private GroupBookEntry entry(Group group, LocalDate startDate, LocalDate endDate) {
+        return GroupBookEntry.create(group, book(), ReadingPeriod.of(startDate, endDate), LocalDate.MIN);
+    }
+
+    private GroupDetail detail(Group group, long memberCount) {
+        return new GroupDetail(group, entry(group, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20)), memberCount, false);
     }
 
     private CreateGroupRequest createRequest() {
@@ -83,7 +99,7 @@ class GroupControllerTest {
     }
 
     private UpdateGroupRequest updateRequest() {
-        return new UpdateGroupRequest("주말 독서 모임", 6, LocalDate.of(2026, 8, 21), LocalDate.of(2026, 9, 27));
+        return new UpdateGroupRequest("주말 독서 모임", 6, null, null, null);
     }
 
     @Test
@@ -91,15 +107,65 @@ class GroupControllerTest {
     void createGroup() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         Group group = group(1L, user(1L));
-        given(groupService.createGroup(eq(1L), any(CreateGroupRequest.class))).willReturn(new GroupDetail(group, 1L));
+        given(groupService.createGroup(eq(1L), any(CreateGroupRequest.class), isNull())).willReturn(detail(group, 1L));
 
         mockMvc.perform(post("/api/groups")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(createRequest())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.groupId").value(1))
+                .andExpect(jsonPath("$.data.bookId").value(1))
+                .andExpect(jsonPath("$.data.bookTitle").value("채식주의자"))
+                .andExpect(jsonPath("$.data.startDate").value("2026-08-20"))
                 .andExpect(jsonPath("$.data.memberCount").value(1))
                 .andExpect(jsonPath("$.data.isHost").value(true));
+    }
+
+    @Test
+    @DisplayName("Idempotency-Key 헤더를 보내면 요청 키로 서비스에 전달된다")
+    void createGroupPassesIdempotencyKey() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        Group group = group(1L, user(1L));
+        given(groupService.createGroup(eq(1L), any(CreateGroupRequest.class), eq("request-key-1")))
+                .willReturn(detail(group, 1L));
+
+        mockMvc.perform(post("/api/groups")
+                        .header("Idempotency-Key", "request-key-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.groupId").value(1));
+    }
+
+    @Test
+    @DisplayName("기간 없이 모임을 만들 수 있고, 응답의 시작일/종료일은 null이다")
+    void createGroupWithoutPeriod() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        Group group = group(1L, user(1L));
+        given(groupService.createGroup(eq(1L), any(CreateGroupRequest.class), isNull()))
+                .willReturn(new GroupDetail(group, entry(group, null, null), 1L, false));
+
+        mockMvc.perform(post("/api/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"고전 뽀개기\",\"bookId\":1,\"capacity\":4}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.startDate").isEmpty())
+                .andExpect(jsonPath("$.data.endDate").isEmpty())
+                .andExpect(jsonPath("$.data.ended").value(false));
+    }
+
+    @Test
+    @DisplayName("과거 날짜로 모임을 만들면 400 에러가 발생한다")
+    void createGroupFailsWithPastDate() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(groupService.createGroup(eq(1L), any(CreateGroupRequest.class), isNull()))
+                .willThrow(new GroupException(GroupErrorCode.PAST_GROUP_DATE));
+
+        mockMvc.perform(post("/api/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createRequest())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("GROUP_400_5"));
     }
 
     @Test
@@ -139,12 +205,8 @@ class GroupControllerTest {
     @DisplayName("모임 목록 조회 응답에는 모임별 isHost 여부가 포함된다")
     void getMyGroups_includesIsHostPerGroup() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        GroupSummaryProjection hostedGroup = new GroupSummaryProjection(
-                1L, "고전 뽀개기", 1L, "채식주의자", null, 1L, 4,
-                LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20), true);
-        GroupSummaryProjection joinedGroup = new GroupSummaryProjection(
-                2L, "주말 독서 모임", 2L, "소년이 온다", null, 2L, 4,
-                LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20), false);
+        GroupSummaryProjection hostedGroup = summary(1L, true, 1L, List.of(preview(1L)));
+        GroupSummaryProjection joinedGroup = summary(2L, false, 2L, List.of(preview(2L), preview(1L)));
         given(groupService.getMyGroups(eq(1L), any()))
                 .willReturn(new PageImpl<>(List.of(hostedGroup, joinedGroup), DEFAULT_PAGEABLE, 2));
 
@@ -155,11 +217,67 @@ class GroupControllerTest {
     }
 
     @Test
+    @DisplayName("모임 카드에는 읽는 책 수, 가장 늦은 종료일, 날짜 표시 방식, 아바타와 +N 인원이 포함된다")
+    void getMyGroupsIncludesReadingSummaryAndMemberPreviews() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        List<GroupMemberPreview> fivePreviews = List.of(preview(1L), preview(2L), preview(3L), preview(4L), preview(5L));
+        GroupSummaryProjection card = summary(1L, true, 7L, fivePreviews);
+        given(groupService.getMyGroups(eq(1L), any())).willReturn(new PageImpl<>(List.of(card), DEFAULT_PAGEABLE, 1));
+
+        mockMvc.perform(get("/api/groups"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.groups[0].readingBookCount").value(3))
+                .andExpect(jsonPath("$.data.groups[0].latestReadingEndDate").value("2026-10-22"))
+                .andExpect(jsonPath("$.data.groups[0].readingScheduleStatus").value("HAS_END_DATE"))
+                .andExpect(jsonPath("$.data.groups[0].memberPreviews.length()").value(5))
+                .andExpect(jsonPath("$.data.groups[0].memberPreviews[0].nickname").value("닉네임1"))
+                .andExpect(jsonPath("$.data.groups[0].extraMemberCount").value(2));
+    }
+
+    private GroupSummaryProjection summary(Long groupId, boolean isHost, long memberCount, List<GroupMemberPreview> previews) {
+        return new GroupSummaryProjection(
+                groupId, "고전 뽀개기", 1L, "채식주의자", null, memberCount, 10,
+                LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20), false, isHost,
+                new GroupReadingSummary(3L, LocalDate.of(2026, 10, 22), ReadingScheduleStatus.HAS_END_DATE), previews);
+    }
+
+    private GroupMemberPreview preview(Long userId) {
+        return new GroupMemberPreview(userId, "닉네임" + userId, null);
+    }
+
+    @Test
+    @DisplayName("모임 상세에는 설정 충돌 검사에 쓸 version이 포함된다")
+    void getGroupDetailIncludesVersion() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        Group group = group(1L, user(1L));
+        ReflectionTestUtils.setField(group, "version", 3L);
+        given(groupService.getGroupDetail(1L, 1L)).willReturn(detail(group, 2L));
+
+        mockMvc.perform(get("/api/groups/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(3));
+    }
+
+    @Test
+    @DisplayName("다른 곳에서 설정이 먼저 바뀌었으면 방 설정 변경 시 409 에러가 발생한다")
+    void updateGroupFailsWhenSettingsConflict() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(groupService.updateGroup(eq(1L), eq(1L), any(UpdateGroupRequest.class)))
+                .willThrow(new GroupException(GroupErrorCode.GROUP_SETTINGS_CONFLICT));
+
+        mockMvc.perform(patch("/api/groups/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"주말 독서 모임\",\"capacity\":6,\"version\":2}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("GROUP_409_5"));
+    }
+
+    @Test
     @DisplayName("모임 상세를 조회한다")
     void getGroupDetail() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         Group group = group(1L, user(1L));
-        given(groupService.getGroupDetail(1L, 1L)).willReturn(new GroupDetail(group, 2L));
+        given(groupService.getGroupDetail(1L, 1L)).willReturn(detail(group, 2L));
 
         mockMvc.perform(get("/api/groups/1"))
                 .andExpect(status().isOk())
@@ -172,7 +290,7 @@ class GroupControllerTest {
     void getGroupDetail_whenNotHost_thenIsHostFalse() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(2L);
         Group group = group(1L, user(1L));
-        given(groupService.getGroupDetail(1L, 2L)).willReturn(new GroupDetail(group, 2L));
+        given(groupService.getGroupDetail(1L, 2L)).willReturn(detail(group, 2L));
 
         mockMvc.perform(get("/api/groups/1"))
                 .andExpect(status().isOk())
@@ -206,8 +324,8 @@ class GroupControllerTest {
     void updateGroup() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
         Group group = group(1L, user(1L));
-        group.updateSettings("주말 독서 모임", 6, LocalDate.of(2026, 8, 21), LocalDate.of(2026, 9, 27), 1L);
-        given(groupService.updateGroup(eq(1L), eq(1L), any(UpdateGroupRequest.class))).willReturn(new GroupDetail(group, 1L));
+        group.updateSettings("주말 독서 모임", 6, 1L);
+        given(groupService.updateGroup(eq(1L), eq(1L), any(UpdateGroupRequest.class))).willReturn(detail(group, 1L));
 
         mockMvc.perform(patch("/api/groups/1")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -266,29 +384,19 @@ class GroupControllerTest {
     }
 
     @Test
-    @DisplayName("모임 멤버 목록을 조회한다")
-    void getGroupMembers() throws Exception {
-        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        Group group = group(1L, user(1L));
-        GroupMember member = GroupMember.of(group, user(1L), GroupMemberRole.HOST);
-        given(groupService.getGroupMembers(eq(1L), eq(1L), any()))
-                .willReturn(new PageImpl<>(List.of(member), DEFAULT_PAGEABLE, 1));
-
-        mockMvc.perform(get("/api/groups/1/members"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.members[0].role").value("HOST"));
-    }
-
-    @Test
     @DisplayName("모임장은 초대 링크를 조회할 수 있다")
     void getInviteLink() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(groupService.getInviteLink(1L, 1L)).willReturn("invitecode123");
+        given(groupService.getInviteLink(1L, 1L))
+                .willReturn(new GroupInviteLink(group(1L, user(1L)), "invitecode123", 4L));
 
         mockMvc.perform(get("/api/groups/1/invite-link"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.groupId").value(1))
-                .andExpect(jsonPath("$.data.inviteCode").value("invitecode123"));
+                .andExpect(jsonPath("$.data.inviteCode").value("invitecode123"))
+                .andExpect(jsonPath("$.data.memberCount").value(4))
+                .andExpect(jsonPath("$.data.capacity").value(4))
+                .andExpect(jsonPath("$.data.full").value(true));
     }
 
     @Test
@@ -306,7 +414,8 @@ class GroupControllerTest {
     @DisplayName("모임장은 초대 링크를 재발급할 수 있다")
     void regenerateInviteLink() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(groupService.regenerateInviteLink(1L, 1L)).willReturn("newinvitecode456");
+        given(groupService.regenerateInviteLink(1L, 1L))
+                .willReturn(new GroupInviteLink(group(1L, user(1L)), "newinvitecode456", 1L));
 
         mockMvc.perform(post("/api/groups/1/invite-link/regenerate"))
                 .andExpect(status().isOk())
@@ -317,11 +426,12 @@ class GroupControllerTest {
     @DisplayName("초대 링크를 미리보기하면 모임 정보를 반환한다")
     void previewInvitation() throws Exception {
         Group group = group(1L, user(1L));
-        given(groupService.previewInvitation(group.getInviteCode(), null))
-                .willReturn(new GroupInvitationPreview(group, 2L, false));
+        given(groupService.previewInvitation("invitecode123", null))
+                .willReturn(new GroupInvitationPreview(group, entry(group, null, null), 2L, false));
 
-        mockMvc.perform(get("/api/groups/invitations/" + group.getInviteCode()))
+        mockMvc.perform(get("/api/groups/invitations/invitecode123"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.bookTitle").value("채식주의자"))
                 .andExpect(jsonPath("$.data.memberCount").value(2))
                 .andExpect(jsonPath("$.data.full").value(false))
                 .andExpect(jsonPath("$.data.alreadyJoined").value(false));
@@ -343,9 +453,9 @@ class GroupControllerTest {
     void joinGroup() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(2L);
         Group group = group(1L, user(1L));
-        given(groupService.joinGroup(group.getInviteCode(), 2L)).willReturn(new GroupDetail(group, 2L));
+        given(groupService.joinGroup("invitecode123", 2L)).willReturn(detail(group, 2L));
 
-        mockMvc.perform(post("/api/groups/invitations/" + group.getInviteCode() + "/join"))
+        mockMvc.perform(post("/api/groups/invitations/invitecode123/join"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.memberCount").value(2))
                 .andExpect(jsonPath("$.data.isHost").value(false));
@@ -359,6 +469,18 @@ class GroupControllerTest {
         mockMvc.perform(post("/api/groups/invitations/somecode/join"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.title").value("AUTH_401_1"));
+    }
+
+    @Test
+    @DisplayName("내보내진 계정이 예전 초대 링크로 다시 가입하면 403 에러가 발생한다")
+    void joinGroupFailsWhenRemovedMemberUsesOldInvite() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(2L);
+        given(groupService.joinGroup("oldcode", 2L))
+                .willThrow(new GroupException(GroupErrorCode.REJOIN_REQUIRES_NEW_INVITE));
+
+        mockMvc.perform(post("/api/groups/invitations/oldcode/join"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("GROUP_403_3"));
     }
 
     @Test

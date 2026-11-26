@@ -13,8 +13,8 @@ public record AdminGroupSummaryResponse(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String hostNickname,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int capacity,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long memberCount,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDate startDate,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDate endDate,
+        @Schema(nullable = true, description = "대표 책(가장 먼저 등록된 책)의 시작일. 기간이 없으면 null.") LocalDate startDate,
+        @Schema(nullable = true, description = "대표 책(가장 먼저 등록된 책)의 종료일. 기간이 없으면 null.") LocalDate endDate,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) LocalDateTime createdAt
 ) {
 }

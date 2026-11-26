@@ -98,6 +98,8 @@ public class NotificationPreferenceService {
                     ? preference.isGroupLikeEnabled() : preference.isActivityLikeEnabled();
             case GROUP_JOINED, GROUP_MEMBER_JOINED -> preference.isGroupInviteJoinEnabled();
             case GROUP_SCHEDULE_CHANGED, GROUP_ENDING_SOON -> preference.isGroupScheduleEnabled();
+            // 모임에서 내보내진 사실은 본인이 반드시 알아야 해서 알림 설정으로 끄지 않는다.
+            case GROUP_MEMBER_REMOVED -> true;
             // 더 이상 새로 발송하지 않는다(이슈 #193) — 대응하는 토글이 없으므로 차단하지 않는다.
             case BOOK_NEW_OPINIONS -> true;
             // 운영 안내는 설정으로 끌 수 없다(인앱은 항상 저장). 이 경로를 타지 않지만 switch 완결성을 위해 둔다.

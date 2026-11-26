@@ -10,8 +10,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.infrastructure.BookRepository;
 import com.nexters.palang.domain.group.domain.Group;
+import com.nexters.palang.domain.group.domain.GroupBookEntry;
+import com.nexters.palang.domain.group.domain.GroupInvitation;
 import com.nexters.palang.domain.group.domain.GroupMember;
 import com.nexters.palang.domain.group.domain.GroupMemberRole;
+import com.nexters.palang.domain.group.domain.ReadingPeriod;
+import com.nexters.palang.domain.group.infrastructure.GroupBookEntryRepository;
+import com.nexters.palang.domain.group.infrastructure.GroupInvitationRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupRepository;
 import com.nexters.palang.domain.group.presentation.dto.CreateGroupRequest;
@@ -32,11 +37,10 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
-// open-in-view: false 환경에서 GroupMapper가 Group.book/host(둘 다 LAZY)를 컨트롤러 단에서 참조해
-// LazyInitializationException(500)이 나는지 실제 트랜잭션 경계를 넘는 end-to-end 테스트로 검증한다.
-// (CommentLazyLoadingIntegrationTest와 같은 패턴 — GroupRepository의 join fetch 쿼리
-// (findByIdWithBookAndHost/findByIdForUpdate/findByInviteCodeForUpdate/findByInviteCode)가 없으면
-// 이 테스트들이 실패한다.)
+// open-in-view: false 환경에서 GroupMapper가 Group.host와 대표 책(GroupBookEntry.book, 둘 다 LAZY)을 컨트롤러
+// 단에서 참조해 LazyInitializationException(500)이 나는지 실제 트랜잭션 경계를 넘는 end-to-end 테스트로 검증한다.
+// (CommentLazyLoadingIntegrationTest와 같은 패턴 — GroupRepository/GroupInvitationRepository/GroupBookEntryRepository의
+// join fetch 쿼리가 없으면 이 테스트들이 실패한다.)
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
@@ -58,6 +62,12 @@ class GroupLazyLoadingIntegrationTest {
 
     @Autowired
     private GroupMemberRepository groupMemberRepository;
+
+    @Autowired
+    private GroupBookEntryRepository groupBookEntryRepository;
+
+    @Autowired
+    private GroupInvitationRepository groupInvitationRepository;
 
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
@@ -89,17 +99,21 @@ class GroupLazyLoadingIntegrationTest {
     private Group createGroupDirectly() {
         Book book = bookRepository.findById(bookId).orElseThrow();
         User host = userRepository.findById(hostId).orElseThrow();
-        Group group = groupRepository.save(Group.create(
-                "고전 뽀개기", book, host, 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20)));
-        groupMemberRepository.save(GroupMember.of(group, host, GroupMemberRole.HOST));
+        Group group = groupRepository.save(Group.create("고전 뽀개기", host, 4));
+        groupMemberRepository.save(GroupMember.join(group, host, GroupMemberRole.HOST, LocalDateTime.now()));
+        groupBookEntryRepository.save(GroupBookEntry.create(group, book, ReadingPeriod.NONE, LocalDate.now()));
         return group;
+    }
+
+    private String issueInviteCode(Group group) {
+        return groupInvitationRepository.save(GroupInvitation.issue(group, hostId)).getCode();
     }
 
     @Test
     @DisplayName("모임을 생성하면 host 닉네임과 책 제목이 포함된 응답이 정상적으로 내려온다")
     void createGroupReturnsHostNicknameAndBookTitle() throws Exception {
         CreateGroupRequest request = new CreateGroupRequest(
-                "고전 뽀개기", bookId, 4, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20));
+                "고전 뽀개기", bookId, 4, LocalDate.now().plusDays(1), LocalDate.now().plusDays(30));
 
         mockMvc.perform(post("/api/groups")
                         .header("Authorization", bearerToken(hostId))
@@ -126,8 +140,7 @@ class GroupLazyLoadingIntegrationTest {
     @DisplayName("방 설정을 변경하면 host 닉네임과 책 제목이 포함된 응답이 정상적으로 내려온다")
     void updateGroupReturnsHostNicknameAndBookTitle() throws Exception {
         Group group = createGroupDirectly();
-        UpdateGroupRequest request = new UpdateGroupRequest(
-                "주말 독서 모임", 6, LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 27));
+        UpdateGroupRequest request = new UpdateGroupRequest("주말 독서 모임", 6, null, null, null);
 
         mockMvc.perform(patch("/api/groups/{groupId}", group.getId())
                         .header("Authorization", bearerToken(hostId))
@@ -141,9 +154,9 @@ class GroupLazyLoadingIntegrationTest {
     @Test
     @DisplayName("초대 링크로 가입하면 host 닉네임과 책 제목이 포함된 응답이 정상적으로 내려온다")
     void joinGroupReturnsHostNicknameAndBookTitle() throws Exception {
-        Group group = createGroupDirectly();
+        String inviteCode = issueInviteCode(createGroupDirectly());
 
-        mockMvc.perform(post("/api/groups/invitations/{inviteCode}/join", group.getInviteCode())
+        mockMvc.perform(post("/api/groups/invitations/{inviteCode}/join", inviteCode)
                         .header("Authorization", bearerToken(otherId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.hostNickname").value("모임장"))
@@ -153,9 +166,9 @@ class GroupLazyLoadingIntegrationTest {
     @Test
     @DisplayName("초대 링크를 미리보기하면 책 제목이 포함된 응답이 정상적으로 내려온다")
     void previewInvitationReturnsBookTitle() throws Exception {
-        Group group = createGroupDirectly();
+        String inviteCode = issueInviteCode(createGroupDirectly());
 
-        mockMvc.perform(get("/api/groups/invitations/{inviteCode}", group.getInviteCode()))
+        mockMvc.perform(get("/api/groups/invitations/{inviteCode}", inviteCode))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.bookTitle").value("프랑켄슈타인"));
     }

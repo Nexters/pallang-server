@@ -9,7 +9,6 @@ import com.nexters.palang.domain.group.presentation.dto.GroupDetailResponse;
 import com.nexters.palang.domain.group.presentation.dto.GroupInvitationPreviewResponse;
 import com.nexters.palang.domain.group.presentation.dto.GroupInviteLinkResponse;
 import com.nexters.palang.domain.group.presentation.dto.GroupListResponse;
-import com.nexters.palang.domain.group.presentation.dto.GroupMemberListResponse;
 import com.nexters.palang.domain.group.presentation.dto.UpdateGroupRequest;
 import com.nexters.palang.global.common.response.DataResponse;
 import com.nexters.palang.global.security.CurrentUserProvider;
@@ -24,6 +23,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -34,15 +34,18 @@ public class GroupController implements GroupApi {
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 100;
+    private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 
     private final GroupService groupService;
     private final CurrentUserProvider currentUserProvider;
 
     @Override
     @PostMapping("/api/groups")
-    public ResponseEntity<DataResponse<GroupDetailResponse>> createGroup(@Valid @RequestBody CreateGroupRequest request) {
+    public ResponseEntity<DataResponse<GroupDetailResponse>> createGroup(
+            @RequestHeader(value = IDEMPOTENCY_KEY_HEADER, required = false) String idempotencyKey,
+            @Valid @RequestBody CreateGroupRequest request) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        GroupDetail detail = groupService.createGroup(currentUserId, request);
+        GroupDetail detail = groupService.createGroup(currentUserId, request, idempotencyKey);
         return ResponseEntity.ok(DataResponse.from(GroupMapper.toDetailResponse(detail, currentUserId)));
     }
 
@@ -82,30 +85,19 @@ public class GroupController implements GroupApi {
     }
 
     @Override
-    @GetMapping("/api/groups/{groupId}/members")
-    public ResponseEntity<DataResponse<GroupMemberListResponse>> getGroupMembers(
-            @PathVariable Long groupId,
-            @RequestParam(defaultValue = "" + DEFAULT_PAGE) int page,
-            @RequestParam(defaultValue = "" + DEFAULT_SIZE) int size) {
-        Long currentUserId = currentUserProvider.getCurrentUserId();
-        return ResponseEntity.ok(DataResponse.from(GroupMapper.toMemberListResponse(
-                groupService.getGroupMembers(groupId, currentUserId, pageable(page, size)))));
-    }
-
-    @Override
     @GetMapping("/api/groups/{groupId}/invite-link")
     public ResponseEntity<DataResponse<GroupInviteLinkResponse>> getInviteLink(@PathVariable Long groupId) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        String inviteCode = groupService.getInviteLink(groupId, currentUserId);
-        return ResponseEntity.ok(DataResponse.from(GroupMapper.toInviteLinkResponse(groupId, inviteCode)));
+        return ResponseEntity.ok(DataResponse.from(
+                GroupMapper.toInviteLinkResponse(groupService.getInviteLink(groupId, currentUserId))));
     }
 
     @Override
     @PostMapping("/api/groups/{groupId}/invite-link/regenerate")
     public ResponseEntity<DataResponse<GroupInviteLinkResponse>> regenerateInviteLink(@PathVariable Long groupId) {
         Long currentUserId = currentUserProvider.getCurrentUserId();
-        String inviteCode = groupService.regenerateInviteLink(groupId, currentUserId);
-        return ResponseEntity.ok(DataResponse.from(GroupMapper.toInviteLinkResponse(groupId, inviteCode)));
+        return ResponseEntity.ok(DataResponse.from(
+                GroupMapper.toInviteLinkResponse(groupService.regenerateInviteLink(groupId, currentUserId))));
     }
 
     @Override

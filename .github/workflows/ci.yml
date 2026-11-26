@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# 같은 PR에 커밋을 연달아 푸시하면 이전 실행은 의미가 없으므로 취소한다.
+# develop/main push 실행은 머지 결과 검증이라 취소하지 않는다.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -23,18 +29,18 @@ jobs:
           - 3306:3306
         options: >-
           --health-cmd="mysqladmin ping -h localhost"
-          --health-interval=10s
+          --health-interval=2s
           --health-timeout=5s
-          --health-retries=5
+          --health-retries=30
       redis:
         image: redis:7
         ports:
           - 6379:6379
         options: >-
           --health-cmd="redis-cli ping"
-          --health-interval=10s
+          --health-interval=2s
           --health-timeout=5s
-          --health-retries=5
+          --health-retries=30
 
     steps:
       - name: Checkout
@@ -82,15 +88,24 @@ jobs:
       # 완전히 같은 컴파일이 중복 실행된다. 이미 만들어진 jar를 builder 스테이지 결과물 자리에
       # 대신 채워 넣어(--build-context로 builder 스테이지 자체를 치환) 재컴파일을 건너뛴다.
       # Dockerfile 구조는 그대로이므로 실제 배포 이미지를 빌드하는 cd.yml은 영향받지 않고 전체 빌드를 그대로 수행한다.
+      #
+      # develop/main push에서는 cd.yml이 같은 커밋으로 실제 이미지를 빌드하므로 이 검증은 PR에서만 돌린다.
       - name: Prepare pre-built jar for Docker builder-stage override
+        if: github.event_name == 'pull_request'
         run: |
           mkdir -p docker-builder-context/workspace/build/libs
           cp build/libs/*.jar docker-builder-context/workspace/build/libs/
 
       - name: Set up Docker Buildx
+        if: github.event_name == 'pull_request'
         uses: docker/setup-buildx-action@v3
 
+      # GHA 캐시(cache-from/cache-to type=gha)는 쓰지 않는다.
+      # - builder 스테이지를 jar로 치환한 빌드라 캐시할 가치가 있는 레이어가 없고, 캐시 export만 ~27초 걸렸다.
+      # - scope를 지정하지 않으면 cd.yml과 같은 기본 scope("buildkit")를 공유해서, CI가 쓴 캐시 인덱스가
+      #   CD의 캐시(gradle dependencies 레이어 등)를 덮어써 CD가 매번 의존성 다운로드부터 다시 하게 된다.
       - name: Verify Docker image builds
+        if: github.event_name == 'pull_request'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -98,5 +113,3 @@ jobs:
             builder=docker-builder-context
           push: false
           tags: pallang-ci-check:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max

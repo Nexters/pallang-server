@@ -11,14 +11,26 @@ public enum GroupErrorCode implements BaseErrorCode {
 
     GROUP_NOT_FOUND(HttpStatus.NOT_FOUND, "GROUP_404_1", "해당 모임을 찾을 수 없습니다."),
     INVALID_INVITE_CODE(HttpStatus.NOT_FOUND, "GROUP_404_2", "유효하지 않은 초대 코드입니다."),
+    GROUP_BOOK_ENTRY_NOT_FOUND(HttpStatus.NOT_FOUND, "GROUP_404_3", "모임에서 해당 책을 찾을 수 없습니다."),
+    GROUP_MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "GROUP_404_4", "모임에서 해당 멤버를 찾을 수 없습니다."),
     INVALID_GROUP_PERIOD(HttpStatus.BAD_REQUEST, "GROUP_400_1", "시작일은 종료일보다 늦을 수 없습니다."),
     INVALID_GROUP_CAPACITY(HttpStatus.BAD_REQUEST, "GROUP_400_2", "인원은 2명 이상 10명 이하여야 합니다."),
-    GROUP_BOOK_MISMATCH(HttpStatus.BAD_REQUEST, "GROUP_400_3", "선택한 도서가 모임의 지정 도서와 일치하지 않습니다."),
+    GROUP_BOOK_MISMATCH(HttpStatus.BAD_REQUEST, "GROUP_400_3", "선택한 도서가 모임에서 함께 읽는 책이 아닙니다."),
+    INCOMPLETE_GROUP_PERIOD(HttpStatus.BAD_REQUEST, "GROUP_400_4", "시작일과 종료일은 함께 입력하거나 함께 비워야 합니다."),
+    PAST_GROUP_DATE(HttpStatus.BAD_REQUEST, "GROUP_400_5", "새로 입력하거나 변경한 날짜는 오늘 이후여야 합니다."),
+    INVALID_GROUP_NAME(HttpStatus.BAD_REQUEST, "GROUP_400_6", "모임명은 공백을 제외하고 1자 이상 15자 이하여야 합니다."),
+    INVALID_REMOVAL_REASON(HttpStatus.BAD_REQUEST, "GROUP_400_7",
+            "내보내기 사유를 하나 선택해 주세요. 기타를 고르면 내용을 1자 이상 200자 이하로 입력해야 합니다."),
     NOT_HOST(HttpStatus.FORBIDDEN, "GROUP_403_1", "모임장만 가능한 작업입니다."),
     NOT_MEMBER(HttpStatus.FORBIDDEN, "GROUP_403_2", "모임원만 조회할 수 있습니다."),
+    REJOIN_REQUIRES_NEW_INVITE(HttpStatus.FORBIDDEN, "GROUP_403_3",
+            "이 초대 링크로는 다시 참여할 수 없습니다. 모임장에게 새 초대 링크를 요청해 주세요."),
     CAPACITY_BELOW_MEMBER_COUNT(HttpStatus.CONFLICT, "GROUP_409_1", "인원을 현재 참여 인원보다 적게 설정할 수 없습니다."),
     ALREADY_JOINED(HttpStatus.CONFLICT, "GROUP_409_2", "이미 가입된 모임입니다."),
     GROUP_FULL(HttpStatus.CONFLICT, "GROUP_409_3", "모임 정원이 가득 찼습니다."),
+    GROUP_BOOK_ALREADY_ADDED(HttpStatus.CONFLICT, "GROUP_409_4", "이미 모임에 등록된 책입니다."),
+    CANNOT_REMOVE_HOST(HttpStatus.CONFLICT, "GROUP_409_6", "모임장은 내보낼 수 없습니다."),
+    GROUP_SETTINGS_CONFLICT(HttpStatus.CONFLICT, "GROUP_409_5", "다른 곳에서 모임 설정이 먼저 변경되었습니다. 최신 설정을 확인한 뒤 다시 저장해 주세요."),
     ;
 
     private final HttpStatus httpStatus;

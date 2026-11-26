@@ -17,6 +17,7 @@ import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.group.common.error.GroupErrorCode;
 import com.nexters.palang.domain.group.common.error.GroupException;
 import com.nexters.palang.domain.passage.application.PageNumbersResult;
+import com.nexters.palang.domain.passage.application.PassageImageCardResult;
 import com.nexters.palang.domain.passage.application.PassageOcrService;
 import com.nexters.palang.domain.passage.application.PassageService;
 import com.nexters.palang.domain.passage.application.SimilarPassageFinder;
@@ -281,6 +282,54 @@ class PassageControllerTest {
         mockMvc.perform(patch("/api/passages/999/spoiler")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new PassageRequest.UpdateSpoiler(true))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("PASSAGE_404_1"));
+    }
+
+    @Test
+    @DisplayName("이미지 저장용 대목 정보를 조회하면 발췌 문장·페이지·책 제목·작가만 반환한다")
+    void getImageCard() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(passageService.getImageCard(10L, 1L)).willReturn(
+                new PassageImageCardResult(10L, "우리는 모두 이야기를 찾아 헤맨다.", 87, "이방인", "알베르 카뮈"));
+
+        mockMvc.perform(get("/api/passages/10/image-card"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.passageId").value(10))
+                .andExpect(jsonPath("$.data.quotedText").value("우리는 모두 이야기를 찾아 헤맨다."))
+                .andExpect(jsonPath("$.data.pageNumber").value(87))
+                .andExpect(jsonPath("$.data.bookTitle").value("이방인"))
+                .andExpect(jsonPath("$.data.bookAuthor").value("알베르 카뮈"));
+    }
+
+    @Test
+    @DisplayName("비로그인으로 이미지 저장용 대목 정보를 조회하면 401 에러가 발생한다")
+    void getImageCardFailsWhenUnauthenticated() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willThrow(new LoginRequiredException());
+
+        mockMvc.perform(get("/api/passages/10/image-card"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.title").value("AUTH_401_1"));
+    }
+
+    @Test
+    @DisplayName("모임원이 아닌 사용자가 모임 전용 대목의 이미지 저장용 정보를 조회하면 403 에러가 발생한다")
+    void getImageCardFailsWhenNotGroupMember() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(passageService.getImageCard(10L, 1L)).willThrow(new GroupException(GroupErrorCode.NOT_MEMBER));
+
+        mockMvc.perform(get("/api/passages/10/image-card"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("GROUP_403_2"));
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 대목의 이미지 저장용 정보를 조회하면 404 에러가 발생한다")
+    void getImageCardFailsWhenPassageNotFound() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(passageService.getImageCard(10L, 1L)).willThrow(new PassageException(PassageErrorCode.PASSAGE_NOT_FOUND));
+
+        mockMvc.perform(get("/api/passages/10/image-card"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.title").value("PASSAGE_404_1"));
     }

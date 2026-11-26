@@ -8,6 +8,9 @@ import static org.mockito.Mockito.verify;
 import com.nexters.palang.domain.comment.infrastructure.CommentRepository;
 import com.nexters.palang.domain.decoration.infrastructure.DecorationRepository;
 import com.nexters.palang.domain.group.domain.Group;
+import com.nexters.palang.domain.group.infrastructure.GroupBookEntryRepository;
+import com.nexters.palang.domain.group.infrastructure.GroupInvitationRepository;
+import com.nexters.palang.domain.group.infrastructure.GroupMemberRemovalRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.group.infrastructure.GroupRepository;
 import com.nexters.palang.domain.opinion.infrastructure.OpinionLikeRepository;
@@ -39,13 +42,20 @@ class AdminCascadeDeleterTest {
     private GroupRepository groupRepository;
     @Mock
     private GroupMemberRepository groupMemberRepository;
+    @Mock
+    private GroupBookEntryRepository groupBookEntryRepository;
+    @Mock
+    private GroupInvitationRepository groupInvitationRepository;
+    @Mock
+    private GroupMemberRemovalRepository groupMemberRemovalRepository;
 
     private AdminCascadeDeleter cascadeDeleter;
 
     @BeforeEach
     void setUp() {
         cascadeDeleter = new AdminCascadeDeleter(passageRepository, opinionRepository, commentRepository,
-                decorationRepository, opinionLikeRepository, groupRepository, groupMemberRepository);
+                decorationRepository, opinionLikeRepository, groupRepository, groupMemberRepository,
+                groupBookEntryRepository, groupInvitationRepository, groupMemberRemovalRepository);
     }
 
     @Test
@@ -79,7 +89,7 @@ class AdminCascadeDeleterTest {
     }
 
     @Test
-    @DisplayName("모임 삭제는 그 안의 대목들을 먼저 지운 뒤 모임원과 모임을 지운다")
+    @DisplayName("모임 삭제는 그 안의 대목들을 먼저 지운 뒤 모임 책/초대/모임원과 모임을 지운다")
     void deleteGroupsRemovesPassagesThenMembersThenGroup() {
         Passage passage = mock(Passage.class);
         given(passage.getId()).willReturn(10L);
@@ -89,6 +99,9 @@ class AdminCascadeDeleterTest {
         cascadeDeleter.deleteGroups(List.of(100L));
 
         verify(passageRepository).deleteAllById(List.of(10L));
+        verify(groupBookEntryRepository).deleteAllByGroupIdIn(List.of(100L));
+        verify(groupInvitationRepository).deleteAllByGroupIdIn(List.of(100L));
+        verify(groupMemberRemovalRepository).deleteAllByGroupIdIn(List.of(100L));
         verify(groupMemberRepository).deleteAllByGroupIdIn(List.of(100L));
         verify(groupRepository).deleteAllById(List.of(100L));
     }

@@ -58,6 +58,17 @@ public class PassageService {
         return passageQueryRepository.findPassagesByPage(bookId, groupId, pageNumber);
     }
 
+    // 이미지 저장(꾸미기) 화면용 대목 정보. 공개 대목은 등록자와 무관하게 로그인한 누구나 이미지를 만들 수 있고,
+    // 모임 전용 대목은 그 모임원만 만들 수 있다(흔적 조회와 같은 접근 범위).
+    public PassageImageCardResult getImageCard(Long passageId, Long userId) {
+        Passage passage = passageRepository.findByIdAndDeletedAtIsNull(passageId)
+                .orElseThrow(() -> new PassageException(PassageErrorCode.PASSAGE_NOT_FOUND));
+        if (passage.getGroup() != null) {
+            groupAccessValidator.validateMember(passage.getGroup().getId(), userId);
+        }
+        return PassageImageCardResult.from(passage);
+    }
+
     // 내가 남긴 대목 목록: bookId 미지정 시 전체 도서, spoilerOnly=true 시 스포일러 대목만,
     // scope로 대목 소속(전역/특정 모임)을 좁힐 수 있다. 특정 모임이면 그 모임의 멤버인지 먼저 확인한다.
     public Page<MyPassageProjection> getMyPassages(

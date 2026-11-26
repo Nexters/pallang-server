@@ -2,6 +2,7 @@ package com.nexters.palang.domain.notification.application;
 
 import com.nexters.palang.domain.comment.domain.event.CommentCreatedEvent;
 import com.nexters.palang.domain.group.domain.event.GroupJoinedEvent;
+import com.nexters.palang.domain.group.domain.event.GroupMemberRemovedEvent;
 import com.nexters.palang.domain.group.domain.event.GroupScheduleChangedEvent;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.notification.domain.NotificationType;
@@ -79,8 +80,15 @@ public class NotificationEventListener {
 
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onGroupMemberRemoved(GroupMemberRemovedEvent event) {
+        notificationCreationService.createGroupMemberRemovedNotice(
+                event.removedUserId(), event.groupId(), event.groupName());
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onGroupScheduleChanged(GroupScheduleChangedEvent event) {
-        List<Long> memberIds = groupMemberRepository.findUserIdsByGroupId(event.groupId());
+        List<Long> memberIds = groupMemberRepository.findActiveUserIdsByGroupId(event.groupId());
         String title = "모임 일정 변경";
         String body = "'%s' 모임의 일정이 변경됐어요.".formatted(event.groupName());
         for (Long memberId : memberIds) {
