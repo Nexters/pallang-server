@@ -48,6 +48,17 @@ class GroupNameTest {
         assertThat(GroupName.normalize(name)).isEqualTo(name);
     }
 
+    @Test
+    @DisplayName("코드 포인트가 많은 이모지 15자도 저장 길이(코드 포인트 100) 안이면 허용한다")
+    void allowsFifteenZwjEmojis() {
+        // 가족 이모지: 보이는 글자 1개, 코드 포인트 7개(15개 = 105), UTF-16 11자 — 6개면 42 코드 포인트
+        String family = "👨‍👩‍👧‍👦";
+        String thumbsUp = "👍🏽"; // 코드 포인트 2개, UTF-16 4자
+        String name = family.repeat(6) + thumbsUp.repeat(9); // 15자, 코드 포인트 60, UTF-16 102자
+
+        assertThat(GroupName.normalize(name)).isEqualTo(name);
+    }
+
     @ParameterizedTest
     @NullSource
     @ValueSource(strings = {"", "   ", "\t\n"})

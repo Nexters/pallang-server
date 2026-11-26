@@ -16,6 +16,7 @@ import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.group.application.GroupDetail;
 import com.nexters.palang.domain.group.application.GroupInvitationPreview;
+import com.nexters.palang.domain.group.application.GroupInviteLink;
 import com.nexters.palang.domain.group.application.GroupMemberPreview;
 import com.nexters.palang.domain.group.application.GroupService;
 import com.nexters.palang.domain.group.application.GroupSummaryProjection;
@@ -383,30 +384,19 @@ class GroupControllerTest {
     }
 
     @Test
-    @DisplayName("모임 멤버 목록을 조회한다")
-    void getGroupMembers() throws Exception {
-        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        Group group = group(1L, user(1L));
-        GroupMember member = GroupMember.join(group, user(1L), GroupMemberRole.HOST, LocalDateTime.of(2026, 8, 1, 12, 0));
-        given(groupService.getGroupMembers(eq(1L), eq(1L), any()))
-                .willReturn(new PageImpl<>(List.of(member), DEFAULT_PAGEABLE, 1));
-
-        mockMvc.perform(get("/api/groups/1/members"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.members[0].role").value("HOST"))
-                .andExpect(jsonPath("$.data.members[0].joinedAt").value("2026-08-01T12:00:00"));
-    }
-
-    @Test
     @DisplayName("모임장은 초대 링크를 조회할 수 있다")
     void getInviteLink() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(groupService.getInviteLink(1L, 1L)).willReturn("invitecode123");
+        given(groupService.getInviteLink(1L, 1L))
+                .willReturn(new GroupInviteLink(group(1L, user(1L)), "invitecode123", 4L));
 
         mockMvc.perform(get("/api/groups/1/invite-link"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.groupId").value(1))
-                .andExpect(jsonPath("$.data.inviteCode").value("invitecode123"));
+                .andExpect(jsonPath("$.data.inviteCode").value("invitecode123"))
+                .andExpect(jsonPath("$.data.memberCount").value(4))
+                .andExpect(jsonPath("$.data.capacity").value(4))
+                .andExpect(jsonPath("$.data.full").value(true));
     }
 
     @Test
@@ -424,7 +414,8 @@ class GroupControllerTest {
     @DisplayName("모임장은 초대 링크를 재발급할 수 있다")
     void regenerateInviteLink() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        given(groupService.regenerateInviteLink(1L, 1L)).willReturn("newinvitecode456");
+        given(groupService.regenerateInviteLink(1L, 1L))
+                .willReturn(new GroupInviteLink(group(1L, user(1L)), "newinvitecode456", 1L));
 
         mockMvc.perform(post("/api/groups/1/invite-link/regenerate"))
                 .andExpect(status().isOk())
@@ -478,6 +469,18 @@ class GroupControllerTest {
         mockMvc.perform(post("/api/groups/invitations/somecode/join"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.title").value("AUTH_401_1"));
+    }
+
+    @Test
+    @DisplayName("내보내진 계정이 예전 초대 링크로 다시 가입하면 403 에러가 발생한다")
+    void joinGroupFailsWhenRemovedMemberUsesOldInvite() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(2L);
+        given(groupService.joinGroup("oldcode", 2L))
+                .willThrow(new GroupException(GroupErrorCode.REJOIN_REQUIRES_NEW_INVITE));
+
+        mockMvc.perform(post("/api/groups/invitations/oldcode/join"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.title").value("GROUP_403_3"));
     }
 
     @Test

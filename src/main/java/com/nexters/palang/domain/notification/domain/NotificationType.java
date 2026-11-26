@@ -13,6 +13,9 @@ public enum NotificationType {
     GROUP_SCHEDULE_CHANGED,
     // 모임 종료 하루 전(멤버 전원에게).
     GROUP_ENDING_SOON,
+    // 모임장이 멤버를 내보냄(내보내진 사람에게). 참여 종료 사실만 알리고 사유는 담지 않는다.
+    // notifications.type이 MySQL ENUM이라 배포 전에 값을 수동으로 추가해야 한다(docs/migrations/20261120_01 참고).
+    GROUP_MEMBER_REMOVED,
     // 운영 안내: 관리자가 사유를 골라 게시물을 삭제했을 때(작성자에게). 알림함 "운영" 탭에만 표시된다.
     CONTENT_REMOVED,
 }

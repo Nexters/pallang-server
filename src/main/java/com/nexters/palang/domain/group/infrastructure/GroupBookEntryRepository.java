@@ -1,11 +1,13 @@
 package com.nexters.palang.domain.group.infrastructure;
 
 import com.nexters.palang.domain.group.domain.GroupBookEntry;
+import jakarta.persistence.LockModeType;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -20,6 +22,13 @@ public interface GroupBookEntryRepository extends JpaRepository<GroupBookEntry, 
     @Query("select e from GroupBookEntry e join fetch e.book where e.id = :entryId and e.group.id = :groupId")
     Optional<GroupBookEntry> findWithBookByIdAndGroupId(
             @Param("entryId") Long entryId, @Param("groupId") Long groupId);
+
+    // 책 추가 전용: 모임 행을 잠근 뒤 같은 판본 중복을 최신 커밋 기준으로 확인한다(잠금 대기 중 다른 요청이 추가한 책 포함).
+    // MySQL REPEATABLE READ에서 일반 조회는 잠금 전 스냅샷을 읽을 수 있어 잠금 읽기로 읽는다. book까지 잠그지 않도록
+    // join fetch는 하지 않고, 판본 비교에 필요한 book은 지연 로딩한다(모임당 책 수가 적다).
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select e from GroupBookEntry e where e.group.id = :groupId")
+    List<GroupBookEntry> findAllByGroupIdForUpdate(@Param("groupId") Long groupId);
 
     boolean existsByGroupIdAndBookId(Long groupId, Long bookId);
 

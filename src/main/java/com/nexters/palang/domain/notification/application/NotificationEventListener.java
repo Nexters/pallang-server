@@ -2,6 +2,7 @@ package com.nexters.palang.domain.notification.application;
 
 import com.nexters.palang.domain.comment.domain.event.CommentCreatedEvent;
 import com.nexters.palang.domain.group.domain.event.GroupJoinedEvent;
+import com.nexters.palang.domain.group.domain.event.GroupMemberRemovedEvent;
 import com.nexters.palang.domain.group.domain.event.GroupScheduleChangedEvent;
 import com.nexters.palang.domain.group.infrastructure.GroupMemberRepository;
 import com.nexters.palang.domain.notification.domain.NotificationType;
@@ -75,6 +76,13 @@ public class NotificationEventListener {
         String memberJoinedBody = "%s님이 '%s' 모임에 가입했어요.".formatted(newMember.getNickname(), event.groupName());
         notificationCreationService.create(event.hostUserId(), event.newMemberUserId(), NotificationType.GROUP_MEMBER_JOINED,
                 "새 멤버 가입", memberJoinedBody, null, null, null, event.groupId(), event.groupName(), null);
+    }
+
+    @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void onGroupMemberRemoved(GroupMemberRemovedEvent event) {
+        notificationCreationService.createGroupMemberRemovedNotice(
+                event.removedUserId(), event.groupId(), event.groupName());
     }
 
     @Async

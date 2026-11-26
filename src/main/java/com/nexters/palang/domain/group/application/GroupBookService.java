@@ -90,7 +90,9 @@ public class GroupBookService {
         validateHost(group, userId);
         Book book = bookRepository.findById(request.bookId())
                 .orElseThrow(() -> new BookException(BookErrorCode.BOOK_NOT_FOUND));
-        boolean alreadyAdded = groupBookEntryRepository.findAllWithBookByGroupIdIn(List.of(groupId)).stream()
+        // 모임 행을 잠근 뒤 잠금 읽기로 최신 커밋 상태를 본다 — 일반 조회는 요청 키 확인 시점의 스냅샷을 읽어, 잠금을
+        // 기다리는 사이 다른 요청이 추가한 같은 판본을 못 볼 수 있다(MySQL REPEATABLE READ).
+        boolean alreadyAdded = groupBookEntryRepository.findAllByGroupIdForUpdate(groupId).stream()
                 .anyMatch(existing -> existing.isSameEditionAs(book));
         if (alreadyAdded) {
             throw new GroupException(GroupErrorCode.GROUP_BOOK_ALREADY_ADDED);

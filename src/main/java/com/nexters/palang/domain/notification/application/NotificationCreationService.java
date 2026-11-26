@@ -87,6 +87,29 @@ public class NotificationCreationService {
         }
     }
 
+    // 모임에서 내보내짐(GROUP_MEMBER_REMOVED). 본인이 반드시 알아야 하는 사실이라 운영 안내처럼 알림 설정과 무관하게
+    // 인앱에는 항상 저장하고, 푸시만 사용자의 푸시 마스터 설정을 따른다. 내보낸 사람(actor)은 남기지 않는다.
+    @Transactional
+    public void createGroupMemberRemovedNotice(Long receiverId, Long groupId, String groupName) {
+        Notification notification = notificationRepository.save(Notification.builder()
+                .receiver(userRepository.getReferenceById(receiverId))
+                .type(NotificationType.GROUP_MEMBER_REMOVED)
+                .title("모임 참여 종료")
+                .body("'%s' 모임 참여가 종료되었어요.".formatted(groupName))
+                .groupId(groupId)
+                .groupName(groupName)
+                .build());
+        if (!notificationPreferenceService.isPushEnabled(receiverId)) {
+            return;
+        }
+        try {
+            pushDispatcher.dispatch(receiverId, NotificationType.GROUP_MEMBER_REMOVED,
+                    notification.getTitle(), notification.getBody(), notification.getId());
+        } catch (Exception e) {
+            log.error("FCM 푸시 발송 실패 (notificationId={})", notification.getId(), e);
+        }
+    }
+
     // OPINION_LIKED 전용 집계 경로(Figma 기준 "N명이 좋아해요"): 같은 흔적에 대해 아직 안 읽은 좋아요 알림이
     // 있으면 새로 만들지 않고 그 알림의 제목(인원수)/행위자만 갱신한다. 없거나 이미 읽었으면 새로 만든다.
     @Transactional

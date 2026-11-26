@@ -210,7 +210,7 @@ class GroupBookServiceTest {
         given(bookRepository.findById(200L)).willReturn(Optional.of(book(200L, "9788936434127")));
         GroupBookEntry finishedSameEdition = entry(10L, book(100L, "9788936434127"),
                 ReadingPeriod.of(TODAY.minusDays(10), TODAY.minusDays(1)));
-        given(groupBookEntryRepository.findAllWithBookByGroupIdIn(List.of(9L))).willReturn(List.of(finishedSameEdition));
+        given(groupBookEntryRepository.findAllByGroupIdForUpdate(9L)).willReturn(List.of(finishedSameEdition));
 
         assertThatThrownBy(() -> service.addGroupBook(9L, 1L, new AddGroupBookRequest(200L, null, null), null))
                 .isInstanceOf(GroupException.class)
@@ -225,7 +225,7 @@ class GroupBookServiceTest {
         Book newBook = book(200L, null);
         given(groupRepository.findByIdForUpdate(9L)).willReturn(Optional.of(group));
         given(bookRepository.findById(200L)).willReturn(Optional.of(newBook));
-        given(groupBookEntryRepository.findAllWithBookByGroupIdIn(List.of(9L)))
+        given(groupBookEntryRepository.findAllByGroupIdForUpdate(9L))
                 .willReturn(List.of(entry(10L, book(100L, null), ReadingPeriod.NONE)));
         AtomicReference<GroupBookEntry> savedEntry = new AtomicReference<>();
         given(groupBookEntryRepository.save(any(GroupBookEntry.class))).willAnswer(invocation -> {
@@ -253,7 +253,7 @@ class GroupBookServiceTest {
         runIdempotentActionDirectly();
         given(groupRepository.findByIdForUpdate(9L)).willReturn(Optional.of(group));
         given(bookRepository.findById(200L)).willReturn(Optional.of(book(200L, null)));
-        given(groupBookEntryRepository.findAllWithBookByGroupIdIn(List.of(9L))).willReturn(List.of());
+        given(groupBookEntryRepository.findAllByGroupIdForUpdate(9L)).willReturn(List.of());
 
         assertThatThrownBy(() -> service.addGroupBook(
                 9L, 1L, new AddGroupBookRequest(200L, TODAY.minusDays(1), TODAY.plusDays(3)), null))
