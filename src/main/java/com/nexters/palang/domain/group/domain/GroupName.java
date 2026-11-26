@@ -23,7 +23,9 @@ public final class GroupName {
         }
         String trimmed = rawName.strip();
         long length = graphemeLength(trimmed);
-        if (length < 1 || length > MAX_GRAPHEME_LENGTH || trimmed.length() > COLUMN_LENGTH) {
+        // 컬럼 길이는 MySQL VARCHAR와 같은 기준(코드 포인트 수)으로 본다. UTF-16 길이로 보면 이모지 이름을 잘못 거부한다.
+        long storedLength = trimmed.codePointCount(0, trimmed.length());
+        if (length < 1 || length > MAX_GRAPHEME_LENGTH || storedLength > COLUMN_LENGTH) {
             throw new GroupException(GroupErrorCode.INVALID_GROUP_NAME);
         }
         return trimmed;

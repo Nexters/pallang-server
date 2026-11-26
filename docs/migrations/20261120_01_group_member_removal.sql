@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS group_member_removals
     actor_user_id  BIGINT        NOT NULL,
     target_user_id BIGINT        NOT NULL,
     reason_code    VARCHAR(40)   NOT NULL,
-    other_text     VARCHAR(1000) NULL,
+    other_text     VARCHAR(2000) NULL,
     request_key    VARCHAR(100)  NULL,
     created_at     DATETIME(6)   NOT NULL,
     PRIMARY KEY (id),

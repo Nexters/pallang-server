@@ -83,6 +83,32 @@ class GroupMemberRemovalTest {
     }
 
     @Test
+    @DisplayName("기타 사유 길이는 내부 공백을 빼고 세고, 저장은 앞뒤 공백만 뺀 원문 그대로 한다")
+    void otherTextLengthExcludesInnerWhitespace() {
+        String text = "가" + " ".repeat(300) + "나"; // 공백 제외 2자
+        String fullWidthSpaced = "가　나"; // 전각 공백도 공백으로 본다
+
+        assertThat(GroupMemberRemoval.record(9L, 1L, 2L, GroupMemberRemovalReason.OTHER, text, null).getOtherText())
+                .isEqualTo(text);
+        assertThat(GroupMemberRemoval.record(9L, 1L, 2L, GroupMemberRemovalReason.OTHER, fullWidthSpaced, null)
+                .getOtherText()).isEqualTo(fullWidthSpaced);
+        assertThatThrownBy(() -> GroupMemberRemoval.record(
+                9L, 1L, 2L, GroupMemberRemovalReason.OTHER, "　 \t　", null))
+                .isInstanceOf(GroupException.class);
+    }
+
+    @Test
+    @DisplayName("코드 포인트가 많은 이모지 200자도 저장 길이 제한에 걸리지 않는다")
+    void allowsTwoHundredZwjEmojis() {
+        // 가족 이모지: 보이는 글자 1개, 코드 포인트 7개, UTF-16 11자
+        String family = "👨‍👩‍👧‍👦";
+        String twoHundred = family.repeat(200);
+
+        assertThat(GroupMemberRemoval.record(9L, 1L, 2L, GroupMemberRemovalReason.OTHER, twoHundred, null).getOtherText())
+                .isEqualTo(twoHundred);
+    }
+
+    @Test
     @DisplayName("사유가 없으면 예외가 발생한다")
     void rejectsMissingReason() {
         assertThatThrownBy(() -> GroupMemberRemoval.record(9L, 1L, 2L, null, null, null))

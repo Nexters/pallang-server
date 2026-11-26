@@ -13,6 +13,7 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
+import java.util.regex.Pattern;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -36,8 +37,11 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 public class GroupMemberRemoval {
 
     public static final int OTHER_TEXT_MAX_GRAPHEME_LENGTH = 200;
-    // 200 grapheme이라도 이모지 등은 코드 포인트가 훨씬 많을 수 있어 컬럼은 여유 있게 둔다.
-    public static final int OTHER_TEXT_COLUMN_LENGTH = 1000;
+    // MySQL VARCHAR 길이는 문자(코드 포인트) 수다. 200 grapheme이라도 ZWJ 이모지(가족 이모지 1개 = 7 코드 포인트) 등은
+    // 코드 포인트가 훨씬 많을 수 있고, 길이 계산에서 빠지는 내부 공백도 저장은 되므로 컬럼은 여유 있게 둔다.
+    public static final int OTHER_TEXT_COLUMN_LENGTH = 2000;
+
+    private static final Pattern WHITESPACE = Pattern.compile("\\p{javaWhitespace}");
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -100,8 +104,11 @@ public class GroupMemberRemoval {
             }
             return null;
         }
-        long length = GroupName.graphemeLength(stripped);
-        if (length < 1 || length > OTHER_TEXT_MAX_GRAPHEME_LENGTH || stripped.length() > OTHER_TEXT_COLUMN_LENGTH) {
+        // 길이는 "공백을 제외한" 보이는 글자(grapheme) 수로 센다. 저장은 앞뒤 공백만 뺀 원문 그대로 한다.
+        // 공백 정의는 strip()과 같은 \p{javaWhitespace}를 쓴다(\s는 전각 공백 U+3000을 빼먹는다).
+        long length = GroupName.graphemeLength(WHITESPACE.matcher(stripped).replaceAll(""));
+        long storedLength = stripped.codePointCount(0, stripped.length());
+        if (length < 1 || length > OTHER_TEXT_MAX_GRAPHEME_LENGTH || storedLength > OTHER_TEXT_COLUMN_LENGTH) {
             throw new GroupException(GroupErrorCode.INVALID_REMOVAL_REASON);
         }
         return stripped;
