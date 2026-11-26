@@ -115,6 +115,82 @@ class GroupBookEntryTest {
         assertThat(entry.getStartDate()).isEqualTo(TODAY);
     }
 
+    private Book book(Long id, String title, String isbn) {
+        Book built = Book.builder().title(title).author("한강").publisher("창비").pageCount(268).isbn(isbn)
+                .source(BookSource.API).build();
+        ReflectionTestUtils.setField(built, "id", id);
+        return built;
+    }
+
+    @Test
+    @DisplayName("같은 도서 행이면 같은 판본이다")
+    void sameBookRowIsSameEdition() {
+        GroupBookEntry entry = GroupBookEntry.create(group(), book(1L, "채식주의자", null), ReadingPeriod.NONE, TODAY);
+
+        assertThat(entry.isSameEditionAs(book(1L, "채식주의자", null))).isTrue();
+    }
+
+    @Test
+    @DisplayName("다른 도서 행이어도 ISBN이 같으면(하이픈 무시) 같은 판본이다")
+    void sameIsbnIsSameEdition() {
+        GroupBookEntry entry = GroupBookEntry.create(
+                group(), book(1L, "채식주의자", "978-89-364-3412-7"), ReadingPeriod.NONE, TODAY);
+
+        assertThat(entry.isSameEditionAs(book(2L, "채식주의자 (리커버)", "9788936434127"))).isTrue();
+    }
+
+    @Test
+    @DisplayName("제목이 같아도 ISBN이 다르거나 없으면 다른 판본이다")
+    void sameTitleDifferentEditionIsNotSameEdition() {
+        GroupBookEntry entry = GroupBookEntry.create(
+                group(), book(1L, "채식주의자", "9788936434127"), ReadingPeriod.NONE, TODAY);
+
+        assertThat(entry.isSameEditionAs(book(2L, "채식주의자", "9788936434594"))).isFalse();
+        assertThat(entry.isSameEditionAs(book(3L, "채식주의자", null))).isFalse();
+    }
+
+    @Test
+    @DisplayName("ISBN이 없는 책끼리는 도서 행이 다르면 다른 판본이다")
+    void booksWithoutIsbnAreDifferentUnlessSameRow() {
+        GroupBookEntry entry = GroupBookEntry.create(group(), book(1L, "직접 등록한 책", " "), ReadingPeriod.NONE, TODAY);
+
+        assertThat(entry.isSameEditionAs(book(2L, "직접 등록한 책", " "))).isFalse();
+    }
+
+    @Test
+    @DisplayName("설정 변경에서 상태를 보내지 않으면 기간만 바뀌고 상태 모드는 그대로다")
+    void changeSettingsWithoutStatusKeepsMode() {
+        GroupBookEntry entry = entry(ReadingPeriod.of(TODAY, TODAY.plusDays(3)));
+
+        entry.changeSettings(ReadingPeriod.NONE, null, TODAY);
+
+        assertThat(entry.getPeriod().isEmpty()).isTrue();
+        assertThat(entry.getStatusMode()).isEqualTo(ReadingStatusMode.AUTO);
+    }
+
+    @Test
+    @DisplayName("설정 변경에서 상태를 보내면 수동 모드로 바뀐다")
+    void changeSettingsWithStatusSwitchesToManual() {
+        GroupBookEntry entry = entry(ReadingPeriod.of(TODAY, TODAY.plusDays(3)));
+
+        entry.changeSettings(ReadingPeriod.of(TODAY, TODAY.plusDays(3)), ReadingStatus.FINISHED, TODAY);
+
+        assertThat(entry.getStatusMode()).isEqualTo(ReadingStatusMode.MANUAL);
+        assertThat(entry.currentStatus(TODAY)).isEqualTo(ReadingStatus.FINISHED);
+    }
+
+    @Test
+    @DisplayName("설정 변경의 날짜가 잘못되면 상태도 바뀌지 않는다")
+    void changeSettingsChangesNothingWhenDateInvalid() {
+        GroupBookEntry entry = entry(ReadingPeriod.of(TODAY, TODAY.plusDays(3)));
+
+        assertThatThrownBy(() -> entry.changeSettings(
+                ReadingPeriod.of(TODAY.minusDays(2), TODAY.plusDays(3)), ReadingStatus.FINISHED, TODAY))
+                .isInstanceOf(GroupException.class);
+
+        assertThat(entry.getStatusMode()).isEqualTo(ReadingStatusMode.AUTO);
+    }
+
     @Test
     @DisplayName("관리자 정정은 과거 날짜로도 기간을 덮어쓴다")
     void correctPeriodAllowsPastDates() {

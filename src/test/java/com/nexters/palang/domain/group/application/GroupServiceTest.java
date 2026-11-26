@@ -312,7 +312,7 @@ class GroupServiceTest {
         given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group(1L, host)));
 
         assertThatThrownBy(() -> groupService.updateGroup(
-                1L, other.getId(), new UpdateGroupRequest("주말 독서 모임", 6, null, null)))
+                1L, other.getId(), new UpdateGroupRequest("주말 독서 모임", 6, null, null, null)))
                 .isInstanceOf(GroupException.class)
                 .extracting("errorCode").isEqualTo(GroupErrorCode.NOT_HOST);
     }
@@ -325,7 +325,7 @@ class GroupServiceTest {
         given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(merged));
 
         assertThatThrownBy(() -> groupService.updateGroup(
-                1L, host.getId(), new UpdateGroupRequest("주말 독서 모임", 6, null, null)))
+                1L, host.getId(), new UpdateGroupRequest("주말 독서 모임", 6, null, null, null)))
                 .isInstanceOf(GroupException.class)
                 .extracting("errorCode").isEqualTo(GroupErrorCode.GROUP_NOT_FOUND);
     }
@@ -339,7 +339,7 @@ class GroupServiceTest {
         given(groupBookEntries.getPrimaryEntry(1L)).willReturn(entry(group, ReadingPeriod.NONE));
 
         assertThatThrownBy(() -> groupService.updateGroup(
-                1L, host.getId(), new UpdateGroupRequest("고전 뽀개기", 2, null, null)))
+                1L, host.getId(), new UpdateGroupRequest("고전 뽀개기", 2, null, null, null)))
                 .isInstanceOf(GroupException.class)
                 .extracting("errorCode").isEqualTo(GroupErrorCode.CAPACITY_BELOW_MEMBER_COUNT);
     }
@@ -354,7 +354,7 @@ class GroupServiceTest {
         given(groupBookEntries.getPrimaryEntry(1L)).willReturn(primaryEntry);
 
         GroupDetail detail = groupService.updateGroup(
-                1L, host.getId(), new UpdateGroupRequest("주말 독서 모임", 6, TODAY.plusDays(1), TODAY.plusDays(20)));
+                1L, host.getId(), new UpdateGroupRequest("주말 독서 모임", 6, TODAY.plusDays(1), TODAY.plusDays(20), null));
 
         assertThat(detail.group().getName()).isEqualTo("주말 독서 모임");
         assertThat(detail.group().getCapacity()).isEqualTo(6);
@@ -371,7 +371,7 @@ class GroupServiceTest {
         given(groupMemberRepository.countActiveMembers(1L)).willReturn(1L);
         given(groupBookEntries.getPrimaryEntry(1L)).willReturn(primaryEntry);
 
-        groupService.updateGroup(1L, host.getId(), new UpdateGroupRequest("주말 독서 모임", 6, null, null));
+        groupService.updateGroup(1L, host.getId(), new UpdateGroupRequest("주말 독서 모임", 6, null, null, null));
 
         assertThat(primaryEntry.getPeriod()).isEqualTo(ReadingPeriod.of(TODAY, TODAY.plusDays(10)));
         verify(eventPublisher, never()).publishEvent(any());
@@ -387,7 +387,7 @@ class GroupServiceTest {
         given(groupBookEntries.getPrimaryEntry(1L)).willReturn(entry(group, pastPeriod));
 
         groupService.updateGroup(1L, host.getId(),
-                new UpdateGroupRequest("주말 독서 모임", 6, pastPeriod.startDate(), pastPeriod.endDate()));
+                new UpdateGroupRequest("주말 독서 모임", 6, pastPeriod.startDate(), pastPeriod.endDate(), null));
 
         assertThat(group.getName()).isEqualTo("주말 독서 모임");
         verify(eventPublisher, never()).publishEvent(any());
@@ -402,12 +402,40 @@ class GroupServiceTest {
         given(groupBookEntries.getPrimaryEntry(1L)).willReturn(entry(group, ReadingPeriod.of(TODAY, TODAY.plusDays(10))));
 
         assertThatThrownBy(() -> groupService.updateGroup(1L, host.getId(),
-                new UpdateGroupRequest("주말 독서 모임", 6, TODAY.minusDays(3), TODAY.plusDays(10))))
+                new UpdateGroupRequest("주말 독서 모임", 6, TODAY.minusDays(3), TODAY.plusDays(10), null)))
                 .isInstanceOf(GroupException.class)
                 .extracting("errorCode").isEqualTo(GroupErrorCode.PAST_GROUP_DATE);
 
         assertThat(group.getName()).isEqualTo("고전 뽀개기");
         assertThat(group.getCapacity()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("설정 화면을 연 뒤 다른 곳에서 설정이 바뀌었으면(version 불일치) 저장하지 않고 예외가 발생한다")
+    void updateGroupFailsWhenVersionMismatch() {
+        Group group = group(1L, host);
+        ReflectionTestUtils.setField(group, "version", 3L);
+        given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group));
+
+        assertThatThrownBy(() -> groupService.updateGroup(
+                1L, host.getId(), new UpdateGroupRequest("주말 독서 모임", 6, null, null, 2L)))
+                .isInstanceOf(GroupException.class)
+                .extracting("errorCode").isEqualTo(GroupErrorCode.GROUP_SETTINGS_CONFLICT);
+        assertThat(group.getName()).isEqualTo("고전 뽀개기");
+    }
+
+    @Test
+    @DisplayName("받은 version이 현재와 같으면 설정을 저장한다")
+    void updateGroupSucceedsWhenVersionMatches() {
+        Group group = group(1L, host);
+        ReflectionTestUtils.setField(group, "version", 3L);
+        given(groupRepository.findByIdForUpdate(1L)).willReturn(Optional.of(group));
+        given(groupMemberRepository.countActiveMembers(1L)).willReturn(1L);
+        given(groupBookEntries.getPrimaryEntry(1L)).willReturn(entry(group, ReadingPeriod.NONE));
+
+        groupService.updateGroup(1L, host.getId(), new UpdateGroupRequest("주말 독서 모임", 6, null, null, 3L));
+
+        assertThat(group.getName()).isEqualTo("주말 독서 모임");
     }
 
     @Test
@@ -418,7 +446,7 @@ class GroupServiceTest {
         given(groupMemberRepository.countActiveMembers(1L)).willReturn(1L);
         given(groupBookEntries.getPrimaryEntry(1L)).willReturn(entry(group, ReadingPeriod.NONE));
 
-        groupService.updateGroup(1L, host.getId(), new UpdateGroupRequest("주말 독서 모임", 6, null, null));
+        groupService.updateGroup(1L, host.getId(), new UpdateGroupRequest("주말 독서 모임", 6, null, null, null));
 
         verify(groupRepository).findByIdForUpdate(1L);
         verify(groupRepository, never()).findById(any());

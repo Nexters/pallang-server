@@ -21,6 +21,9 @@ public record GroupDetailResponse(
                 requiredMode = Schema.RequiredMode.REQUIRED) boolean ended,
         @Schema(example = "true", description = "현재 로그인한 유저가 이 모임의 모임장인지 여부. "
                 + "방 설정 변경 등 모임장 전용 화면 노출 여부를 프론트에서 판단하는 데 사용합니다.",
-                requiredMode = Schema.RequiredMode.REQUIRED) boolean isHost
+                requiredMode = Schema.RequiredMode.REQUIRED) boolean isHost,
+        @Schema(example = "3", description = "모임 설정 버전. 방 설정 변경 시 받은 값을 그대로 version으로 보내면, 그사이 "
+                + "다른 곳에서 설정이 바뀐 경우 저장하지 않고 409(GROUP_409_5)를 돌려준다.",
+                requiredMode = Schema.RequiredMode.REQUIRED) long version
 ) {
 }

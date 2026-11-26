@@ -16,6 +16,7 @@ import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.book.domain.BookSource;
 import com.nexters.palang.domain.group.application.GroupDetail;
 import com.nexters.palang.domain.group.application.GroupInvitationPreview;
+import com.nexters.palang.domain.group.application.GroupMemberPreview;
 import com.nexters.palang.domain.group.application.GroupService;
 import com.nexters.palang.domain.group.application.GroupSummaryProjection;
 import com.nexters.palang.domain.group.common.error.GroupErrorCode;
@@ -24,7 +25,9 @@ import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.domain.group.domain.GroupBookEntry;
 import com.nexters.palang.domain.group.domain.GroupMember;
 import com.nexters.palang.domain.group.domain.GroupMemberRole;
+import com.nexters.palang.domain.group.domain.GroupReadingSummary;
 import com.nexters.palang.domain.group.domain.ReadingPeriod;
+import com.nexters.palang.domain.group.domain.ReadingScheduleStatus;
 import com.nexters.palang.domain.group.presentation.dto.CreateGroupRequest;
 import com.nexters.palang.domain.group.presentation.dto.UpdateGroupRequest;
 import com.nexters.palang.domain.user.domain.User;
@@ -95,7 +98,7 @@ class GroupControllerTest {
     }
 
     private UpdateGroupRequest updateRequest() {
-        return new UpdateGroupRequest("주말 독서 모임", 6, null, null);
+        return new UpdateGroupRequest("주말 독서 모임", 6, null, null, null);
     }
 
     @Test
@@ -201,12 +204,8 @@ class GroupControllerTest {
     @DisplayName("모임 목록 조회 응답에는 모임별 isHost 여부가 포함된다")
     void getMyGroups_includesIsHostPerGroup() throws Exception {
         given(currentUserProvider.getCurrentUserId()).willReturn(1L);
-        GroupSummaryProjection hostedGroup = new GroupSummaryProjection(
-                1L, "고전 뽀개기", 1L, "채식주의자", null, 1L, 4,
-                LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20), false, true);
-        GroupSummaryProjection joinedGroup = new GroupSummaryProjection(
-                2L, "주말 독서 모임", 2L, "소년이 온다", null, 2L, 4,
-                LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20), false, false);
+        GroupSummaryProjection hostedGroup = summary(1L, true, 1L, List.of(preview(1L)));
+        GroupSummaryProjection joinedGroup = summary(2L, false, 2L, List.of(preview(2L), preview(1L)));
         given(groupService.getMyGroups(eq(1L), any()))
                 .willReturn(new PageImpl<>(List.of(hostedGroup, joinedGroup), DEFAULT_PAGEABLE, 2));
 
@@ -214,6 +213,62 @@ class GroupControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.groups[0].isHost").value(true))
                 .andExpect(jsonPath("$.data.groups[1].isHost").value(false));
+    }
+
+    @Test
+    @DisplayName("모임 카드에는 읽는 책 수, 가장 늦은 종료일, 날짜 표시 방식, 아바타와 +N 인원이 포함된다")
+    void getMyGroupsIncludesReadingSummaryAndMemberPreviews() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        List<GroupMemberPreview> fivePreviews = List.of(preview(1L), preview(2L), preview(3L), preview(4L), preview(5L));
+        GroupSummaryProjection card = summary(1L, true, 7L, fivePreviews);
+        given(groupService.getMyGroups(eq(1L), any())).willReturn(new PageImpl<>(List.of(card), DEFAULT_PAGEABLE, 1));
+
+        mockMvc.perform(get("/api/groups"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.groups[0].readingBookCount").value(3))
+                .andExpect(jsonPath("$.data.groups[0].latestReadingEndDate").value("2026-10-22"))
+                .andExpect(jsonPath("$.data.groups[0].readingScheduleStatus").value("HAS_END_DATE"))
+                .andExpect(jsonPath("$.data.groups[0].memberPreviews.length()").value(5))
+                .andExpect(jsonPath("$.data.groups[0].memberPreviews[0].nickname").value("닉네임1"))
+                .andExpect(jsonPath("$.data.groups[0].extraMemberCount").value(2));
+    }
+
+    private GroupSummaryProjection summary(Long groupId, boolean isHost, long memberCount, List<GroupMemberPreview> previews) {
+        return new GroupSummaryProjection(
+                groupId, "고전 뽀개기", 1L, "채식주의자", null, memberCount, 10,
+                LocalDate.of(2026, 8, 20), LocalDate.of(2026, 9, 20), false, isHost,
+                new GroupReadingSummary(3L, LocalDate.of(2026, 10, 22), ReadingScheduleStatus.HAS_END_DATE), previews);
+    }
+
+    private GroupMemberPreview preview(Long userId) {
+        return new GroupMemberPreview(userId, "닉네임" + userId, null);
+    }
+
+    @Test
+    @DisplayName("모임 상세에는 설정 충돌 검사에 쓸 version이 포함된다")
+    void getGroupDetailIncludesVersion() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        Group group = group(1L, user(1L));
+        ReflectionTestUtils.setField(group, "version", 3L);
+        given(groupService.getGroupDetail(1L, 1L)).willReturn(detail(group, 2L));
+
+        mockMvc.perform(get("/api/groups/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(3));
+    }
+
+    @Test
+    @DisplayName("다른 곳에서 설정이 먼저 바뀌었으면 방 설정 변경 시 409 에러가 발생한다")
+    void updateGroupFailsWhenSettingsConflict() throws Exception {
+        given(currentUserProvider.getCurrentUserId()).willReturn(1L);
+        given(groupService.updateGroup(eq(1L), eq(1L), any(UpdateGroupRequest.class)))
+                .willThrow(new GroupException(GroupErrorCode.GROUP_SETTINGS_CONFLICT));
+
+        mockMvc.perform(patch("/api/groups/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"주말 독서 모임\",\"capacity\":6,\"version\":2}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.title").value("GROUP_409_5"));
     }
 
     @Test

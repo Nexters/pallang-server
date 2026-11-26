@@ -4,15 +4,19 @@ import com.nexters.palang.domain.book.domain.Book;
 import com.nexters.palang.domain.group.domain.Group;
 import com.nexters.palang.domain.group.domain.GroupBookEntry;
 import com.nexters.palang.domain.group.domain.GroupMember;
+import com.nexters.palang.domain.group.domain.GroupReadingSummary;
 import com.nexters.palang.domain.group.presentation.dto.GroupDetailResponse;
 import com.nexters.palang.domain.group.presentation.dto.GroupInvitationPreviewResponse;
 import com.nexters.palang.domain.group.presentation.dto.GroupInviteLinkResponse;
 import com.nexters.palang.domain.group.presentation.dto.GroupListResponse;
 import com.nexters.palang.domain.group.presentation.dto.GroupMemberListResponse;
+import com.nexters.palang.domain.group.presentation.dto.GroupMemberPreviewResponse;
 import com.nexters.palang.domain.group.presentation.dto.GroupMemberResponse;
 import com.nexters.palang.domain.group.presentation.dto.GroupSummaryResponse;
 import com.nexters.palang.domain.user.domain.User;
 import com.nexters.palang.global.common.response.PageInfo;
+import java.util.List;
+import java.util.Objects;
 import org.springframework.data.domain.Page;
 
 public final class GroupMapper {
@@ -28,14 +32,23 @@ public final class GroupMapper {
         return new GroupDetailResponse(
                 group.getId(), group.getName(), book.getId(), book.getTitle(), book.getAuthor(), book.getCoverImageUrl(),
                 host.getId(), host.getNickname(), group.getCapacity(), detail.memberCount(),
-                primaryEntry.getStartDate(), primaryEntry.getEndDate(), detail.ended(), host.getId().equals(currentUserId));
+                primaryEntry.getStartDate(), primaryEntry.getEndDate(), detail.ended(), host.getId().equals(currentUserId),
+                Objects.requireNonNullElse(group.getVersion(), 0L));
     }
 
     public static GroupSummaryResponse toSummaryResponse(GroupSummaryProjection projection) {
+        GroupReadingSummary readingSummary = projection.readingSummary();
+        List<GroupMemberPreviewResponse> memberPreviews = projection.memberPreviews().stream()
+                .map(preview -> new GroupMemberPreviewResponse(
+                        preview.userId(), preview.nickname(), preview.profileImageUrl()))
+                .toList();
+        long extraMemberCount = Math.max(projection.memberCount() - memberPreviews.size(), 0L);
         return new GroupSummaryResponse(
                 projection.groupId(), projection.name(), projection.bookId(), projection.bookTitle(),
                 projection.bookCoverImageUrl(), projection.memberCount(), projection.capacity(),
-                projection.startDate(), projection.endDate(), projection.ended(), projection.isHost());
+                projection.startDate(), projection.endDate(), projection.ended(), projection.isHost(),
+                readingSummary.readingBookCount(), readingSummary.latestReadingEndDate(),
+                readingSummary.scheduleStatus(), memberPreviews, extraMemberCount);
     }
 
     public static GroupListResponse toListResponse(Page<GroupSummaryProjection> page) {
